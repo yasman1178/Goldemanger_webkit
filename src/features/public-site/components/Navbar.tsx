@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Menu, X, Gem, Phone } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Menu, X, Gem, Phone, LogIn } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { SITE_PHONE_DISPLAY, TEL_LINK } from '@/shared/lib/seo'
 
@@ -57,6 +58,13 @@ export function Navbar() {
             <Phone className="size-4 text-primary" />
             {SITE_PHONE_DISPLAY}
           </a>
+          <Link
+            to="/login"
+            className="inline-flex touch-target items-center gap-2 rounded-full border border-primary/40 px-5 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
+          >
+            <LogIn className="size-4" />
+            دخول
+          </Link>
           <a
             href="#contact"
             onClick={(e) => {
@@ -95,6 +103,14 @@ export function Navbar() {
               </button>
             </li>
           ))}
+          <li className="py-3">
+            <Link
+              to="/login"
+              className="block touch-target rounded-full border border-primary/40 px-5 py-2 text-center font-bold text-primary"
+            >
+              دخول
+            </Link>
+          </li>
           <li className="py-3">
             <a
               href="#contact"
