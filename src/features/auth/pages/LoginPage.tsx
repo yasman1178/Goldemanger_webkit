@@ -60,23 +60,6 @@ export function LoginPage() {
     mutation.mutate({ phoneNumber: form.phone, password: form.password })
   }
 
-  function handleDemoLogin() {
-    const user: User = {
-      id: 'demo',
-      userName: 'مدير تجريبي',
-      email: 'demo@goldmaster.local',
-      roles: ['Manager'],
-    }
-    setAuth(
-      user,
-      'demo-token',
-      'demo-refresh',
-      { totalCash: 0, totalDebts: 0, totalExpenses: 0, totalSales: 0, branchName: 'فرع تجريبي' },
-      1,
-    )
-    navigate('/app')
-  }
-
   return (
     <div className="flex min-h-screen bg-background">
       <div className="hidden w-1/2 flex-col justify-center bg-[#0a0a0a] p-12 text-white lg:flex">
@@ -168,22 +151,6 @@ export function LoginPage() {
             >
               {mutation.isPending && <Loader2 className="animate-spin" />}
               تسجيل الدخول
-            </Button>
-
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-[13px] text-muted-foreground">أو</span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-
-            <Button
-              type="button"
-              size="lg"
-              variant="outline"
-              onClick={handleDemoLogin}
-              className="h-12 w-full rounded-full border-primary text-primary touch-target hover:bg-primary/5"
-            >
-              دخول تجريبي
             </Button>
           </form>
         </div>
