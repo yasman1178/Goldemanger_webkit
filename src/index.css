@@ -1,0 +1,206 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans:
+    'Cairo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-latin:
+    system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif;
+
+  /* DESIGN.md colors — Apple style, single Action Blue */
+  --color-background: #ffffff;      /* canvas */
+  --color-foreground: #1d1d1f;      /* ink */
+
+  --color-card: #ffffff;            /* canvas */
+  --color-card-foreground: #1d1d1f; /* ink */
+
+  --color-primary: #2563eb;         /* brand-primary (single action color) */
+  --color-primary-foreground: #ffffff; /* on-primary */
+
+  --color-secondary: #f5f5f7;       /* canvas-parchment */
+  --color-secondary-foreground: #1d1d1f;
+
+  --color-muted: #f5f5f7;           /* canvas-parchment */
+  --color-muted-foreground: #7a7a7a; /* ink-muted-48 */
+
+  --color-accent: #2563eb;          /* brand-primary */
+  --color-accent-foreground: #ffffff;
+
+  --color-destructive: #ff3b30;     /* error (Apple) */
+  --color-destructive-foreground: #ffffff;
+
+  --color-success: #34c759;         /* success (Apple green) */
+  --color-warning: #ff9500;         /* warning (Apple orange) */
+  --color-error: #ff3b30;           /* error (Apple red) */
+
+  --color-tint: #fafafc;            /* surface-pearl */
+
+  --color-border: #e0e0e0;          /* hairline */
+  --color-input: #e0e0e0;           /* hairline */
+  --color-ring: #2563eb;            /* brand-primary */
+
+  /* DESIGN.md rounded */
+  --radius: 10px;                   /* rounded.sm */
+  --radius-sm: 10px;                /* rounded.sm */
+  --radius-md: 14px;                /* rounded.md */
+  --radius-lg: 18px;                /* rounded.lg */
+  --radius-xl: 24px;                /* rounded.xl */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    text-rendering: optimizeLegibility;
+    line-height: 1.6;
+  }
+}
+
+html {
+  direction: rtl;
+}
+
+/* Arabic line-height: body >= 1.6 across headings */
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+/* Metric numbers: fixed-width for dashboards */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tablet-first: base targets ~10" (800–1280px), scrollable block breaks */
+@media (min-width: 1280px) {
+  .break-all-1col {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Large touch targets for tablet (DESIGN.md §8.2: min 44px) */
+.touch-target {
+  min-height: 44px;
+}
+
+.search-field {
+  min-height: 44px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.search-field:focus-visible {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.no-number-spin::-webkit-inner-spin-button,
+.no-number-spin::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.no-number-spin {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+/* DESIGN.md elevation (Apple) */
+.elevation-card {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.elevation-floating {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.12),
+    0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* غلاف الطباعة على قياس ورق ليبيل 35x10mm */
+.receipt-label {
+  width: 35mm;
+  max-width: 35mm;
+  height: 10mm;
+  background: #fff;
+  color: #000;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+/* غلاف الطباعة على قياس ورق كاشير 80mm */
+.receipt-paper {
+  width: 80mm;
+  max-width: 80mm;
+  background: #fff;
+  color: #000;
+  font-size: 10.5px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+.receipt-paper table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.receipt-paper th,
+.receipt-paper td {
+  padding: 1.5px 2px;
+  text-align: right;
+  vertical-align: top;
+}
+.receipt-paper .receipt-total-row {
+  border-top: 1px dashed #000;
+}
+
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 2mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .receipt-print,
+  .receipt-print * {
+    visibility: visible !important;
+  }
+  .receipt-print {
+    position: fixed !important;
+    inset: 0 auto auto 0 !important;
+    margin: 0 !important;
+    z-index: 9999 !important;
+    box-shadow: none !important;
+  }
+  .receipt-no-print,
+  .receipt-no-print * {
+    display: none !important;
+  }
+}
+
+/* طباعة ليبيل القطعة 35x10mm */
+@media print {
+  .receipt-label-print,
+  .receipt-label-print * {
+    visibility: visible !important;
+  }
+  .receipt-label-print {
+    position: fixed !important;
+    inset: 0 auto auto 0 !important;
+    margin: 0 !important;
+    z-index: 9999 !important;
+  }
+}

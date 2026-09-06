@@ -1,0 +1,649 @@
+import { useCallback, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Boxes, Layers, MapPin, Package, Printer, Search, Scale, X } from 'lucide-react'
+
+import { getInventoryUnits } from '@/features/inventory/api'
+import type {
+  InventoryUnitRecord,
+  InventoryUnitStatus,
+} from '@/features/inventory/types'
+import { inventoryUnitStatusLabels } from '@/features/inventory/types'
+import { InventoryUnitActions } from '@/features/inventory/components/InventoryUnitActions'
+import { InventoryUnitLabelPrint } from '@/features/inventory/components/InventoryUnitLabelPrint'
+import { InventoryReceiptPrint } from '@/features/inventory/components/InventoryReceiptPrint'
+import { getProducts } from '@/features/products/api'
+import type { Product } from '@/features/products/types'
+import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { typeLabels } from '@/features/products/types'
+import { formatNumber } from '@/shared/lib/utils'
+import { Badge } from '@/shared/components/ui/badge'
+import { Button } from '@/shared/components/ui/button'
+import { Card, CardContent } from '@/shared/components/ui/card'
+import { Input } from '@/shared/components/ui/input'
+import { Skeleton } from '@/shared/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/shared/components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog'
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  unit,
+}: {
+  icon: typeof Boxes
+  label: string
+  value: string
+  unit?: string
+}) {
+  return (
+    <Card className="elevation-card">
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-amber-300 to-amber-500 shadow-sm">
+          <Icon className="size-6 text-white" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[13px] text-muted-foreground">{label}</p>
+          <p className="truncate text-[22px] font-bold leading-[1.2] tabular-nums text-foreground">
+            {value}
+            {unit && (
+              <span className="text-[13px] font-semibold text-muted-foreground">
+                {' '}
+                {unit}
+              </span>
+            )}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProductDetail({
+  product,
+  onClose,
+}: {
+  product: Product | null
+  onClose: () => void
+}) {
+  return (
+    <Dialog open={Boolean(product)} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{product?.productName ?? 'تفاصيل المنتج'}</DialogTitle>
+          <DialogDescription>تفاصيل رصيد المنتج في الجرد.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2.5 text-[15px]">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">العدد</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatNumber(product?.quantity ?? 0)} قطعة
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">الوزن للقطعة</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatNumber(product?.weight ?? 0)} gm
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">الوزن الكلي</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatNumber((product?.quantity ?? 0) * (product?.weight ?? 0))} gm
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">العيار</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {product?.karat ? `${product.karat}k` : '—'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">النوع</span>
+            <span className="font-semibold text-foreground">
+              {product
+                ? (typeLabels[product.typegolde as keyof typeof typeLabels] ?? '—')
+                : '—'}
+            </span>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function InventoryPage() {
+  const activeBranchId = useActiveBranchId()
+  const [query, setQuery] = useState('')
+  const [storageFilter, setStorageFilter] = useState('all')
+  const [unitStorageFilter, setUnitStorageFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<InventoryUnitStatus | 'all'>('AVAILABLE')
+  const [selected, setSelected] = useState<Product | null>(null)
+  const [printUnit, setPrintUnit] = useState<InventoryUnitRecord | null>(null)
+  const [printInventory, setPrintInventory] = useState(false)
+
+  const { data: products = [], isLoading, isError } = useQuery({
+    queryKey: ['products', activeBranchId],
+    queryFn: () => getProducts(activeBranchId ?? undefined),
+  })
+
+  const { data: units, isLoading: unitsLoading } = useQuery({
+    queryKey: ['inventory-units', activeBranchId],
+    queryFn: () => getInventoryUnits(activeBranchId ?? undefined),
+  })
+
+  const availableProducts = useMemo(() => {
+    return products.filter(
+      (p) =>
+        (p.quantity ?? 0) > 0 &&
+        p.isActive &&
+        (storageFilter === 'all' || String(p.storageId) === storageFilter),
+    )
+  }, [products, storageFilter])
+
+  const filteredProducts = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return availableProducts
+      .filter((p) => {
+        if (!q) return true
+        return p.productName.toLowerCase().includes(q)
+      })
+      .sort((a, b) => b.productId - a.productId)
+  }, [availableProducts, query])
+
+  const storages = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const p of products) {
+      if (p.storageId != null) {
+        map.set(p.storageId, `مخزن #${p.storageId}`)
+      }
+    }
+    for (const u of units ?? []) {
+      if (u.storage) map.set(u.storage.storageId, u.storage.location)
+    }
+    return Array.from(map, ([id, location]) => ({ id, location }))
+  }, [products, units])
+
+  const totals = useMemo(() => {
+    const productIds = new Set(availableProducts.map((p) => p.productId))
+    return {
+      items: productIds.size,
+      pieces: availableProducts.reduce((sum, p) => sum + (p.quantity ?? 0), 0),
+      weight: availableProducts.reduce((sum, p) => sum + (p.quantity ?? 0) * (p.weight ?? 0), 0),
+      storages: new Set(
+        availableProducts.map((p) => p.storageId).filter((v) => v != null),
+      ).size,
+    }
+  }, [availableProducts])
+
+  const karatTotals = useMemo(() => {
+    const map = new Map<number, { pieces: number; weight: number }>()
+    for (const p of availableProducts) {
+      const current = map.get(p.karat) ?? { pieces: 0, weight: 0 }
+      map.set(p.karat, {
+        pieces: current.pieces + (p.quantity ?? 0),
+        weight: current.weight + (p.quantity ?? 0) * (p.weight ?? 0),
+      })
+    }
+    return Array.from(map, ([karat, values]) => ({ karat, ...values })).sort(
+      (first, second) => second.karat - first.karat,
+    )
+  }, [availableProducts])
+
+  const selectedStorageName =
+    storageFilter === 'all'
+      ? 'كل المخازن'
+      : storages.find((storage) => String(storage.id) === storageFilter)?.location ?? 'المخزن'
+
+  const storageNameOf = useCallback(
+    (storageId: number | null) => {
+      if (storageId == null) return 'بدون مخزن'
+      return storages.find((s) => s.id === storageId)?.location ?? `مخزن #${storageId}`
+    },
+    [storages],
+  )
+
+  const kaserShop = useMemo(() => {
+    const build = (isKaser: boolean) => {
+      const map = new Map<number, { pieces: number; weight: number }>()
+      for (const p of availableProducts) {
+        if ((p.typegolde === 3) !== isKaser) continue
+        const current = map.get(p.karat) ?? { pieces: 0, weight: 0 }
+        map.set(p.karat, {
+          pieces: current.pieces + (p.quantity ?? 0),
+          weight: current.weight + (p.quantity ?? 0) * (p.weight ?? 0),
+        })
+      }
+      const rows = Array.from(map, ([karat, values]) => ({ karat, ...values })).sort(
+        (first, second) => second.karat - first.karat,
+      )
+      return {
+        rows,
+        totalWeight: rows.reduce((sum, r) => sum + r.weight, 0),
+      }
+    }
+    return { kaser: build(true), shop: build(false) }
+  }, [availableProducts])
+
+  const filteredUnits = useMemo(() => {
+    if (!units) return []
+    const q = query.trim().toLowerCase()
+    return units.filter((u) => {
+      if (unitStorageFilter !== 'all' && String(u.storageId) !== unitStorageFilter)
+        return false
+      if (statusFilter !== 'all' && u.status !== statusFilter) return false
+      if (!q) return true
+      const number = u.inventoryNumber.toLowerCase()
+      const name = u.products?.productName?.toLowerCase() ?? ''
+      return number.includes(q) || name.includes(q)
+    })
+  }, [units, query, unitStorageFilter, statusFilter])
+
+  return (
+    <div className="space-y-6 pb-20">
+      <div>
+        <h1 className="text-[34px] font-bold leading-[1.2] text-foreground">
+          الجرد
+        </h1>
+        <p className="text-muted-foreground">
+          أرصدة القطع في مواقع التخزين — مشتقة من المخزون الفعلي
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="flex items-center gap-3 p-4">
+                <Skeleton className="size-11 rounded-2xl" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-6 w-16" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard
+            icon={Layers}
+            label="الأصناف المتاحة"
+            value={formatNumber(totals.items)}
+          />
+          <StatCard
+            icon={Boxes}
+            label="القطع المتاحة فعلياً"
+            value={formatNumber(totals.pieces)}
+          />
+          <StatCard
+            icon={Scale}
+            label="الوزن المتاح فعلياً"
+            value={formatNumber(totals.weight)}
+            unit="gm"
+          />
+          <StatCard
+            icon={MapPin}
+            label="المخازن ذات الرصيد"
+            value={formatNumber(totals.storages)}
+          />
+        </div>
+      )}
+
+      <Card className="elevation-card">
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-bold text-foreground">ملخص الرصيد الفعلي</p>
+              <p className="text-[13px] text-muted-foreground">{selectedStorageName}</p>
+            </div>
+            <span className="text-[13px] font-semibold text-success">متاح للبيع</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {karatTotals.length === 0 ? (
+              <span className="text-sm text-muted-foreground">لا توجد قطع متاحة</span>
+            ) : (
+              karatTotals.map((entry) => (
+                <div key={entry.karat} className="rounded-xl bg-secondary px-3 py-2 text-[13px]">
+                  <span className="font-bold">عيار {entry.karat}</span>
+                  <span className="mx-1 text-muted-foreground">•</span>
+                  <span className="tabular-nums">{formatNumber(entry.pieces)} قطعة</span>
+                  <span className="mx-1 text-muted-foreground">•</span>
+                  <span className="tabular-nums">{formatNumber(entry.weight)} جم</span>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card className="elevation-card">
+          <CardContent className="space-y-2 p-4">
+            <p className="font-bold text-foreground">رصيد الكسر (جرام)</p>
+            {kaserShop.kaser.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">لا يوجد رصيد كسر</p>
+            ) : (
+              kaserShop.kaser.rows.map((entry) => (
+                <div key={entry.karat} className="flex items-center justify-between gap-2 text-[14px]">
+                  <span className="font-semibold text-foreground">عيار {entry.karat}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatNumber(entry.pieces)} قطعة • {formatNumber(entry.weight)} جم
+                  </span>
+                </div>
+              ))
+            )}
+            <div className="flex items-center justify-between gap-2 border-t border-black/5 pt-2 text-[14px]">
+              <span className="font-bold text-foreground">الإجمالي</span>
+              <span className="font-bold tabular-nums text-foreground">
+                {formatNumber(kaserShop.kaser.totalWeight)} جم
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="elevation-card">
+          <CardContent className="space-y-2 p-4">
+            <p className="font-bold text-foreground">رصيد المحل (جرام)</p>
+            {kaserShop.shop.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">لا يوجد رصيد بالمحل</p>
+            ) : (
+              kaserShop.shop.rows.map((entry) => (
+                <div key={entry.karat} className="flex items-center justify-between gap-2 text-[14px]">
+                  <span className="font-semibold text-foreground">عيار {entry.karat}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatNumber(entry.pieces)} قطعة • {formatNumber(entry.weight)} جم
+                  </span>
+                </div>
+              ))
+            )}
+            <div className="flex items-center justify-between gap-2 border-t border-black/5 pt-2 text-[14px]">
+              <span className="font-bold text-foreground">الإجمالي</span>
+              <span className="font-bold tabular-nums text-foreground">
+                {formatNumber(kaserShop.shop.totalWeight)} جم
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="ابحث بالمنتج..."
+            className="search-field h-11 ps-9 pe-9"
+          />
+          {query && (
+            <button
+              type="button"
+              aria-label="مسح البحث"
+              onClick={() => setQuery('')}
+              className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+        <Select
+          value={storageFilter}
+          onValueChange={(value) => {
+            setStorageFilter(value)
+            setUnitStorageFilter(value)
+          }}
+        >
+          <SelectTrigger className="w-full h-11 rounded-full border-black/10 bg-white sm:w-48">
+            <SelectValue placeholder="كل المخازن" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">كل المخازن</SelectItem>
+            {storages.map((s) => (
+              <SelectItem key={s.id} value={String(s.id)}>
+                {s.location}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <Skeleton className="h-12" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="flex items-center justify-center py-16 text-error">
+          تعذّر تحميل الجرد.
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-20 text-center">
+          <Search className="size-12 text-muted-foreground" />
+          <p className="text-[17px] font-semibold text-foreground">
+            لا نتائج مطابقة
+          </p>
+          <p className="text-sm text-muted-foreground">
+            جرّب تعديل البحث أو الفلتر.
+          </p>
+        </div>
+      ) : (
+        <Card className="overflow-hidden elevation-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-black/[0.03]">
+                <TableHead>المنتج</TableHead>
+                <TableHead className="text-end">العدد</TableHead>
+                <TableHead className="text-end">وزن القطعة</TableHead>
+                <TableHead className="text-end">الوزن الكلي</TableHead>
+                <TableHead className="text-end">العيار</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredProducts.map((p) => (
+                <TableRow
+                  key={p.productId}
+                  className="cursor-pointer"
+                  onClick={() => setSelected(p)}
+                >
+                  <TableCell>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-foreground">
+                        {p.productName}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-end font-semibold tabular-nums text-foreground">
+                    {formatNumber(p.quantity ?? 0)}
+                  </TableCell>
+                  <TableCell className="text-end tabular-nums text-muted-foreground">
+                    {formatNumber(p.weight ?? 0)} gm
+                  </TableCell>
+                  <TableCell className="text-end font-semibold tabular-nums text-foreground">
+                    {formatNumber((p.quantity ?? 0) * (p.weight ?? 0))} gm
+                  </TableCell>
+                  <TableCell className="text-end text-muted-foreground">
+                    {p.karat}k
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+
+      <div className="flex items-center gap-2 pt-2">
+        <Package className="size-5 text-primary" />
+        <h2 className="text-xl font-bold text-foreground">القطع الفعلية</h2>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setPrintInventory(true)}
+          disabled={availableProducts.length === 0}
+          className="ms-auto h-11 gap-2 rounded-full touch-target"
+        >
+          <Printer className="size-4" />
+          طباعة كشف الجرد
+        </Button>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {selectedStorageName} — {formatNumber(totals.pieces)} قطعة متاحة فعلياً، بوزن {formatNumber(totals.weight)} جم.
+      </p>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as InventoryUnitStatus | 'all')}>
+          <SelectTrigger className="w-full h-11 rounded-full border-black/10 bg-white sm:w-48">
+            <SelectValue placeholder="الحالة" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">كل الحالات</SelectItem>
+            {(Object.keys(inventoryUnitStatusLabels) as InventoryUnitStatus[]).map((s) => (
+              <SelectItem key={s} value={s}>
+                {inventoryUnitStatusLabels[s]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {unitsLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <Skeleton className="h-12" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : !units || units.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-16 text-center">
+          <Package className="size-12 text-muted-foreground" />
+          <p className="text-[17px] font-semibold text-foreground">
+            لا توجد قطع مخزنية بعد
+          </p>
+          <p className="text-sm text-muted-foreground">
+            سجّل فاتورة شراء وسيُنشأ لكل قطعة رقم مخزن تلقائياً.
+          </p>
+        </div>
+      ) : filteredUnits.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-16 text-center">
+          <Search className="size-12 text-muted-foreground" />
+          <p className="text-[17px] font-semibold text-foreground">
+            لا نتائج مطابقة
+          </p>
+          <p className="text-sm text-muted-foreground">
+            جرّب تعديل الفلاتر أو البحث برقم المخزن أو اسم المنتج.
+          </p>
+        </div>
+      ) : (
+        <Card className="overflow-hidden elevation-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-black/[0.03]">
+                <TableHead>رقم المخزن</TableHead>
+                <TableHead>المنتج</TableHead>
+                <TableHead>المخزن</TableHead>
+                <TableHead className="text-end">الوزن</TableHead>
+                <TableHead className="text-end">العيار</TableHead>
+                <TableHead>الحالة</TableHead>
+                <TableHead className="text-end">إجراءات</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUnits.map((u) => (
+                <TableRow key={u.inventoryUnitId}>
+                  <TableCell>
+                    <span
+                      dir="ltr"
+                      className="font-mono font-semibold text-foreground"
+                    >
+                      {u.inventoryNumber}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-foreground">
+                        {u.products?.productName ?? `منتج #${u.productId}`}
+                      </p>
+                      {u.products?.sku ? (
+                        <p className="text-[13px] text-muted-foreground">
+                          SKU: {u.products.sku}
+                        </p>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-muted-foreground">
+                      {u.storage?.location ?? '—'}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-end font-semibold tabular-nums text-foreground">
+                    {formatNumber(u.weight)} gm
+                  </TableCell>
+                  <TableCell className="text-end text-muted-foreground">
+                    {u.karat}k
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={u.status} />
+                  </TableCell>
+                  <TableCell>
+                    <InventoryUnitActions
+                      unit={u}
+                      onPrint={setPrintUnit}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+
+      <ProductDetail product={selected} onClose={() => setSelected(null)} />
+      <InventoryUnitLabelPrint unit={printUnit} onClose={() => setPrintUnit(null)} />
+      <InventoryReceiptPrint
+        open={printInventory}
+        onOpenChange={setPrintInventory}
+        title={selectedStorageName}
+        products={availableProducts}
+        storageNameOf={storageNameOf}
+      />
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: InventoryUnitStatus }) {
+  const variant =
+    status === 'AVAILABLE'
+      ? 'default'
+      : status === 'SOLD'
+        ? 'destructive'
+        : 'secondary'
+  return (
+    <Badge variant={variant}>{inventoryUnitStatusLabels[status] ?? status}</Badge>
+  )
+}
