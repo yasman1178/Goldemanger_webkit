@@ -109,7 +109,7 @@ export function PurchaseImagesDialog({ purchaseId, legacyImages = [], onClose }:
               {legacyImages.map((img) => {
                 const url = img.path.startsWith('http')
                   ? img.path
-                  : `${import.meta.env.VITE_API_URL ?? 'http://localhost:5000'}${img.path}`
+                  : `${import.meta.env.VITE_API_URL ?? ''}${img.path}`
                 return (
                   <figure
                     key={img.path}

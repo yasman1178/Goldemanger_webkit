@@ -1,3 +1,13 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "http://goldmaster.runasp.net/api/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "http://goldmaster.runasp.net/uploads/:path*"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

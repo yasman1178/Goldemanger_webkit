@@ -100,7 +100,7 @@ function loadImage(
 
 function resolveImageUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url
-  const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:5000'
+  const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
   return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`
 }
 

@@ -4,7 +4,7 @@ import type { CreateProductPayload, Product, PublicProduct } from './types'
 
 const base = '/api/Products'
 const API_BASE: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:5000'
+  (import.meta.env.VITE_API_URL as string | undefined) ?? ''
 
 /** جلب بيانات المنتج العامة — بدون interceptor بهدف تجنّب تحويل 401 إلى صفحة تسجيل الدخول. */
 export async function getPublicProduct(
