@@ -20,7 +20,7 @@ function readEnv() {
   }
 }
 
-const siteUrl = (process.env.VITE_SITE_URL?.trim() || readEnv() || 'http://localhost:5173').replace(/\/+$/, '')
+const siteUrl = (process.env.VITE_SITE_URL?.trim() || readEnv() || 'https://goldemanger.vercel.app').replace(/\/+$/, '')
 
 mkdirSync(publicDir, { recursive: true })
 

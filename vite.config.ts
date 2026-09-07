@@ -2,12 +2,28 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
+
+const defaultSiteUrl = 'https://goldemanger.vercel.app'
+
+function siteUrlDefault(): Plugin {
+  return {
+    name: 'site-url-default',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        const siteUrl = (process.env.VITE_SITE_URL?.trim() || defaultSiteUrl).replace(/\/+$/, '')
+        return html.replace(/%VITE_SITE_URL%/g, siteUrl)
+      },
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    siteUrlDefault(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/icon-192.png', 'icons/icon-512.png'],
