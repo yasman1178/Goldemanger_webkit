@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { getProducts } from '@/features/products/api'
+import { getProductKarats, getProductsPage } from '@/features/products/api'
 import type { Product } from '@/features/products/types'
 import { ProductFormSheet } from '@/features/products/components/ProductFormSheet'
 import { salePerGram } from '@/shared/lib/gold'
@@ -22,6 +22,8 @@ import { getLatestGoldPrice } from '@/shared/lib/parties'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
+import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
+import { PaginationBar } from '@/shared/components/ui/pagination'
 import { getSiteUrl, resolveProductImage } from '@/shared/lib/seo'
 import { buildProductShareImage, canvasToPngBlob, SHARE_IMAGE_STYLES } from '@/shared/lib/share-image'
 import type { ShareImageStyleId } from '@/shared/lib/share-image'
@@ -88,15 +90,51 @@ export function ProductsPage() {
   const [makingDiscount, setMakingDiscount] = useState('')
   const [query, setQuery] = useState('')
   const [karatFilter, setKaratFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+
+  const searchActive =
+    query.trim().length > 0 || karatFilter !== 'all' || statusFilter !== 'all'
+
+  const [page, setPage] = useState(1)
 
   const {
-    data: products,
+    data: pageResult,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ['products', activeBranchId],
-    queryFn: () => getProducts(activeBranchId ?? undefined),
+    queryKey: [
+      'products',
+      activeBranchId,
+      'page',
+      page,
+      query.trim(),
+      karatFilter,
+      statusFilter,
+    ],
+    queryFn: () =>
+      getProductsPage({
+        branchId: activeBranchId ?? undefined,
+        page,
+        q: query.trim() || undefined,
+        karat: karatFilter === 'all' ? undefined : karatFilter,
+        active: statusFilter === 'all' ? undefined : statusFilter,
+        inStock: searchActive ? undefined : true,
+      }),
+    enabled: !!activeBranchId,
+  })
+
+  const products = pageResult?.data ?? []
+  const { page: safePage, pageCount, goToPage, reset } = usePaginablePage(
+    pageResult?.totalCount ?? 0,
+    page,
+    PAGE_SIZE,
+    setPage,
+  )
+
+  const { data: karatOptions = [] } = useQuery({
+    queryKey: ['product-karats', activeBranchId],
+    queryFn: () => getProductKarats(activeBranchId ?? undefined),
+    enabled: !!activeBranchId,
   })
 
   const gold21 = useGoldStore((s) => s.gold21)
@@ -240,32 +278,6 @@ export function ProductsPage() {
     )
   }
 
-  const filtered = useMemo(() => {
-    if (!products) return []
-    const q = query.trim().toLowerCase()
-    const sorted = [...products].sort((a, b) => b.productId - a.productId)
-    return sorted.filter((p) => {
-      if (statusFilter === 'active' && !p.isActive) return false
-      if (statusFilter === 'inactive' && p.isActive) return false
-      if (karatFilter !== 'all' && String(p.karat) !== karatFilter) return false
-      if (!q) {
-        if ((p.quantity ?? 0) <= 0) return false
-        return true
-      }
-      return (
-        p.productName.toLowerCase().includes(q) ||
-        (p.sku?.toLowerCase().includes(q) ?? false) ||
-        (p.barcode?.toLowerCase().includes(q) ?? false)
-      )
-    })
-  }, [products, query, statusFilter, karatFilter])
-
-  const karatOptions = useMemo(() => {
-    if (!products) return []
-    const set = new Set(products.map((p) => String(p.karat)))
-    return Array.from(set).sort((a, b) => Number(a) - Number(b))
-  }, [products])
-
   function openAdd() {
     setFormOpen(true)
   }
@@ -295,7 +307,10 @@ export function ProductsPage() {
           <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              reset()
+            }}
             placeholder="ابحث بالاسم أو SKU أو الباركود..."
             className="search-field h-11 ps-9 pe-9"
           />
@@ -303,7 +318,10 @@ export function ProductsPage() {
             <button
               type="button"
               aria-label="مسح البحث"
-              onClick={() => setQuery('')}
+              onClick={() => {
+                setQuery('')
+                reset()
+              }}
               className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="size-4" />
@@ -311,20 +329,32 @@ export function ProductsPage() {
           )}
         </div>
         <div className="flex gap-3">
-          <Select value={karatFilter} onValueChange={setKaratFilter}>
+          <Select
+            value={karatFilter}
+            onValueChange={(v) => {
+              reset()
+              setKaratFilter(v)
+            }}
+          >
             <SelectTrigger className="w-36 h-11 rounded-full border-black/10 bg-white">
               <SelectValue placeholder="كل الأعيرة" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">كل الأعيرة</SelectItem>
               {karatOptions.map((k) => (
-                <SelectItem key={k} value={k}>
+                <SelectItem key={k} value={String(k)}>
                   {k} قيراط
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => {
+              reset()
+              setStatusFilter(v as 'all' | 'active' | 'inactive')
+            }}
+          >
             <SelectTrigger className="w-36 h-11 rounded-full border-black/10 bg-white">
               <SelectValue placeholder="كل الحالات" />
             </SelectTrigger>
@@ -357,21 +387,22 @@ export function ProductsPage() {
             اضغط "إنشاء تعريف منتج" لإضافة منتج جديد.
           </p>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : products.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-20 text-center">
           <Search className="size-12 text-muted-foreground" />
           <p className="text-[17px] font-semibold text-foreground">
-            {query.trim() ? 'لا نتائج مطابقة' : 'لا توجد منتجات برصيد متاح'}
+            {searchActive ? 'لا نتائج مطابقة' : 'لا توجد منتجات برصيد متاح'}
           </p>
           <p className="text-sm text-muted-foreground">
-            {query.trim()
+            {searchActive
               ? 'جرّب تعديل كلمة البحث أو الفلاتر.'
               : 'المنتجات التي لها رصيد فقط تظهر هنا — ابحث لعرض كل الأصناف المسجلة.'}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {filtered.map((p) => (
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {products.map((p) => (
             <Card
               key={p.productId}
               className="overflow-hidden p-0 rounded-[14px] elevation-card transition-transform hover:-translate-y-0.5"
@@ -428,6 +459,15 @@ export function ProductsPage() {
             </Card>
           ))}
         </div>
+
+        <PaginationBar
+          page={safePage}
+          pageCount={pageCount}
+          onChange={goToPage}
+          totalCount={pageResult?.totalCount ?? 0}
+        />
+
+      </>
       )}
 
       <Dialog

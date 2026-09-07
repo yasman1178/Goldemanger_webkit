@@ -26,8 +26,6 @@ export function usePwaInstall() {
   const [installedThroughPrompt, setInstalledThroughPrompt] = useState(false)
 
   useEffect(() => {
-    if (isStandalone()) setIsInstalled(true)
-
     const onPrompt = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)

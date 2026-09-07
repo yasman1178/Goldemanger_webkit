@@ -5,8 +5,8 @@ import { CalendarDays, Eye, Images, PackagePlus, Plus, SearchX } from 'lucide-re
 
 import {
   getPurchase,
-  getPurchases,
   getPurchasesByDate,
+  getPurchasesPage,
 } from '@/features/purchases/api'
 import { PurchaseReceiptDialog, type ReceiptParty } from '@/features/purchases/components/PurchaseReceiptDialog'
 import { PurchaseImagesDialog } from '@/features/purchases/components/PurchaseImagesDialog'
@@ -14,6 +14,8 @@ import type { Purchase } from '@/features/purchases/types'
 import { getCustomers, getSuppliers } from '@/shared/lib/parties'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
+import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
+import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { Badge } from '@/shared/components/ui/badge'
@@ -59,6 +61,7 @@ export function PurchasesPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [searchLoading, setSearchLoading] = useState(false)
+  const [page, setPage] = useState(1)
   const [printTarget, setPrintTarget] = useState<{
     purchase: Purchase
     party: ReceiptParty | null
@@ -66,10 +69,24 @@ export function PurchasesPage() {
   } | null>(null)
   const [imagesTargetId, setImagesTargetId] = useState<number | null>(null)
 
-  const { data: purchases = [], isLoading, isError } = useQuery({
-    queryKey: ['purchases', activeBranchId],
-    queryFn: () => getPurchases(activeBranchId ?? undefined),
+  const { data: pageResult, isLoading, isError } = useQuery({
+    queryKey: ['purchases', activeBranchId, 'page', page, query.trim()],
+    queryFn: () =>
+      getPurchasesPage({
+        branchId: activeBranchId ?? undefined,
+        page,
+        q: query.trim() || undefined,
+      }),
+    enabled: !!activeBranchId,
   })
+
+  const purchases = pageResult?.data ?? []
+  const { page: safePage, pageCount, goToPage, reset } = usePaginablePage(
+    pageResult?.totalCount ?? 0,
+    page,
+    PAGE_SIZE,
+    setPage,
+  )
 
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
@@ -104,6 +121,7 @@ export function PurchasesPage() {
     setDateResults(null)
     setFromDate('')
     setToDate('')
+    reset()
   }
 
   function resolveParty(purchase: Purchase): ReceiptParty | null {
@@ -132,15 +150,17 @@ export function PurchasesPage() {
     setPrintTarget({ purchase: target, party, isCustomer: isCustomerPurchase(target) })
   }
 
-  const displayed = (dateResults ?? purchases).filter((p) => {
-    const q = query.trim().toLowerCase()
-    if (!q) return true
-    return (
-      (p.supplierName ?? '').toLowerCase().includes(q) ||
-      (p.supplierPhone ?? '').toLowerCase().includes(q) ||
-      String(p.id).includes(q)
-    )
-  })
+  const displayed = dateResults
+    ? dateResults.filter((p) => {
+        const q = query.trim().toLowerCase()
+        if (!q) return true
+        return (
+          (p.supplierName ?? '').toLowerCase().includes(q) ||
+          (p.supplierPhone ?? '').toLowerCase().includes(q) ||
+          String(p.id).includes(q)
+        )
+      })
+    : purchases
   const dateSearching = dateResults !== null
 
   return (
@@ -165,14 +185,20 @@ export function PurchasesPage() {
         <div className="relative flex-1">
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              reset()
+            }}
             placeholder="ابحث بالاسم أو الهاتف أو رقم الفاتورة..."
             className="search-field h-12 touch-target pe-24"
           />
           {query && (
             <button
               type="button"
-              onClick={() => setQuery('')}
+              onClick={() => {
+                setQuery('')
+                reset()
+              }}
               className="absolute end-2 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full px-3 py-1 text-[12px] text-primary hover:bg-primary/10 touch-target"
             >
               <SearchX className="size-4" />
@@ -260,6 +286,7 @@ export function PurchasesPage() {
           </p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {displayed.map((purchase) => (
             <Card key={purchase.id} className="elevation-card">
@@ -367,6 +394,16 @@ export function PurchasesPage() {
             </Card>
           ))}
         </div>
+
+        {!dateSearching && (
+          <PaginationBar
+            page={safePage}
+            pageCount={pageCount}
+            onChange={goToPage}
+            totalCount={pageResult?.totalCount ?? 0}
+          />
+        )}
+        </>
       )}
 
       <PurchaseReceiptDialog

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
@@ -11,7 +11,7 @@ import {
   FileText,
 } from 'lucide-react'
 
-import { getBranchDebts, updateDebt } from '@/features/debts/api'
+import { getBranchDebtsPage, getBranchDebtsSummary, updateDebt } from '@/features/debts/api'
 import {
   getDebtStatus,
   debtStatusLabels,
@@ -20,6 +20,8 @@ import {
 } from '@/features/debts/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { formatEgp } from '@/shared/lib/utils'
+import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
+import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
@@ -69,12 +71,47 @@ export function DebtsPage() {
   const [filterStatus, setFilterStatus] = useState<DebtStatus | 'all'>('all')
   const [paymentSheet, setPaymentSheet] = useState<Debt | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
+  const [page, setPage] = useState(1)
 
-  const { data: debts = [], isLoading, isError } = useQuery({
-    queryKey: ['debts', activeBranchId],
-    queryFn: () => getBranchDebts(activeBranchId ?? 0),
+  const { data: pageResult, isLoading, isError } = useQuery({
+    queryKey: [
+      'debts',
+      activeBranchId,
+      'page',
+      page,
+      searchQuery.trim(),
+      filterStatus,
+    ],
+    queryFn: () =>
+      getBranchDebtsPage({
+        branchId: activeBranchId ?? 0,
+        page,
+        q: searchQuery.trim() || undefined,
+        status: filterStatus === 'all' ? undefined : filterStatus,
+      }),
     enabled: !!activeBranchId,
   })
+
+  const debts = pageResult?.data ?? []
+  const { page: safePage, pageCount, goToPage, reset } = usePaginablePage(
+    pageResult?.totalCount ?? 0,
+    page,
+    PAGE_SIZE,
+    setPage,
+  )
+
+  const { data: summary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['debts-summary', activeBranchId],
+    queryFn: () => getBranchDebtsSummary(activeBranchId ?? 0),
+    enabled: !!activeBranchId,
+  })
+
+  const summaryTotal = summaryLoading
+    ? 0
+    : (summary?.total ?? 0)
+  const summaryPaid = summaryLoading ? 0 : (summary?.paid ?? 0)
+  const summaryRemaining = summaryLoading ? 0 : (summary?.remaining ?? 0)
+  const summaryOverdue = summaryLoading ? 0 : (summary?.overdue ?? 0)
 
   const paymentMutation = useMutation({
     mutationFn: async () => {
@@ -100,25 +137,6 @@ export function DebtsPage() {
       toast.error('فشل تسجيل الدفعة. تأكد من المبلغ.')
     },
   })
-
-  const filtered = debts.filter((d) => {
-    const status = getDebtStatus(d)
-    if (filterStatus !== 'all' && status !== filterStatus) return false
-    if (searchQuery) {
-      const name = d.clientName ?? ''
-      const phone = d.clientPhone ?? ''
-      const q = searchQuery.toLowerCase()
-      return name.toLowerCase().includes(q) || phone.includes(q)
-    }
-    return true
-  })
-
-  const summary = {
-    total: debts.reduce((s, d) => s + d.amountOwed, 0),
-    paid: debts.reduce((s, d) => s + d.paidAmount, 0),
-    remaining: debts.reduce((s, d) => s + (d.amountOwed - d.paidAmount), 0),
-    overdue: debts.filter((d) => getDebtStatus(d) === 'overdue').length,
-  }
 
   return (
     <div className="space-y-6 pb-20">
@@ -152,7 +170,7 @@ export function DebtsPage() {
           </CardHeader>
           <CardContent>
             <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-foreground">
-              {formatEgp(summary.total)}
+              {formatEgp(summaryTotal)}
             </div>
           </CardContent>
         </Card>
@@ -166,7 +184,7 @@ export function DebtsPage() {
           </CardHeader>
           <CardContent>
             <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-success">
-              {formatEgp(summary.paid)}
+              {formatEgp(summaryPaid)}
             </div>
           </CardContent>
         </Card>
@@ -180,7 +198,7 @@ export function DebtsPage() {
           </CardHeader>
           <CardContent>
             <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-warning">
-              {formatEgp(summary.remaining)}
+              {formatEgp(summaryRemaining)}
             </div>
           </CardContent>
         </Card>
@@ -194,7 +212,7 @@ export function DebtsPage() {
           </CardHeader>
           <CardContent>
             <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-error">
-              {summary.overdue}
+              {summaryOverdue}
             </div>
           </CardContent>
         </Card>
@@ -204,7 +222,10 @@ export function DebtsPage() {
         <div className="relative flex-1">
           <Input
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              reset()
+            }}
             placeholder="ابحث بالاسم أو رقم الهاتف..."
             className="search-field h-12 touch-target"
           />
@@ -215,7 +236,10 @@ export function DebtsPage() {
               key={s}
               type="button"
               variant={filterStatus === s ? 'default' : 'outline'}
-              onClick={() => setFilterStatus(s)}
+              onClick={() => {
+                reset()
+                setFilterStatus(s)
+              }}
               className="h-10 rounded-full px-4 text-[13px] touch-target"
             >
               <Filter className="size-3.5" />
@@ -235,7 +259,7 @@ export function DebtsPage() {
         <div className="flex items-center justify-center py-20 text-error">
           تعذّر تحميل بيانات المديونيات.
         </div>
-      ) : filtered.length === 0 ? (
+      ) : debts.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-20 text-center">
           <Wallet className="size-12 text-muted-foreground" />
           <p className="text-[17px] font-semibold text-foreground">
@@ -248,6 +272,7 @@ export function DebtsPage() {
           </p>
         </div>
       ) : (
+        <>
         <Card className="elevation-card overflow-hidden">
           <Table>
             <TableHeader>
@@ -262,7 +287,7 @@ export function DebtsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((debt) => {
+              {debts.map((debt) => {
                 const status = getDebtStatus(debt)
                 const remaining = Math.max(0, debt.amountOwed - debt.paidAmount)
                 const cfg = statusConfig[status]
@@ -311,6 +336,14 @@ export function DebtsPage() {
             </TableBody>
           </Table>
         </Card>
+
+        <PaginationBar
+          page={safePage}
+          pageCount={pageCount}
+          onChange={goToPage}
+          totalCount={pageResult?.totalCount ?? 0}
+        />
+        </>
       )}
 
       <Sheet open={!!paymentSheet} onOpenChange={(o) => { if (!o) { setPaymentSheet(null); setPaymentAmount('') } }}>

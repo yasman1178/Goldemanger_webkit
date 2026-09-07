@@ -1,6 +1,7 @@
 import axios from 'axios'
 import api from '@/shared/lib/api'
-import type { InventoryUnitRecord, StockRecord } from './types'
+import { PAGE_SIZE, type PaginatedResult } from '@/shared/lib/pagination'
+import type { InventoryUnitRecord, InventoryUnitStatus, StockRecord } from './types'
 
 const base = '/api/Stock'
 
@@ -22,6 +23,30 @@ export async function getInventoryUnits(branchId?: number): Promise<InventoryUni
   const { data } = await api.get<InventoryUnitRecord[]>('/api/InventoryUnit/GetAll', {
     params: branchId ? { branchId } : undefined,
   })
+  return data
+}
+
+export async function getInventoryUnitsPage(params: {
+  branchId?: number
+  page: number
+  pageSize?: number
+  q?: string
+  status?: InventoryUnitStatus | 'all'
+  storageId?: number
+}): Promise<PaginatedResult<InventoryUnitRecord>> {
+  const { data } = await api.get<PaginatedResult<InventoryUnitRecord>>(
+    '/api/InventoryUnit/GetAll',
+    {
+      params: {
+        branchId: params.branchId ?? undefined,
+        page: params.page,
+        pageSize: params.pageSize ?? PAGE_SIZE,
+        q: params.q || undefined,
+        status: params.status === 'all' ? undefined : params.status,
+        storageId: params.storageId,
+      },
+    },
+  )
   return data
 }
 

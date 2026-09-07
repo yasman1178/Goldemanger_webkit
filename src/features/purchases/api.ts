@@ -1,6 +1,7 @@
 import axios from 'axios'
 import api from '@/shared/lib/api'
 import { compressPurchaseImage } from '@/shared/lib/imageCompress'
+import { PAGE_SIZE, type PaginatedResult } from '@/shared/lib/pagination'
 import type {
   ApiResponse,
   CompanyInfo,
@@ -23,6 +24,33 @@ export async function getPurchases(branchId?: number): Promise<Purchase[]> {
     }
     throw error
   }
+}
+
+export async function getPurchasesPage(params: {
+  branchId?: number
+  page: number
+  pageSize?: number
+  q?: string
+}): Promise<PaginatedResult<Purchase>> {
+  const { data } = await api.get<ApiResponse<PaginatedResult<Purchase>>>(
+    `${base}/GetAllPurchases`,
+    {
+      params: {
+        branchId: params.branchId ?? undefined,
+        page: params.page,
+        pageSize: params.pageSize ?? PAGE_SIZE,
+        q: params.q || undefined,
+      },
+    },
+  )
+  return (
+    data?.data ?? {
+      data: [],
+      totalCount: 0,
+      pageNumber: params.page,
+      pageSize: params.pageSize ?? PAGE_SIZE,
+    }
+  )
 }
 
 export async function getPurchasesByPhone(

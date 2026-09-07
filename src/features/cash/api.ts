@@ -1,5 +1,6 @@
 import axios from 'axios'
 import api from '@/shared/lib/api'
+import { PAGE_SIZE, type PaginatedResult } from '@/shared/lib/pagination'
 import type { CashRecord } from '@/shared/types/api'
 
 export async function getCashToday(branchId?: number): Promise<CashRecord[]> {
@@ -32,6 +33,28 @@ export async function getCashFiltered(params: {
     }
     throw error
   }
+}
+
+export async function getCashFilteredPage(params: {
+  date?: string
+  transactionType?: number
+  branchId?: number
+  page: number
+  pageSize?: number
+}): Promise<PaginatedResult<CashRecord>> {
+  const { data } = await api.get<PaginatedResult<CashRecord>>(
+    '/api/Cash/GetCashFiltered',
+    {
+      params: {
+        date: params.date || undefined,
+        transactionType: params.transactionType ?? undefined,
+        branchId: params.branchId ?? undefined,
+        page: params.page,
+        pageSize: params.pageSize ?? PAGE_SIZE,
+      },
+    },
+  )
+  return data
 }
 
 export async function getCurrentCash(branchId?: number): Promise<CashRecord | null> {

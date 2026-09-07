@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Boxes, Layers, MapPin, Package, Printer, Search, Scale, X } from 'lucide-react'
 
-import { getInventoryUnits } from '@/features/inventory/api'
+import { getInventoryUnitsPage } from '@/features/inventory/api'
 import type {
   InventoryUnitRecord,
   InventoryUnitStatus,
@@ -16,6 +16,8 @@ import type { Product } from '@/features/products/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { typeLabels } from '@/features/products/types'
 import { formatNumber } from '@/shared/lib/utils'
+import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
+import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
@@ -140,16 +142,48 @@ export function InventoryPage() {
   const [selected, setSelected] = useState<Product | null>(null)
   const [printUnit, setPrintUnit] = useState<InventoryUnitRecord | null>(null)
   const [printInventory, setPrintInventory] = useState(false)
+  const [page, setPage] = useState(1)
 
   const { data: products = [], isLoading, isError } = useQuery({
     queryKey: ['products', activeBranchId],
     queryFn: () => getProducts(activeBranchId ?? undefined),
   })
 
-  const { data: units, isLoading: unitsLoading } = useQuery({
-    queryKey: ['inventory-units', activeBranchId],
-    queryFn: () => getInventoryUnits(activeBranchId ?? undefined),
+  const {
+    data: unitsPage,
+    isLoading: unitsLoading,
+  } = useQuery({
+    queryKey: [
+      'inventory-units',
+      activeBranchId,
+      'page',
+      page,
+      query.trim(),
+      unitStorageFilter,
+      statusFilter,
+    ],
+    queryFn: () =>
+      getInventoryUnitsPage({
+        branchId: activeBranchId ?? undefined,
+        page,
+        q: query.trim() || undefined,
+        status:
+          statusFilter === 'all'
+            ? undefined
+            : statusFilter,
+        storageId:
+          unitStorageFilter === 'all' ? undefined : Number(unitStorageFilter),
+      }),
+    enabled: !!activeBranchId,
   })
+
+  const units = unitsPage?.data
+  const { page: safePage, pageCount, goToPage, reset } = usePaginablePage(
+    unitsPage?.totalCount ?? 0,
+    page,
+    PAGE_SIZE,
+    setPage,
+  )
 
   const availableProducts = useMemo(() => {
     return products.filter(
@@ -243,20 +277,6 @@ export function InventoryPage() {
     }
     return { kaser: build(true), shop: build(false) }
   }, [availableProducts])
-
-  const filteredUnits = useMemo(() => {
-    if (!units) return []
-    const q = query.trim().toLowerCase()
-    return units.filter((u) => {
-      if (unitStorageFilter !== 'all' && String(u.storageId) !== unitStorageFilter)
-        return false
-      if (statusFilter !== 'all' && u.status !== statusFilter) return false
-      if (!q) return true
-      const number = u.inventoryNumber.toLowerCase()
-      const name = u.products?.productName?.toLowerCase() ?? ''
-      return number.includes(q) || name.includes(q)
-    })
-  }, [units, query, unitStorageFilter, statusFilter])
 
   return (
     <div className="space-y-6 pb-20">
@@ -390,7 +410,10 @@ export function InventoryPage() {
           <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              reset()
+            }}
             placeholder="ابحث بالمنتج..."
             className="search-field h-11 ps-9 pe-9"
           />
@@ -398,7 +421,10 @@ export function InventoryPage() {
             <button
               type="button"
               aria-label="مسح البحث"
-              onClick={() => setQuery('')}
+              onClick={() => {
+                setQuery('')
+                reset()
+              }}
               className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="size-4" />
@@ -408,6 +434,7 @@ export function InventoryPage() {
         <Select
           value={storageFilter}
           onValueChange={(value) => {
+            reset()
             setStorageFilter(value)
             setUnitStorageFilter(value)
           }}
@@ -514,7 +541,7 @@ export function InventoryPage() {
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as InventoryUnitStatus | 'all')}>
+        <Select value={statusFilter} onValueChange={(v) => { reset(); setStatusFilter(v as InventoryUnitStatus | 'all') }}>
           <SelectTrigger className="w-full h-11 rounded-full border-black/10 bg-white sm:w-48">
             <SelectValue placeholder="الحالة" />
           </SelectTrigger>
@@ -549,17 +576,8 @@ export function InventoryPage() {
             سجّل فاتورة شراء وسيُنشأ لكل قطعة رقم مخزن تلقائياً.
           </p>
         </div>
-      ) : filteredUnits.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-16 text-center">
-          <Search className="size-12 text-muted-foreground" />
-          <p className="text-[17px] font-semibold text-foreground">
-            لا نتائج مطابقة
-          </p>
-          <p className="text-sm text-muted-foreground">
-            جرّب تعديل الفلاتر أو البحث برقم المخزن أو اسم المنتج.
-          </p>
-        </div>
       ) : (
+        <>
         <Card className="overflow-hidden elevation-card">
           <Table>
             <TableHeader>
@@ -574,7 +592,7 @@ export function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUnits.map((u) => (
+              {units.map((u) => (
                 <TableRow key={u.inventoryUnitId}>
                   <TableCell>
                     <span
@@ -621,6 +639,14 @@ export function InventoryPage() {
             </TableBody>
           </Table>
         </Card>
+
+        <PaginationBar
+          page={safePage}
+          pageCount={pageCount}
+          onChange={goToPage}
+          totalCount={unitsPage?.totalCount ?? 0}
+        />
+        </>
       )}
 
       <ProductDetail product={selected} onClose={() => setSelected(null)} />

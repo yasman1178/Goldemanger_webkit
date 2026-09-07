@@ -3,11 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Eye, Plus, ReceiptText, SearchX, Wallet } from 'lucide-react'
 
-import { getSales } from '@/features/sales/api'
+import { getSalesPage } from '@/features/sales/api'
 import { SaleReceiptDialog } from '@/features/sales/components/pos/SaleReceiptDialog'
 import { getBranchDebts } from '@/features/debts/api'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
+import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
+import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { Badge } from '@/shared/components/ui/badge'
@@ -50,11 +52,26 @@ export function SalesHistoryPage() {
   const activeBranchId = useActiveBranchId()
   const [query, setQuery] = useState('')
   const [printTarget, setPrintTarget] = useState<number | null>(null)
+  const [page, setPage] = useState(1)
 
-  const { data: sales = [], isLoading, isError } = useQuery({
-    queryKey: ['sales', activeBranchId],
-    queryFn: () => getSales(activeBranchId ?? undefined),
+  const { data: pageResult, isLoading, isError } = useQuery({
+    queryKey: ['sales', activeBranchId, 'page', page, query.trim()],
+    queryFn: () =>
+      getSalesPage({
+        branchId: activeBranchId ?? undefined,
+        page,
+        q: query.trim() || undefined,
+      }),
+    enabled: !!activeBranchId,
   })
+
+  const sales = pageResult?.data ?? []
+  const { page: safePage, pageCount, goToPage, reset } = usePaginablePage(
+    pageResult?.totalCount ?? 0,
+    page,
+    PAGE_SIZE,
+    setPage,
+  )
 
   const { data: debts = [] } = useQuery({
     queryKey: ['debts', activeBranchId],
@@ -63,16 +80,6 @@ export function SalesHistoryPage() {
   })
 
   const debtSaleIds = useMemo(() => new Set(debts.map((d) => d.saleId)), [debts])
-
-  const displayed = sales.filter((s) => {
-    const q = query.trim().toLowerCase()
-    if (!q) return true
-    return (
-      (s.customerName ?? '').toLowerCase().includes(q) ||
-      String(s.saleId).includes(q) ||
-      String(s.totalAmount ?? 0).includes(q)
-    )
-  })
 
   return (
     <div className="space-y-6 pb-20">
@@ -95,14 +102,20 @@ export function SalesHistoryPage() {
       <div className="relative">
         <Input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            reset()
+          }}
           placeholder="ابحث بالعميل أو رقم الفاتورة أو المبلغ..."
           className="search-field h-12 touch-target pe-24"
         />
         {query && (
           <button
             type="button"
-            onClick={() => setQuery('')}
+            onClick={() => {
+              setQuery('')
+              reset()
+            }}
             className="absolute end-2 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full px-3 py-1 text-[12px] text-primary hover:bg-primary/10 touch-target"
           >
             <SearchX className="size-4" />
@@ -121,7 +134,7 @@ export function SalesHistoryPage() {
         <div className="flex items-center justify-center py-20 text-error">
           تعذّر تحميل المبيعات.
         </div>
-      ) : displayed.length === 0 ? (
+      ) : sales.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-20 text-center">
           <ReceiptText className="size-12 text-muted-foreground" />
           <p className="text-[17px] font-semibold text-foreground">
@@ -132,8 +145,9 @@ export function SalesHistoryPage() {
           </p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {displayed.map((s) => {
+          {sales.map((s) => {
             const pieces = (s.saleItems ?? []).reduce(
               (sum, i) => sum + (i.quantity ?? 0),
               0,
@@ -210,6 +224,14 @@ export function SalesHistoryPage() {
             )
           })}
         </div>
+
+        <PaginationBar
+          page={safePage}
+          pageCount={pageCount}
+          onChange={goToPage}
+          totalCount={pageResult?.totalCount ?? 0}
+        />
+        </>
       )}
 
       <SaleReceiptDialog

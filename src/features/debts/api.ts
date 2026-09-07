@@ -1,8 +1,48 @@
 import api from '@/shared/lib/api'
-import type { CreateDebtPayload, Debt, DebtClientSummary, UpdateDebtPayload } from './types'
+import { PAGE_SIZE, type PaginatedResult } from '@/shared/lib/pagination'
+import type {
+  CreateDebtPayload,
+  Debt,
+  DebtClientSummary,
+  DebtStatus,
+  UpdateDebtPayload,
+} from './types'
 
 export async function getBranchDebts(branchId: number): Promise<Debt[]> {
   const { data } = await api.get(`/api/Debts/BranchGetDebts/${branchId}`)
+  return data
+}
+
+export async function getBranchDebtsPage(params: {
+  branchId: number
+  page: number
+  pageSize?: number
+  q?: string
+  status?: DebtStatus
+}): Promise<PaginatedResult<Debt>> {
+  const { data } = await api.get<PaginatedResult<Debt>>(
+    `/api/Debts/BranchGetDebts/${params.branchId}`,
+    {
+      params: {
+        page: params.page,
+        pageSize: params.pageSize ?? PAGE_SIZE,
+        q: params.q || undefined,
+        status: params.status,
+      },
+    },
+  )
+  return data
+}
+
+export interface DebtBranchSummary {
+  total: number
+  paid: number
+  remaining: number
+  overdue: number
+}
+
+export async function getBranchDebtsSummary(branchId: number): Promise<DebtBranchSummary> {
+  const { data } = await api.get<DebtBranchSummary>(`/api/Debts/BranchSummary/${branchId}`)
   return data
 }
 

@@ -1,6 +1,7 @@
 import axios from 'axios'
 import api from '@/shared/lib/api'
 import { getApiBaseUrl } from '@/shared/lib/api-url'
+import { PAGE_SIZE, type PaginatedResult } from '@/shared/lib/pagination'
 import type { CreateProductPayload, Product, PublicProduct } from './types'
 
 const base = '/api/Products'
@@ -33,6 +34,38 @@ export async function getProducts(branchId?: number): Promise<Product[]> {
     }
     throw error
   }
+}
+
+export interface GetProductsPageParams {
+  branchId?: number
+  page: number
+  pageSize?: number
+  q?: string
+  karat?: string
+  active?: 'active' | 'inactive'
+  inStock?: boolean
+}
+
+export async function getProductsPage(params: GetProductsPageParams): Promise<PaginatedResult<Product>> {
+  const { data } = await api.get<PaginatedResult<Product>>(`${base}/GetAllProduct`, {
+    params: {
+      branchId: params.branchId ?? undefined,
+      page: params.page,
+      pageSize: params.pageSize ?? PAGE_SIZE,
+      q: params.q || undefined,
+      karat: params.karat || undefined,
+      active: params.active === undefined ? undefined : params.active === 'active',
+      inStock: params.inStock,
+    },
+  })
+  return data
+}
+
+export async function getProductKarats(branchId?: number): Promise<number[]> {
+  const { data } = await api.get<number[]>(`${base}/Karats`, {
+    params: branchId ? { branchId } : undefined,
+  })
+  return data
 }
 
 export async function createProduct(

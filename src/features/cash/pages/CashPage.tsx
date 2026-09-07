@@ -7,13 +7,14 @@ import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import {
   depositCash,
   withdrawCash,
-  getCashFiltered,
+  getCashFilteredPage,
   getCurrentCash,
-  getOpeningBalance,
 } from '@/features/cash/api'
 import { invalidateAfterCash } from '@/shared/lib/invalidateShop'
 import { transactionLabels, type CashRecord, type TransactionType } from '@/shared/types/api'
 import { cn, formatEgp } from '@/shared/lib/utils'
+import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
+import { PaginationBar } from '@/shared/components/ui/pagination'
 import { getPurchase } from '@/features/purchases/api'
 import {
   PurchaseReceiptDialog,
@@ -98,6 +99,7 @@ export function CashPage() {
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [filterDate, setFilterDate] = useState('')
   const [filterType, setFilterType] = useState('all')
+  const [page, setPage] = useState(1)
 
   const { data: overview } = useQuery({
     queryKey: ['overview'],
@@ -120,23 +122,28 @@ export function CashPage() {
   })
 
   const {
-    data: transactions = [],
+    data: pageResult,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ['cash-today', filterDate, filterType, activeBranchId],
+    queryKey: ['cash-today', filterDate, filterType, activeBranchId, 'page', page],
     queryFn: () =>
-      getCashFiltered({
+      getCashFilteredPage({
         date: filterDate || undefined,
         transactionType: filterType === 'all' ? undefined : Number(filterType),
         branchId: activeBranchId ?? undefined,
+        page,
       }),
+    enabled: !!activeBranchId,
   })
 
-  const { data: openingBalance = 0 } = useQuery({
-    queryKey: ['cash-opening', filterDate, activeBranchId],
-    queryFn: () => getOpeningBalance(filterDate || undefined, activeBranchId ?? undefined),
-  })
+  const transactions = pageResult?.data ?? []
+  const { page: safePage, pageCount, goToPage, reset } = usePaginablePage(
+    pageResult?.totalCount ?? 0,
+    page,
+    PAGE_SIZE,
+    setPage,
+  )
 
   const depositMutation = useMutation({
     mutationFn: ({ amount, targetBranchId }: { amount: number; targetBranchId?: number }) =>
@@ -165,23 +172,13 @@ export function CashPage() {
   })
 
   const rows = useMemo(() => {
-    const chronological = [...transactions].sort(
-      (a, b) =>
-        new Date(a.transactionDate).getTime() -
-        new Date(b.transactionDate).getTime(),
-    )
-    return chronological
-      .reduce<{ rows: Array<{ record: CashRecord; delta: number }>; prev: number }>(
-        (acc, record) => {
-          const delta = record.amount - acc.prev
-          acc.rows.push({ record, delta })
-          acc.prev = record.amount
-          return acc
-        },
-        { rows: [], prev: openingBalance },
-      )
-      .rows.reverse()
-  }, [transactions, openingBalance])
+    const items = pageResult?.data ?? []
+    const carry = pageResult?.carryAmount ?? 0
+    return items.map((record, i) => {
+      const prev = i + 1 < items.length ? items[i + 1].amount : carry
+      return { record, delta: record.amount - prev }
+    })
+  }, [pageResult])
 
   return (
     <div className="space-y-6 pb-20">
@@ -204,7 +201,10 @@ export function CashPage() {
             id="cash-filter-date"
             type="date"
             value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value)}
+            onChange={(e) => {
+              setFilterDate(e.target.value)
+              reset()
+            }}
             className="h-11 rounded-[14px] touch-target"
           />
         </div>
@@ -217,7 +217,10 @@ export function CashPage() {
           </label>
           <Select
             value={filterType}
-            onValueChange={(v) => setFilterType(v)}
+            onValueChange={(v) => {
+              reset()
+              setFilterType(v)
+            }}
           >
             <SelectTrigger
               id="cash-filter-type"
@@ -287,7 +290,7 @@ export function CashPage() {
           </CardHeader>
           <CardContent>
             <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-foreground">
-              {transactions.length}
+              {pageResult?.totalCount ?? 0}
             </div>
           </CardContent>
         </Card>
@@ -312,6 +315,7 @@ export function CashPage() {
           </p>
         </div>
       ) : (
+        <>
         <Card className="elevation-card overflow-hidden">
           <Table>
             <TableHeader>
@@ -380,6 +384,14 @@ export function CashPage() {
             </TableBody>
           </Table>
         </Card>
+
+        <PaginationBar
+          page={safePage}
+          pageCount={pageCount}
+          onChange={goToPage}
+          totalCount={pageResult?.totalCount ?? 0}
+        />
+        </>
       )}
 
       <CashDetailsDialog

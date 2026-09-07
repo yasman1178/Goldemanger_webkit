@@ -1,5 +1,6 @@
 import axios from 'axios'
 import api from '@/shared/lib/api'
+import { PAGE_SIZE, type PaginatedResult } from '@/shared/lib/pagination'
 import type { CreateSalePayload, Sale } from './types'
 
 const base = '/api/Sale'
@@ -16,6 +17,25 @@ export async function getSales(branchId?: number): Promise<Sale[]> {
     }
     throw error
   }
+}
+
+export async function getSalesPage(
+  params: {
+    branchId?: number
+    page: number
+    pageSize?: number
+    q?: string
+  },
+): Promise<PaginatedResult<Sale>> {
+  const { data } = await api.get<PaginatedResult<Sale>>(`${base}/GetAllSales`, {
+    params: {
+      branchId: params.branchId ?? undefined,
+      page: params.page,
+      pageSize: params.pageSize ?? PAGE_SIZE,
+      q: params.q || undefined,
+    },
+  })
+  return data
 }
 
 export interface SalePrintItem {

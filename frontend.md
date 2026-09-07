@@ -1,6 +1,6 @@
 # frontend.md — دليلك السريع للمكونات في Goldemanger_webkit
 
-> يشرح كيف يُبنى أي مكوّن/صفحة جديدة على هذا الـ Frontend، وكيف ترتبط بالمكونات الجديدة التي أُضيفت مؤخراً (الدفع بالبطاقة/التحويل + تقرير المديونيات المفصل).
+> يشرح كيف يُبنى أي مكوّن/صفحة جديدة على هذا الـ Frontend، وكيف ترتبط بالمكونات الجديدة التي أُضيفت مؤخراً (الدفع بالبطاقة/التحويل + تقرير المديونيات المفصل + الترقيم الحقيقي).
 
 ## 1) خارطة البنية (قبل أي كود)
 
@@ -57,6 +57,8 @@ src/
 | `src/features/sales/types.ts` | `CreateSalePayload.paymentMethod?: 'cash' | 'card' | 'transfer'` | لإرسال الفاتورة |
 | `src/features/debts/types.ts` | `DebtClientSummary` | صف الملخص من `ClientSummary` |
 | `src/features/debts/api.ts` | `getClientSummary` / `getClientDebts` | قراءة التقرير |
+| `src/shared/lib/pagination.ts` | `PAGE_SIZE`، `PaginatedResult<T>`، `totalPages()`، `usePaginablePage(...)` | الترقيم الحقيقي |
+| `src/shared/components/ui/pagination.tsx` | `PaginationBar` | شريط الترقيم RTL |
 
 ## 6) خطوات إضافة صفحة/مكوّن جديد (الاختصار)
 
@@ -66,4 +68,20 @@ src/
 4. أضف بند القائمة في `src/app/AppLayout.tsx` (مصفوفة القائمة الجانبية) إن كانت الصفحة من الصفحات الرئيسية.
 5. تحقق بالترتيب: `npm.cmd run typecheck` ← `npm.cmd run lint` ← `npm.cmd test` ← `npm.cmd run build`.
 
-> ⚠️ ملاحظة lint قائمة: `src/shared/hooks/usePwaInstall.ts` لديه خطأ `set-state-in-effect` قديم غير متعلق بهذه المكونات — لا تصلحه إلا بطلب صريح. وتحذير `AddPieceDialog.tsx` (fast-refresh) معروف ومقبول.
+## 7) الترقيم الحقيقي (Server-Side) — 10 صفوف/صفحة
+
+> **عقد الترقيم**: `GET ...?page=&pageSize=10&q=&<فلاتر>` → عند وجود `page` يُرجع `PaginatedResult<T>` ؛ بدون `page` يُرجع القائمة كاملة (توافق رجعي). صفحات مروّسة بالفعل: منتجات، سجل المبيعات، خزينة، ديون، مشتريات، جرد (جدول الوحدات). **الاستثناءات التي تبقى كاملة**: POS/ProductGrid (بحث فوري/باركود من الذاكرة)، ملخص منتجات لوحة الجرد، لوحة التحكم/التقارير، والإيصالات.
+
+- **المشترك**:
+  - `src/shared/lib/pagination.ts` — `PAGE_SIZE = 10`، `PaginatedResult<T> { totalCount, page, pageSize, totalPages, data, carryAmount? }`، `totalPages()`، وhook **`usePaginablePage(totalCount, page, PAGE_SIZE, setPage)`** → `{ page: safePage, pageCount, goToPage, reset }`.
+  - `src/shared/components/ui/pagination.tsx` — `PaginationBar` (prop **`onChange`** — ليس `onPageChange`)، يختفي عند `pageCount <= 1`، ويُمرَّر له `totalCount`.
+- **نمط الصفحة (إلزامي)** — لأن `page` state تسبق الاستعلام (دورة تعتمدية):
+  1. `const [page, setPage] = useState(1)` **قبل** الـ `useQuery`.
+  2. ضع `page` + كل الفلاتر في `queryKey` (الـ `reset()` يعيد `page` لـ 1 عند أي تغيير فلتر/بحث).
+  3. `const { data } = useQuery({ ..., queryFn: () => getXPage({ branchId, page, q, ... }) })` — استدعِ دالة `getXPage` الخاصة بالصفحة من `api.ts` لا القائمة الكاملة.
+  4. `const units = data?.data` لصفوف الصفحة، و`data?.totalCount` للعدادات.
+  5. `<PaginationBar page={safePage} pageCount={pageCount} onChange={goToPage} totalCount={data?.totalCount ?? 0} />`.
+- **`PaginatedResult<T>`** مخططه مطابق للـ Backend (`PaginatedResult.cs` في `GoldeManger.Core/Dor/PaginatedResult.cs`) — أي حقل جديد يُضاف هنا تلقائياً للـ API.
+- **carryAmount** (خزينة فقط): رصيد آخر حركة قبل أقدم صف بالصفحة — يحسب «المبلغ المؤثر» عبر الصفحات (`delta = amount − prev`، ولأقدم صف `amount − carryAmount`).
+- **الملخصات/البطاقات الإحصائية (ديون، خزينة)**: احسبها من **مصدر كامل منفصل** (مثل `GET /api/Debts/BranchSummary/{branchId}`) — **لا** تُشتق من صفوف الصفحة الحالية (ستعطي رقماً خاطئاً عند التنقل).
+- **إضافة ترقيم لصفحة جديدة**: (1) اربط دالة `getXPage` على الـ endpoint المروّس في `api.ts`؛ (2) طبّق نمط الصفحة أعلاه؛ (3) `npm.cmd run typecheck` ثم `lint` ثم `test` ثم `build`.
