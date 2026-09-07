@@ -97,4 +97,10 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/api': { target: 'https://goldmaster.runasp.net', changeOrigin: true },
+      '/uploads': { target: 'https://goldmaster.runasp.net', changeOrigin: true },
+    },
+  },
 })
