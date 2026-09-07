@@ -1,5 +1,4 @@
 import { Gem, ArrowDown } from 'lucide-react'
-import { InstallAppButton } from '@/features/public-site/components/InstallAppButton'
 import {
   LayoutDashboard,
   Package,
@@ -72,10 +71,6 @@ export function Hero() {
               <ArrowDown className="h-5 w-5" />
               شاهد المميزات
             </button>
-          </div>
-
-          <div className="mt-5 flex justify-center">
-            <InstallAppButton />
           </div>
         </div>
 

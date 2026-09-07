@@ -43,6 +43,7 @@ import { getDashboardStats, closeDay } from '@/features/dashboard/api'
 import type { DayCloseSummary } from '@/features/dashboard/types'
 import { SaleReceiptDialog } from '@/features/sales/components/pos/SaleReceiptDialog'
 import { CloseDayDialog } from '@/features/dashboard/components/CloseDayDialog'
+import { InstallAppButton } from '@/features/public-site/components/InstallAppButton'
 
 interface Metric {
   label: string
@@ -250,6 +251,10 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 pb-20">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold leading-[1.45] text-foreground">لوحة التحكم</h1>
+        <InstallAppButton />
+      </div>
       <div
         className={cn(
           'grid grid-cols-2 gap-3',
