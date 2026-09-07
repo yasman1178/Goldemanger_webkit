@@ -1,5 +1,5 @@
 import api from '@/shared/lib/api'
-import type { CreateDebtPayload, Debt, UpdateDebtPayload } from './types'
+import type { CreateDebtPayload, Debt, DebtClientSummary, UpdateDebtPayload } from './types'
 
 export async function getBranchDebts(branchId: number): Promise<Debt[]> {
   const { data } = await api.get(`/api/Debts/BranchGetDebts/${branchId}`)
@@ -8,6 +8,11 @@ export async function getBranchDebts(branchId: number): Promise<Debt[]> {
 
 export async function getClientDebts(clientId: number): Promise<Debt[]> {
   const { data } = await api.get(`/api/Debts/ClientGetDebts/${clientId}`)
+  return data
+}
+
+export async function getClientSummary(branchId: number): Promise<DebtClientSummary[]> {
+  const { data } = await api.get(`/api/Debts/ClientSummary?branchId=${branchId}`)
   return data
 }
 

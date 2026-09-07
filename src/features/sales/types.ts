@@ -37,6 +37,7 @@ export interface CreateSalePayload {
   totalAmount: number
   paidAmount: number
   amountOwed: number
+  paymentMethod?: 'cash' | 'card' | 'transfer'
   saleItems: CreateSaleLine[]
   branchId?: number | null
 }

@@ -68,18 +68,39 @@ export function PaymentDialog({
 
   const paidValue = Math.round(amountToNumber(paid))
   const change = Math.max(0, paidValue - totals.total)
+  const cashToCollect = Math.max(0, totals.total - paidValue)
+
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      setMethod('cash')
+      setPaid('')
+    }
+    onOpenChange(open)
+  }
+
+  const selectMethod = (next: PaymentMethod) => {
+    setMethod(next)
+    if (next === 'cash') {
+      if (paid === String(totals.total)) setPaid('')
+    } else if (!paid) {
+      setPaid(String(totals.total))
+    }
+  }
+
+  const isCash = method === 'cash'
+  const effectivePaid = Math.min(paidValue, totals.total)
 
   const mutation = useMutation({
     mutationFn: async () => {
       if (!customerId) throw new Error('لا يوجد عميل')
-      const amountOwed = method === 'cash' ? Math.max(0, totals.total - paidValue) : totals.total
       return createSale({
         customerId,
         saleDate: new Date().toISOString(),
         discount,
         totalAmount: totals.total,
-        paidAmount: method === 'cash' ? paidValue : 0,
-        amountOwed,
+        paidAmount: isCash ? paidValue : effectivePaid,
+        amountOwed: isCash ? Math.max(0, totals.total - paidValue) : 0,
+        paymentMethod: method,
         saleItems: lines,
         branchId: activeBranchId ?? undefined,
       })
@@ -88,7 +109,7 @@ export function PaymentDialog({
       toast.success('تمت عملية البيع بنجاح')
       invalidateAfterSale(queryClient)
       onOpenChange(false)
-      onSuccess({ saleId: sale.saleId, paid: method === 'cash' ? paidValue : 0 })
+      onSuccess({ saleId: sale.saleId, paid: isCash ? paidValue : effectivePaid })
     },
     onError: (error: { response?: { data?: { message?: string } } }) => {
       toast.error(error.response?.data?.message ?? 'تعذّر إتمام البيع.')
@@ -101,7 +122,7 @@ export function PaymentDialog({
     (method !== 'cash' || paidValue > 0)
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-1rem)] gap-2 overflow-y-auto p-2 sm:max-w-[26rem]">
         <DialogHeader>
           <DialogTitle>إتمام البيع</DialogTitle>
@@ -158,7 +179,7 @@ export function PaymentDialog({
               <button
                 key={m.key}
                 type="button"
-                onClick={() => setMethod(m.key)}
+                onClick={() => selectMethod(m.key)}
                 className={cn(
                   'h-11 touch-target rounded-lg border text-[13px] font-semibold transition-all',
                   method === m.key
@@ -172,30 +193,45 @@ export function PaymentDialog({
           </div>
         </div>
 
-        {method === 'cash' && (
-          <div className="space-y-2 rounded-xl border-2 border-success/25 bg-success/5 p-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="paid" className="text-[13px] font-bold text-success">
-                المدفوع
-              </Label>
-              <Input
-                id="paid"
-                type="number"
-                min="0"
-                value={paid}
-                onChange={(e) => setPaid(e.target.value)}
-                placeholder="0.00"
-                className="no-number-spin h-11 touch-target rounded-lg border-success/40 bg-white text-[15px] font-bold tabular-nums focus-visible:ring-success/30"
-              />
-            </div>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-muted-foreground">المتبقي للعميل</span>
-              <span className="tabular-nums font-bold text-success">
-                {formatEgp(change)}
-              </span>
-            </div>
+        <div className="space-y-2 rounded-xl border-2 border-success/25 bg-success/5 p-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="paid" className="text-[13px] font-bold text-success">
+              {method === 'cash' ? 'المدفوع' : method === 'card' ? 'المدفوع بالبطاقة' : 'المدفوع تحويلاً/محفظة'}
+            </Label>
+            <Input
+              id="paid"
+              type="number"
+              min="0"
+              value={paid}
+              onChange={(e) => setPaid(e.target.value)}
+              placeholder="0.00"
+              className="no-number-spin h-11 touch-target rounded-lg border-success/40 bg-white text-[15px] font-bold tabular-nums focus-visible:ring-success/30"
+            />
           </div>
-        )}
+          <div className="flex items-center justify-between text-[12px]">
+            {method === 'cash' ? (
+              <>
+                <span className="text-muted-foreground">المتبقي للعميل</span>
+                <span className="tabular-nums font-bold text-success">
+                  {formatEgp(change)}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground">المتبقي سيُدفع نقداً</span>
+                <span className={'tabular-nums font-bold ' + (cashToCollect > 0 ? 'text-warning' : 'text-success')}>
+                  {formatEgp(cashToCollect)}
+                </span>
+              </>
+            )}
+          </div>
+          {method !== 'cash' && cashToCollect <= 0 && (
+            <p className="flex items-center gap-1 text-[12px] font-semibold text-success">
+              <CheckCircle2 className="size-3.5" />
+              تسوية كاملة — لا توجد مديونية.
+            </p>
+          )}
+        </div>
 
         <DialogFooter className="sticky bottom-0 -mx-2 -mb-2 bg-muted/95 p-2 backdrop-blur-sm">
           <Button

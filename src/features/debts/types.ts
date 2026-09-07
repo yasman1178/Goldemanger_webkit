@@ -29,6 +29,17 @@ export interface UpdateDebtPayload extends CreateDebtPayload {
 
 export type DebtStatus = 'unpaid' | 'partial' | 'paid' | 'overdue'
 
+export interface DebtClientSummary {
+  clientId: number
+  clientName?: string | null
+  clientPhone?: string | null
+  totalOwed: number
+  totalPaid: number
+  remaining: number
+  invoiceCount: number
+  dueDate: string
+}
+
 export function getDebtStatus(debt: Debt): DebtStatus {
   const remaining = debt.amountOwed - debt.paidAmount
   if (remaining <= 0) return 'paid'

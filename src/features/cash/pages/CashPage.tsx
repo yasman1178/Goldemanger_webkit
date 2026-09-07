@@ -60,7 +60,7 @@ function formatTime(value: string): string {
 }
 
 function typeVariant(type: TransactionType) {
-  if (type === 'Sale') return 'default' as const
+  if (type === 'Sale' || type === 'CardSale' || type === 'TransferSale') return 'default' as const
   if (type === 'Purchase' || type === 'Expense') return 'destructive' as const
   return 'secondary' as const
 }
@@ -77,6 +77,8 @@ const cashTypeOrder: TransactionType[] = [
   'EmployeeAdvance',
   'EmployeeRepayment',
   'DayClose',
+  'CardSale',
+  'TransferSale',
 ]
 
 function cashTypeValue(type: TransactionType): number {

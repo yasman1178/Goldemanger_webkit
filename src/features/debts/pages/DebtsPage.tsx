@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { Link } from 'react-router-dom'
 import {
   Wallet,
   AlertTriangle,
   CheckCircle2,
   Clock,
   Filter,
+  FileText,
 } from 'lucide-react'
 
 import { getBranchDebts, updateDebt } from '@/features/debts/api'
@@ -120,11 +122,24 @@ export function DebtsPage() {
 
   return (
     <div className="space-y-6 pb-20">
-      <div>
-        <h1 className="text-[34px] font-bold leading-[1.2] text-foreground">
-          المديونيات
-        </h1>
-        <p className="text-muted-foreground">إدارة ديون العملاء والمستحقات</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[34px] font-bold leading-[1.2] text-foreground">
+            المديونيات
+          </h1>
+          <p className="text-muted-foreground">إدارة ديون العملاء والمستحقات</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          asChild
+          className="h-11 rounded-full touch-target"
+        >
+          <Link to="/app/debts/report">
+            <FileText className="size-4" />
+            التقرير المفصل
+          </Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

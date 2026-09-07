@@ -36,6 +36,8 @@ export type TransactionType =
   | 'EmployeeRepayment'
   | 'DayClose'
   | 'Withdrawal'
+  | 'CardSale'
+  | 'TransferSale'
 
 export interface CashRecord {
   cashId: number
@@ -68,4 +70,6 @@ export const transactionLabels: Record<TransactionType, string> = {
   EmployeeRepayment: 'سداد سلفة',
   DayClose: 'إغلاق يوم',
   Withdrawal: 'سحب رصيد',
+  CardSale: 'بيع بالبطاقة',
+  TransferSale: 'تحويل/محفظة إلكترونية',
 }

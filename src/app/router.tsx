@@ -13,6 +13,7 @@ import { PurchaseCreatePage } from '@/features/purchases/pages/PurchaseCreatePag
 import { InventoryPage } from '@/features/inventory/pages/InventoryPage'
 import { CashPage } from '@/features/cash/pages/CashPage'
 import { DebtsPage } from '@/features/debts/pages/DebtsPage'
+import { DebtReportPage } from '@/features/debts/pages/DebtReportPage'
 import { SalesHistoryPage } from '@/features/sales/pages/SalesHistoryPage'
 import { ExpensesPage } from '@/features/expenses/pages/ExpensesPage'
 import { EmployeeDebtsPage } from '@/features/employee-debts/pages/EmployeeDebtsPage'
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
           { path: 'inventory', element: <InventoryPage /> },
           { path: 'cash', element: <CashPage /> },
           { path: 'debts', element: <DebtsPage /> },
+          { path: 'debts/report', element: <DebtReportPage /> },
           { path: 'expenses', element: <ExpensesPage /> },
           { path: 'employee-debts', element: <EmployeeDebtsPage /> },
           { path: 'settings', element: <SettingsPage /> },
