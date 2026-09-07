@@ -7,6 +7,7 @@ import {
   getPurchaseImages,
 } from '@/features/purchases/api'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { getApiBaseUrl } from '@/shared/lib/api-url'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
@@ -109,7 +110,7 @@ export function PurchaseImagesDialog({ purchaseId, legacyImages = [], onClose }:
               {legacyImages.map((img) => {
                 const url = img.path.startsWith('http')
                   ? img.path
-                  : `${import.meta.env.VITE_API_URL ?? ''}${img.path}`
+                  : `${getApiBaseUrl()}${img.path}`
                 return (
                   <figure
                     key={img.path}

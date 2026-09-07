@@ -9,6 +9,8 @@
  * يولّد معاينة مصغّرة لكل استايل قبل الرفع.
  */
 
+import { getApiBaseUrl } from '@/shared/lib/api-url'
+
 export type ShareImageStyleId =
   | 'gold-luxury'
   | 'dark-noir'
@@ -100,7 +102,7 @@ function loadImage(
 
 function resolveImageUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url
-  const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
+  const apiBase = getApiBaseUrl()
   return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`
 }
 

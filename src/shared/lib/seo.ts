@@ -3,6 +3,8 @@
  * تُحقن الميتا ديناميكياً في صفحات SPA بعد التركيب.
  */
 
+import { getApiBaseUrl } from '@/shared/lib/api-url'
+
 export const SITE_NAME = 'جولد ماستر'
 export const SITE_NAME_LATIN = 'GOLDMASTER'
 export const SITE_DESCRIPTION =
@@ -13,7 +15,7 @@ export const SITE_PHONE_INTL = '+201551702595'
 export const TEL_LINK = `tel:${SITE_PHONE_INTL}`
 export const WHATSAPP_LINK = `https://wa.me/201551702595?text=${encodeURIComponent('مرحباً، أرغب في الاستفسار عن منتجات جولد ماستر.')}`
 
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
+const API_BASE = getApiBaseUrl()
 
 /**
  * رابط الموقع النهائي؛ يُحدد عبر VITE_SITE_URL عند البناء، وإلا يُشتق من النطاق الحالي.

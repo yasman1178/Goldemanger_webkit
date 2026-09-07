@@ -1,10 +1,10 @@
 import axios from 'axios'
 import api from '@/shared/lib/api'
+import { getApiBaseUrl } from '@/shared/lib/api-url'
 import type { CreateProductPayload, Product, PublicProduct } from './types'
 
 const base = '/api/Products'
-const API_BASE: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? ''
+const API_BASE: string = getApiBaseUrl()
 
 /** جلب بيانات المنتج العامة — بدون interceptor بهدف تجنّب تحويل 401 إلى صفحة تسجيل الدخول. */
 export async function getPublicProduct(
