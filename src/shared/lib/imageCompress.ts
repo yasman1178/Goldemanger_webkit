@@ -48,6 +48,7 @@ export async function preparePiecePhoto(
   watermark = PIECE_PHOTO_WATERMARK,
 ): Promise<File> {
   if (!file.type.startsWith('image/')) return file
+  if (typeof createImageBitmap === 'undefined') return file
   try {
     const bitmap = await createImageBitmap(file)
     const scale = Math.min(

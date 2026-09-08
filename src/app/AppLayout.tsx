@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
+import { useQuery } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   Menu,
@@ -24,12 +25,14 @@ import {
 } from 'lucide-react'
 
 import { useAuthStore } from '@/shared/stores/auth-store'
+import { useCurrencyStore } from '@/shared/stores/currency-store'
+import { getOverview } from '@/features/settings/api'
 import { BranchSelector } from '@/shared/components/BranchSelector'
 import { GoldPriceBar } from '@/features/sales/components/pos/GoldPriceBar'
 import { OnboardingBanner } from '@/features/settings/components/OnboardingBanner'
 import { ChangePasswordDialog } from '@/features/auth/components/ChangePasswordDialog'
 import { Button } from '@/shared/components/ui/button'
-import { cn } from '@/shared/lib/utils'
+import { cn, currencyFromCountry } from '@/shared/lib/utils'
 import {
   Sheet,
   SheetContent,
@@ -225,6 +228,26 @@ export function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { pathname } = useLocation()
   const branchName = useAuthStore((s) => s.branchDetails?.branchName)
+  const branchDetails = useAuthStore((s) => s.branchDetails)
+  const roles = useAuthStore((s) => s.user?.roles ?? [])
+  const selectedBranchId = useAuthStore((s) => s.selectedBranchId)
+  const setCurrency = useCurrencyStore((s) => s.setCurrency)
+  const isOwner = roles.includes('Owner')
+
+  const { data: overview } = useQuery({
+    queryKey: ['overview'],
+    queryFn: getOverview,
+    enabled: isOwner,
+  })
+
+  useEffect(() => {
+    let active = branchDetails?.currency ?? branchDetails?.country
+    if (isOwner && selectedBranchId != null && overview) {
+      const branch = overview.branches.find((b) => b.branchId === selectedBranchId)
+      active = branch?.currency ?? branch?.country ?? active
+    }
+    setCurrency(currencyFromCountry(active))
+  }, [isOwner, selectedBranchId, overview, branchDetails?.currency, branchDetails?.country, setCurrency])
   const isPos = pathname === '/app/sales'
 
   return (

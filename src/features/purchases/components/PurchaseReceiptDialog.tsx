@@ -192,6 +192,33 @@ export function PurchaseReceiptDialog({
               المسؤول: {purchase.userName}
             </div>
           )}
+          {purchase.paymentType === 1 && (
+            <div className="mt-0.5 rounded bg-primary/10 px-1.5 py-1 text-[11px] font-semibold text-primary">
+              طريقة الدفع: تبديل رصيد ذهب (Trade-In)
+            </div>
+          )}
+          {purchase.paymentType === 1 &&
+            (purchase.goldExchanges?.length ?? 0) > 0 && (
+              <div className="mt-1 text-[10px] text-muted-foreground">
+                {purchase.goldExchanges?.map((x, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span>
+                      استبدال {x.sourceType === 1 ? 'قطعة مخزن' : 'كسر'} —{' '}
+                      {x.weight} gm من {x.fromKarat}k إلى {x.toKarat}k
+                    </span>
+                    <span className="tabular-nums font-semibold text-foreground">
+                      {`فارق ${x.differenceGoldWeight > 0 ? `${x.differenceGoldWeight} gm` : ''}`}
+                      {x.differenceCash > 0
+                        ? `${x.differenceGoldWeight > 0 ? ' / ' : ''}${formatNumber(x.differenceCash)} ج.م`
+                        : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
           <div className="mt-1.5 border-t border-dashed border-black/60" />
 

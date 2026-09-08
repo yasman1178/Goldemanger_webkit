@@ -3,8 +3,10 @@ import { Camera, ImagePlus, Plus } from 'lucide-react'
 
 import { amountToNumber, purchaseLineMath } from '@/shared/lib/gold'
 import { formatEgp } from '@/shared/lib/utils'
+import { JEWELRY_ITEM_NAMES } from '@/shared/lib/jewelryItems'
 import { preparePiecePhoto } from '@/shared/lib/imageCompress'
 import { uploadPieceImage } from '@/features/purchases/api'
+import { StoragePicker, type StorageOption } from '@/shared/components/StoragePicker'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
@@ -32,6 +34,7 @@ export interface PieceDraft {
   factoryForSale: string
   quantity: string
   imageLink?: string
+  storageId?: string
 }
 
 export const EMPTY_PIECE_DRAFT: PieceDraft = {
@@ -58,16 +61,19 @@ interface Props {
   initial?: PieceDraft
   includeTax?: boolean
   commissionRate?: number
+  taxRate?: number
+  storages?: StorageOption[]
+  defaultStorageId?: string
   onConfirm: (draft: PieceDraft) => void
 }
 
-export function AddPieceDialog({ open, onOpenChange, goldPrice, initial, includeTax = true, commissionRate = 0, onConfirm }: Props) {
+export function AddPieceDialog({ open, onOpenChange, goldPrice, initial, includeTax = true, commissionRate = 0, taxRate = 0.01, storages = [], defaultStorageId, onConfirm }: Props) {
   // إعادة تهيئة النموذج عند كل فتح عبر remount (key) بدل useEffect — متوافق مع react-hooks/set-state-in-effect.
   const formKey = open ? JSON.stringify(initial ?? EMPTY_PIECE_DRAFT) : 'closed'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <PieceForm key={formKey} goldPrice={goldPrice} initial={initial} includeTax={includeTax} commissionRate={commissionRate} onConfirm={onConfirm} onCancel={() => onOpenChange(false)} />
+        <PieceForm key={formKey} goldPrice={goldPrice} initial={initial} includeTax={includeTax} commissionRate={commissionRate} taxRate={taxRate} storages={storages} defaultStorageId={defaultStorageId} onConfirm={onConfirm} onCancel={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   )
@@ -78,6 +84,9 @@ function PieceForm({
   initial,
   includeTax = true,
   commissionRate = 0,
+  taxRate = 0.01,
+  storages = [],
+  defaultStorageId,
   onConfirm,
   onCancel,
 }: {
@@ -85,10 +94,16 @@ function PieceForm({
   initial?: PieceDraft
   includeTax?: boolean
   commissionRate?: number
+  taxRate?: number
+  storages?: StorageOption[]
+  defaultStorageId?: string
   onConfirm: (draft: PieceDraft) => void
   onCancel: () => void
 }) {
-  const [draft, setDraft] = useState<PieceDraft>(initial ?? EMPTY_PIECE_DRAFT)
+  const [draft, setDraft] = useState<PieceDraft>({
+    ...(initial ?? EMPTY_PIECE_DRAFT),
+    storageId: initial?.storageId ?? defaultStorageId,
+  })
   const [error, setError] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -139,6 +154,7 @@ function PieceForm({
     supplierMaking,
     includeTax,
     includeTax ? 0 : commissionRate,
+    taxRate,
   )
   const goldValue = m.metal
   const stampAndTax = m.taxAndStamp
@@ -198,6 +214,21 @@ function PieceForm({
               placeholder="مثال: خاتم ذهب"
               className="h-12 touch-target rounded-[14px] border-primary/20 bg-white"
             />
+            <Select
+              value=""
+              onValueChange={(v) => v && set('productName', v)}
+            >
+              <SelectTrigger className="h-11 w-full rounded-[14px] border-primary/20 bg-white text-xs text-muted-foreground">
+                <SelectValue placeholder="أو اختر من الأصناف الشائعة…" />
+              </SelectTrigger>
+              <SelectContent>
+                {JEWELRY_ITEM_NAMES.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
@@ -334,6 +365,28 @@ function PieceForm({
             />
           </div>
 
+          {storages.length > 0 && (
+            <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <Label className="text-[13px] font-semibold">المخزن</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    يُخصم الذهب من هذا المخزن. فارغ = مخزن الفاتورة.
+                  </p>
+                </div>
+                <StoragePicker
+                  value={draft.storageId ?? ''}
+                  storages={storages}
+                  onChange={(v) => set('storageId', v === 'all' ? undefined : v)}
+                  allowAll={false}
+                  allowCreate={false}
+                  placeholder="المخزن"
+                  triggerClassName="bg-white"
+                />
+              </div>
+            </div>
+          )}
+
           {showSummary && (
             <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-[13px]">
               <div className="flex items-center justify-between">
@@ -344,7 +397,9 @@ function PieceForm({
               </div>
               {includeTax && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">دمغة وضريبة (1%)</span>
+                  <span className="text-muted-foreground">
+                    دمغة وضريبة ({(taxRate * 100).toFixed(2)}%)
+                  </span>
                   <span className="font-semibold tabular-nums text-foreground">
                     {formatEgp(stampAndTax)}
                   </span>

@@ -3,13 +3,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
+  ArrowLeftRight,
   ArrowRight,
   CheckCircle2,
+  Coins,
   ImagePlus,
   Package,
   Paperclip,
   Plus,
   Save,
+  Scale,
   Store,
   Trash2,
   UserPlus,
@@ -21,9 +24,10 @@ import { invalidateAfterPurchase } from '@/shared/lib/invalidateShop'
 import { AddPieceDialog, EMPTY_PIECE_DRAFT, type PieceDraft } from '@/features/purchases/components/AddPieceDialog'
 import { PurchaseReceiptDialog } from '@/features/purchases/components/PurchaseReceiptDialog'
 import type { ReceiptParty } from '@/features/purchases/components/PurchaseReceiptDialog'
-import type { Purchase, PurchaseLineDraft } from '@/features/purchases/types'
+import type { GoldExchangeLine, Purchase, PurchaseLineDraft, PurchasePaymentType } from '@/features/purchases/types'
 import { getProducts } from '@/features/products/api'
 import type { Product } from '@/features/products/types'
+import { StoragePicker, type StorageOption } from '@/shared/components/StoragePicker'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import {
@@ -42,6 +46,7 @@ import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { Switch } from '@/shared/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -65,6 +70,7 @@ const typeOptions = [
 ]
 
 let lineKey = 0
+let exchangeKey = 0
 
 function toLine(draft: PieceDraft): PurchaseLineDraft {
   return {
@@ -77,7 +83,25 @@ function toLine(draft: PieceDraft): PurchaseLineDraft {
     factoryForSale: draft.factoryForSale,
     quantity: draft.quantity,
     imageLink: draft.imageLink,
+    storageId: draft.storageId,
     committed: true,
+  }
+}
+
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000
+}
+
+function emptyExchange(storageId: string): GoldExchangeLine {
+  return {
+    key: exchangeKey++,
+    sourceType: 'brokenGold',
+    weight: '',
+    fromKarat: '21',
+    toKarat: '18',
+    differenceCash: '',
+    differenceGoldWeight: '',
+    storageId,
   }
 }
 
@@ -92,13 +116,14 @@ export function PurchaseCreatePage() {
 
   const [supplierId, setSupplierId] = useState('')
   const [partyMode, setPartyMode] = useState<PartyMode>('supplier')
+  const [paymentType, setPaymentType] = useState<PurchasePaymentType>('cash')
+  const [stampTaxRate, setStampTaxRate] = useState('1')
+  const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
   const [storageId, setStorageId] = useState('')
   const [isInitialStock, setIsInitialStock] = useState(false)
   const [newSupplierMode, setNewSupplierMode] = useState(false)
   const [newSupplierName, setNewSupplierName] = useState('')
   const [newSupplierPhone, setNewSupplierPhone] = useState('')
-  const [newStorageName, setNewStorageName] = useState('')
-  const [addingStorage, setAddingStorage] = useState(false)
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false)
   const [newCustomerName, setNewCustomerName] = useState('')
   const [newCustomerPhone, setNewCustomerPhone] = useState('')
@@ -109,6 +134,7 @@ export function PurchaseCreatePage() {
   const [invoiceImage, setInvoiceImage] = useState<AttachedFile | null>(null)
   const [idCardImage, setIdCardImage] = useState<AttachedFile | null>(null)
   const [lines, setLines] = useState<PurchaseLineDraft[]>([])
+  const [previewPiece, setPreviewPiece] = useState<PurchaseLineDraft | null>(null)
   const [savedResult, setSavedResult] = useState<{
     purchase: Purchase
     party: ReceiptParty | null
@@ -181,6 +207,7 @@ export function PurchaseCreatePage() {
     if (!goldPrice) return 0
     const isCustomer = partyMode === 'customer'
     const includeTax = !isCustomer
+    const taxRate = amountToNumber(stampTaxRate) / 100
     let total = 0
     for (const line of lines) {
       const weight = amountToNumber(line.weight)
@@ -194,11 +221,12 @@ export function PurchaseCreatePage() {
         amountToNumber(line.factory),
         includeTax,
         isCustomer ? customerCommissionRate : 0,
+        taxRate,
       )
       total += m.total
     }
     return Math.round(total)
-  }, [lines, goldPrice, partyMode, customerCommissionRate])
+  }, [lines, goldPrice, partyMode, customerCommissionRate, stampTaxRate])
 
   const byKarat = useMemo(() => {
     const map = new Map<number, { pieces: number; weight: number }>()
@@ -234,6 +262,25 @@ export function PurchaseCreatePage() {
         supplierId: resolvedSupplierId,
         totalAmount,
         isInitialStock,
+        paymentType,
+        stampTaxRate: amountToNumber(stampTaxRate) / 100,
+        goldExchanges:
+          paymentType === 'goldTradeIn'
+            ? exchanges.map((e) => ({
+                sourceType: e.sourceType,
+                productId: e.productId,
+                storageId: Number(e.storageId),
+                weight: amountToNumber(e.weight),
+                fromKarat: amountToNumber(e.fromKarat),
+                toKarat: amountToNumber(e.toKarat),
+                convertedWeight: round3(
+                  (amountToNumber(e.weight) * amountToNumber(e.fromKarat)) /
+                    amountToNumber(e.toKarat),
+                ),
+                differenceCash: amountToNumber(e.differenceCash),
+                differenceGoldWeight: amountToNumber(e.differenceGoldWeight),
+              }))
+            : undefined,
         invoiceImageFile: invoiceImage?.file ?? null,
         idCardImageFile:
           partyMode === 'customer' ? (idCardImage?.file ?? null) : null,
@@ -247,7 +294,7 @@ export function PurchaseCreatePage() {
             factory: amountToNumber(l.factory),
             factoryForSale: amountToNumber(l.factoryForSale),
             quantity: amountToNumber(l.quantity) || 1,
-            storageId: Number(storageId),
+            storageId: Number(l.storageId ?? storageId),
             imageLink: l.imageLink?.trim() || '',
           })),
       })
@@ -271,6 +318,9 @@ export function PurchaseCreatePage() {
       setLines([])
       setSupplierId('')
       setPartyMode('supplier')
+      setPaymentType('cash')
+      setStampTaxRate('1')
+      setExchanges([])
       setStorageId('')
       setIsInitialStock(false)
       setNewSupplierMode(false)
@@ -303,6 +353,20 @@ export function PurchaseCreatePage() {
     )
   }
 
+  function addExchange() {
+    setExchanges((prev) => [...prev, emptyExchange(storageId)])
+  }
+
+  function updateExchange(key: number, patch: Partial<GoldExchangeLine>) {
+    setExchanges((prev) =>
+      prev.map((e) => (e.key === key ? { ...e, ...patch } : e)),
+    )
+  }
+
+  function removeExchange(key: number) {
+    setExchanges((prev) => prev.filter((e) => e.key !== key))
+  }
+
   function pickProduct(p: Product) {
     setPieceInitial({
       productName: p.productName,
@@ -315,33 +379,6 @@ export function PurchaseCreatePage() {
     })
     setPickerOpen(false)
     setPieceDialogOpen(true)
-  }
-
-  async function handleCreateStorage() {
-    const name = newStorageName.trim()
-    if (!name) {
-      toast.error('اكتب اسم المخزن الجديد.')
-      return
-    }
-    try {
-      const created = await createStorage(name)
-      setStorageId(String(created.id))
-      setNewStorageName('')
-      setAddingStorage(false)
-      queryClient.invalidateQueries({ queryKey: ['storages'] })
-      toast.success('تم إنشاء المخزن ' + created.name)
-    } catch {
-      toast.error('فشل إنشاء المخزن.')
-    }
-  }
-
-  function handleStorageChange(value: string) {
-    if (value === '__new__') {
-      setAddingStorage(true)
-      return
-    }
-    setAddingStorage(false)
-    setStorageId(value)
   }
 
   async function handleCreateCustomer() {
@@ -373,6 +410,13 @@ export function PurchaseCreatePage() {
     }
   }
 
+  async function handleCreateStorage(name: string) {
+    const created = await createStorage(name)
+    queryClient.invalidateQueries({ queryKey: ['storages'] })
+    toast.success('تم إنشاء المخزن ' + created.name)
+    return created
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
@@ -398,6 +442,30 @@ export function PurchaseCreatePage() {
     if (validLines.length === 0) {
       toast.error('أضف قطعة واحدة على الأقل (اسم + وزن صالح).')
       return
+    }
+    if (paymentType === 'goldTradeIn') {
+      if (exchanges.length === 0) {
+        toast.error('أضف بند استبدال واحداً على الأقل.')
+        return
+      }
+      for (const e of exchanges) {
+        if (!e.storageId) {
+          toast.error('اختر المخزن لبند الاستبدال قبل الحفظ.')
+          return
+        }
+        if (
+          amountToNumber(e.weight) <= 0 ||
+          amountToNumber(e.fromKarat) <= 0 ||
+          amountToNumber(e.toKarat) <= 0
+        ) {
+          toast.error('أدخل وزناً وعيارات صحيحة لكل بند استبدال.')
+          return
+        }
+        if (e.sourceType === 'storeItem' && !e.productId) {
+          toast.error('اختر القطعة من المخزن لبند الاستبدال.')
+          return
+        }
+      }
     }
 
     mutation.mutate()
@@ -443,6 +511,50 @@ export function PurchaseCreatePage() {
             <div className="space-y-4 rounded-2xl border border-black/10 bg-white p-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
+                <Label>طريقة الدفع</Label>
+                <div className="mt-1.5 flex items-center gap-1 rounded-full border border-black/10 bg-black/5 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentType('cash')}
+                    className={cn(
+                      'flex h-9 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[14px] font-semibold transition-colors',
+                      paymentType === 'cash'
+                        ? 'bg-primary text-white'
+                        : 'text-muted-foreground hover:bg-black/5',
+                    )}
+                  >
+                    <Coins className="size-4" />
+                    شراء كاش
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (partyMode === 'customer') {
+                        setPartyMode('supplier')
+                        setNewSupplierMode(false)
+                        setSupplierId('')
+                      }
+                      setPaymentType('goldTradeIn')
+                    }}
+                    className={cn(
+                      'flex h-9 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[14px] font-semibold transition-colors',
+                      paymentType === 'goldTradeIn'
+                        ? 'bg-primary text-white'
+                        : 'text-muted-foreground hover:bg-black/5',
+                    )}
+                  >
+                    <ArrowLeftRight className="size-4" />
+                    تبديل رصيد ذهب
+                  </button>
+                </div>
+                {paymentType === 'goldTradeIn' && (
+                  <p className="mt-2 text-[13px] leading-[1.6] text-muted-foreground">
+                    تُسلَّم ذهب قديم (كسر أو قطع من المخزن) بدل قيمة الفاتورة —
+                    مع تحويل العيار وجني الفارق نقداً أو كمديونية للطرف الآخر.
+                  </p>
+                )}
+              </div>
+              <div className="sm:col-span-2">
                 <Label>نوع الشراء</Label>
                 <div className="mt-1.5 flex items-center gap-1 rounded-full border border-black/10 bg-black/5 p-1">
                   <button
@@ -468,6 +580,7 @@ export function PurchaseCreatePage() {
                       setPartyMode('customer')
                       setNewSupplierMode(false)
                       setSupplierId('')
+                      setPaymentType('cash')
                     }}
                     className={cn(
                       'flex h-9 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[14px] font-semibold transition-colors',
@@ -546,69 +659,50 @@ export function PurchaseCreatePage() {
 
               <div className="space-y-2">
                 <Label>المخزن *</Label>
-                {storages.length === 0 ? (
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
-                    <Input
-                      value={newStorageName}
-                      onChange={(e) => setNewStorageName(e.target.value)}
-                      placeholder="اسم المخزن الجديد"
-                      className="h-12 touch-target rounded-[14px]"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCreateStorage}
-                      className="h-12 rounded-[14px] px-4 touch-target"
-                    >
-                      إنشاء
-                    </Button>
-                  </div>
-                ) : (
-                  <Select
-                    value={addingStorage ? '__new__' : storageId}
-                    onValueChange={handleStorageChange}
-                  >
-                    <SelectTrigger className="w-full h-12 rounded-[14px]">
-                      <SelectValue placeholder="اختر المخزن" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {storages.map((s) => (
-                        <SelectItem key={s.id} value={String(s.id)}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="__new__">
-                        + إضافة مخزن جديد
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
+                <StoragePicker
+                  value={storageId}
+                  storages={storages}
+                  onChange={setStorageId}
+                  allowAll={false}
+                  placeholder="اختر المخزن"
+                  allowCreate
+                  onCreateStorage={handleCreateStorage}
+                  triggerClassName="w-full h-12 rounded-[14px] border border-black/10 bg-white text-[14px] font-medium text-foreground"
+                />
+              </div>
 
-                {storages.length > 0 && addingStorage && (
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-2">
-                    <Input
-                      value={newStorageName}
-                      onChange={(e) => setNewStorageName(e.target.value)}
-                      placeholder="اسم المخزن الجديد"
-                      className="h-12 touch-target rounded-[14px]"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setAddingStorage(false)}
-                      className="h-12 rounded-[14px] px-3 touch-target"
-                    >
-                      إلغاء
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={handleCreateStorage}
-                      className="h-12 rounded-[14px] px-4 touch-target"
-                    >
-                      إنشاء
-                    </Button>
-                  </div>
-                )}
+              <div className="flex items-center justify-between rounded-2xl border border-black/10 bg-white p-4">
+                <div>
+                  <Label className="text-[15px] font-semibold">
+                    رصيد أول المدة
+                  </Label>
+                  <p className="mt-0.5 text-[13px] leading-[1.5] text-muted-foreground">
+                    عند التفعيل تُحفظ القطع في المخزون دون خصم من الخزينة — لإدخال
+                    رصيدك الافتتاحي.
+                  </p>
+                </div>
+                <Switch
+                  checked={isInitialStock}
+                  onCheckedChange={setIsInitialStock}
+                  aria-label="فاتورة رصيد أول المدة"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="stamp-tax-rate">نسبة الدمغة والضريبة (%)</Label>
+                <Input
+                  id="stamp-tax-rate"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={stampTaxRate}
+                  onChange={(e) => setStampTaxRate(e.target.value)}
+                  placeholder="1.00"
+                  className="h-12 touch-target rounded-[14px]"
+                />
+                <p className="text-[12px] leading-[1.5] text-muted-foreground">
+                  نُسبة تُطبق على سعر الذهب في كل سطر. الافتراضي 1%.
+                </p>
               </div>
 
               {partyMode === 'supplier' && newSupplierMode && (
@@ -664,6 +758,68 @@ export function PurchaseCreatePage() {
               </div>
             </div>
 
+            {paymentType === 'goldTradeIn' && (
+              <div className="space-y-3 rounded-2xl border border-primary/30 bg-primary/[0.03] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Scale className="size-5" />
+                    </span>
+                    <div>
+                      <Label className="text-[16px] font-semibold">
+                        الذهب المستبدل (Trade-In)
+                      </Label>
+                      <p className="text-[13px] text-muted-foreground">
+                        الذهب الذي يُسلَّم بدل قيمة الفاتورة — يُحسب تحويل العيار
+                        تلقائياً ويُخصم من المخزن.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addExchange}
+                    className="h-10 gap-1.5 rounded-full px-4 text-sm touch-target"
+                  >
+                    <Plus className="size-4" />
+                    إضافة بند
+                  </Button>
+                </div>
+
+                {exchanges.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={addExchange}
+                    className="flex w-full flex-col items-center gap-2 rounded-[14px] border border-dashed border-primary/30 bg-primary/[0.04] p-5 text-center transition-colors hover:bg-primary/[0.08] touch-target"
+                  >
+                    <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <ArrowLeftRight className="size-5" />
+                    </span>
+                    <span className="text-[14px] font-bold text-foreground">
+                      لا توجد بنود استبدال
+                    </span>
+                    <span className="text-[13px] text-muted-foreground">
+                      اضغط هنا لإضافة كسر أو قطعة من المخزن تُسلَّم بدل الفاتورة
+                    </span>
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    {exchanges.map((exchange, index) => (
+                      <TradeInExchangeCard
+                        key={exchange.key}
+                        exchange={exchange}
+                        index={index}
+                        storages={storages}
+                        products={products}
+                        onUpdate={(patch) => updateExchange(exchange.key, patch)}
+                        onRemove={() => removeExchange(exchange.key)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3 rounded-2xl bg-secondary/70 p-3">
                 <Label className="text-[16px] font-semibold">
@@ -718,7 +874,9 @@ export function PurchaseCreatePage() {
                     goldPrice={goldPrice}
                     includeTax={partyMode !== 'customer'}
                     commissionRate={partyMode === 'customer' ? customerCommissionRate : 0}
+                    taxRate={amountToNumber(stampTaxRate) / 100}
                     onRemove={removeLine}
+                    onPreview={line.imageLink ? () => setPreviewPiece(line) : undefined}
                   />
                 ))}
               </div>
@@ -931,8 +1089,41 @@ export function PurchaseCreatePage() {
         initial={pieceInitial}
         includeTax={partyMode !== 'customer'}
         commissionRate={partyMode === 'customer' ? customerCommissionRate : 0}
+        taxRate={amountToNumber(stampTaxRate) / 100}
+        storages={storages}
+        defaultStorageId={storageId || undefined}
         onConfirm={confirmPiece}
       />
+
+      <Dialog open={previewPiece != null} onOpenChange={(open) => !open && setPreviewPiece(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-[18px]">
+              صورة القطعة — {previewPiece?.productName}
+            </DialogTitle>
+            <DialogDescription>
+              {previewPiece ? (
+                <>
+                  {amountToNumber(previewPiece.karat) || 0}K •{' '}
+                  {formatNumber(amountToNumber(previewPiece.weight) * (amountToNumber(previewPiece.quantity) || 1))} gm•{' '}
+                  {formatNumber(amountToNumber(previewPiece.quantity) || 1)} قطعة
+                </>
+              ) : (
+                ''
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {previewPiece?.imageLink && (
+            <div className="overflow-hidden rounded-2xl border border-black/10 bg-black/5">
+              <img
+                src={previewPiece.imageLink}
+                alt={previewPiece.productName}
+                className="max-h-[65vh] w-full object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <PurchaseReceiptDialog
         open={savedResult != null}
@@ -945,20 +1136,244 @@ export function PurchaseCreatePage() {
   )
 }
 
+function TradeInExchangeCard({
+  exchange,
+  index,
+  storages,
+  products,
+  onUpdate,
+  onRemove,
+}: {
+  exchange: GoldExchangeLine
+  index: number
+  storages: StorageOption[]
+  products: Product[]
+  onUpdate: (patch: Partial<GoldExchangeLine>) => void
+  onRemove: () => void
+}) {
+  const weight = amountToNumber(exchange.weight)
+  const fromKarat = amountToNumber(exchange.fromKarat)
+  const toKarat = amountToNumber(exchange.toKarat)
+  const convertedWeight =
+    weight > 0 && fromKarat > 0 && toKarat > 0
+      ? round3((weight * fromKarat) / toKarat)
+      : 0
+  const diffGold = amountToNumber(exchange.differenceGoldWeight)
+  const diffCash = amountToNumber(exchange.differenceCash)
+  const diffWeightValid = fromKarat > 0 && toKarat > 0
+
+  return (
+    <div className="rounded-2xl border border-black/10 bg-white p-3">
+      <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-2">
+        <span className="flex items-center gap-2 text-[13px] font-semibold text-muted-foreground">
+          <Scale className="size-4 text-primary" />
+          بند الاستبدال {index + 1}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex size-8 shrink-0 touch-target items-center justify-center rounded-full text-error hover:bg-error/10"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label className="text-[13px]">مصدر الذهب</Label>
+          <Select
+            value={exchange.sourceType}
+            onValueChange={(v) =>
+              onUpdate({
+                sourceType: v as 'brokenGold' | 'storeItem',
+                productId: undefined,
+                productName: undefined,
+              })
+            }
+          >
+            <SelectTrigger className="h-11 w-full rounded-[14px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="brokenGold">كسر (خردة ذهب)</SelectItem>
+              <SelectItem value="storeItem">قطعة من المخزن</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[13px]">المخزن *</Label>
+          <StoragePicker
+            value={exchange.storageId}
+            storages={storages}
+            onChange={(v) => onUpdate({ storageId: v })}
+            allowAll={false}
+            allowCreate={false}
+            placeholder="المخزن"
+            triggerClassName="w-full h-11 rounded-[14px] border border-black/10 bg-white text-[14px] font-medium text-foreground"
+          />
+        </div>
+
+        {exchange.sourceType === 'storeItem' && (
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="text-[13px]">القطعة من المخزن</Label>
+            <Select
+              value={exchange.productId ? String(exchange.productId) : ''}
+              onValueChange={(v) => {
+                const p = products.find((x) => String(x.productId) === v)
+                onUpdate({
+                  productId: p?.productId,
+                  productName: p?.productName,
+                })
+              }}
+            >
+              <SelectTrigger className="h-11 w-full rounded-[14px]">
+                <SelectValue placeholder="اختر قطعة من المخزن…" />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map((p) => (
+                  <SelectItem key={p.productId} value={String(p.productId)}>
+                    {p.productName} — {p.karat}K •{' '}
+                    {formatNumber(p.weight)} gm
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <Label className="text-[13px]">الوزن المسلَّم (جم) *</Label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={exchange.weight}
+            onChange={(e) => onUpdate({ weight: e.target.value })}
+            placeholder="0.00"
+            className="h-11 touch-target rounded-[14px]"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-[13px]">من عيار</Label>
+            <Select
+              value={exchange.fromKarat}
+              onValueChange={(v) => onUpdate({ fromKarat: v })}
+            >
+              <SelectTrigger className="h-11 w-full rounded-[14px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {['18', '21', '22', '24'].map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {k}k
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[13px]">إلى عيار</Label>
+            <Select value={exchange.toKarat} onValueChange={(v) => onUpdate({ toKarat: v })}>
+              <SelectTrigger className="h-11 w-full rounded-[14px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {['18', '21', '22', '24'].map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {k}k
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {diffWeightValid && convertedWeight > 0 && (
+          <div className="space-y-1 rounded-xl bg-secondary/60 p-2.5 sm:col-span-2">
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="text-muted-foreground">
+                الوزن المحوَّل إلى {toKarat}k
+              </span>
+              <span className="font-semibold tabular-nums text-foreground">
+                {formatNumber(convertedWeight)} gm
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="text-muted-foreground">معادلة التحويل</span>
+              <span className="tabular-nums text-muted-foreground" dir="ltr">
+                {formatNumber(weight)} × {fromKarat} ÷ {toKarat}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div className="sm:col-span-2 grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-[13px]">فارق وزن (جم)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={exchange.differenceGoldWeight}
+              onChange={(e) => onUpdate({ differenceGoldWeight: e.target.value })}
+              placeholder="0.00"
+              className="h-11 touch-target rounded-[14px]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[13px]">فارق نقدي (ج.م)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={exchange.differenceCash}
+              onChange={(e) => onUpdate({ differenceCash: e.target.value })}
+              placeholder="0.00"
+              className="h-11 touch-target rounded-[14px]"
+            />
+          </div>
+        </div>
+
+        {(diffGold > 0 || diffCash > 0) && (
+          <div className="sm:col-span-2 space-y-1 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-[13px]">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">فارق وزن (ذهب)</span>
+              <span className="font-semibold tabular-nums text-foreground">
+                {formatNumber(diffGold)} gm
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">فارق نقدي</span>
+              <span className="font-semibold tabular-nums text-primary">
+                {formatEgp(diffCash)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function CommittedLineRow({
   line,
   index,
   goldPrice,
   includeTax,
   commissionRate = 0,
+  taxRate = 0.01,
   onRemove,
+  onPreview,
 }: {
   line: PurchaseLineDraft
   index: number
   goldPrice: number
   includeTax: boolean
   commissionRate?: number
+  taxRate?: number
   onRemove: (key: number) => void
+  onPreview?: () => void
 }) {
   const weight = amountToNumber(line.weight)
   const quantity = amountToNumber(line.quantity) || 1
@@ -972,6 +1387,7 @@ function CommittedLineRow({
     supplierMaking,
     includeTax,
     includeTax ? 0 : commissionRate,
+    taxRate,
   )
   const goldValue = m.metal
   const stampAndTax = m.taxAndStamp
@@ -984,7 +1400,22 @@ function CommittedLineRow({
     <div className="rounded-2xl border border-black/5 bg-secondary/40 p-3 elevation-card">
       <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-2">
         <span className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-muted-foreground">
-          <CheckCircle2 className="size-4 shrink-0 text-success" />
+          {line.imageLink && onPreview ? (
+            <button
+              type="button"
+              onClick={onPreview}
+              aria-label={`عرض صورة القطعة ${index + 1}: ${line.productName}`}
+              className="flex size-10 shrink-0 touch-target items-center justify-center overflow-hidden rounded-xl border border-black/10 bg-white"
+            >
+              <img
+                src={line.imageLink}
+                alt=""
+                className="size-full object-cover"
+              />
+            </button>
+          ) : (
+            <CheckCircle2 className="size-4 shrink-0 text-success" />
+          )}
           القطعة {index + 1}
           <span className="truncate text-foreground">{line.productName}</span>
         </span>
@@ -1038,7 +1469,9 @@ function CommittedLineRow({
         </div>
         {includeTax && (
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">دمغة وضريبة (1%)</span>
+            <span className="text-muted-foreground">
+              دمغة وضريبة ({(taxRate * 100).toFixed(2)}%)
+            </span>
             <span className="font-semibold tabular-nums text-foreground">
               {goldPrice > 0 ? formatEgp(stampAndTax) : '—'}
             </span>

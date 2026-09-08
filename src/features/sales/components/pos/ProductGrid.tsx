@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import {
   Search,
   X,
@@ -6,7 +6,6 @@ import {
   Plus,
   TriangleAlert,
   ScanBarcode,
-  Boxes,
 } from 'lucide-react'
 
 import type { Product } from '@/features/products/types'
@@ -18,6 +17,7 @@ import type { CartLine } from './types'
 import { karatLabel } from './types'
 import { FormatEg } from './Money'
 import { Badge } from '@/shared/components/ui/badge'
+import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/components/ui/dialog'
-import { Button } from '@/shared/components/ui/button'
+import { StoragePicker } from '@/shared/components/StoragePicker'
 
 const categories = [
   { key: 'all', label: 'الكل' },
@@ -83,7 +83,6 @@ export function ProductGrid({
   const [barcode, setBarcode] = useState('')
   const [category, setCategory] = useState('all')
   const [storageFilter, setStorageFilter] = useState('all')
-  const [storageOpen, setStorageOpen] = useState(false)
   const [preview, setPreview] = useState<Product | null>(null)
   const [barcodeStatus, setBarcodeStatus] = useState<
     'idle' | 'notfound' | 'found'
@@ -227,30 +226,18 @@ export function ProductGrid({
 
         <span className="ms-1 h-8 w-px shrink-0 bg-black/10" aria-hidden />
 
-        <button
-          type="button"
-          onClick={() => setStorageOpen(true)}
-          className={cn(
-            'flex h-11 shrink-0 touch-target items-center gap-2 rounded-xl border-2 px-4 text-[13px] font-semibold transition-colors',
+        <StoragePicker
+          value={storageFilter}
+          storages={storages}
+          onChange={(value) => setStorageFilter(value)}
+          allLabel="المخزن"
+          placeholder="المخزن"
+          triggerClassName={
             selectedStorage
               ? 'border-primary bg-primary/10 text-primary'
-              : 'border-dashed border-black/25 bg-white text-muted-foreground hover:border-primary/60 hover:text-primary',
-          )}
-        >
-          <Boxes className="size-4" />
-          {selectedStorage ? (
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="hidden text-[11px] font-bold tabular-nums md:inline">
-                مخزن #{selectedStorage.id}
-              </span>
-              <span className="min-w-0 truncate text-foreground">
-                {selectedStorage.name}
-              </span>
-            </span>
-          ) : (
-            <span>المخزن</span>
-          )}
-        </button>
+              : 'border-dashed border-black/25 bg-white text-muted-foreground hover:border-primary/60 hover:text-primary'
+          }
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -376,16 +363,6 @@ export function ProductGrid({
         }}
       />
 
-      <StoragePickerDialog
-        open={storageOpen}
-        storages={storages}
-        value={storageFilter}
-        onClose={() => setStorageOpen(false)}
-        onSelect={(value) => {
-          setStorageFilter(value)
-          setStorageOpen(false)
-        }}
-      />
     </div>
   )
 }
@@ -494,110 +471,5 @@ function QuickViewRow({ label, value }: { label: string; value: string }) {
         {value}
       </p>
     </div>
-  )
-}
-
-function StoragePickerDialog({
-  open,
-  storages,
-  value,
-  onClose,
-  onSelect,
-}: {
-  open: boolean
-  storages: StorageLocation[]
-  value: string
-  onClose: () => void
-  onSelect: (value: string) => void
-}) {
-  const allCount = storages.length
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[18px]">
-            <Boxes className="size-5 text-primary" />
-            اختيار المخزن
-          </DialogTitle>
-          <DialogDescription>
-            اعرض قطع مخزن واحد بالضغط على رقمه
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => onSelect('all')}
-            className={cn(
-              'flex h-14 w-full touch-target items-center gap-3 rounded-2xl border-2 px-4 text-start transition-colors',
-              value === 'all'
-                ? 'border-primary bg-primary/10'
-                : 'border-black/10 bg-white hover:border-primary/50',
-            )}
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted-foreground/10 text-[13px] font-bold tabular-nums text-foreground">
-              {allCount}
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[14px] font-bold text-foreground">
-                كل المخازن
-              </span>
-              <span className="block text-[11px] text-muted-foreground">
-                عرض كل القطع المتاحة
-              </span>
-            </span>
-          </button>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            {storages.map((s) => {
-              const active = value === String(s.id)
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => onSelect(String(s.id))}
-                  className={cn(
-                    'flex h-16 touch-target items-center gap-3 rounded-2xl border-2 px-3 text-start transition-colors',
-                    active
-                      ? 'border-primary bg-primary/10'
-                      : 'border-black/10 bg-white hover:border-primary/50',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'flex size-9 shrink-0 items-center justify-center rounded-xl text-[13px] font-bold tabular-nums',
-                      active
-                        ? 'bg-primary text-white'
-                        : 'bg-primary/10 text-primary',
-                    )}
-                  >
-                    {s.id}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[13px] font-bold text-foreground">
-                      {s.name}
-                    </span>
-                    <span className="block text-[10px] tabular-nums text-muted-foreground">
-                      مخزن #{s.id}
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button
-            type="button"
-            onClick={onClose}
-            className="h-11 flex-1 rounded-full touch-target"
-          >
-            إغلاق
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }

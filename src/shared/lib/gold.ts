@@ -14,6 +14,10 @@ export function salePerGram(gold21Price: number, karat: number): number {
   return purchasePerGram(gold21Price, karat) + SALE_MARKUP
 }
 
+export function buyPerGram(gold21Price: number, karat: number): number {
+  return purchasePerGram(gold21Price, karat)
+}
+
 export interface CartLineMath {
   metal: number
   margin: number
@@ -35,7 +39,7 @@ export interface PurchaseLineMath {
  * حساب سطر من فاتورة شراء:
  * - metal: سعر الذهب (الوزن × سعر الجرام حسب العيار)
  * - making: مصنعية المورد (مصنعية المورد/جم × الوزن)
- * - taxAndStamp: الدمغة والضريبة (1% من سعر الذهب) — تُستبعد عند الشراء من عميل
+ * - taxAndStamp: الدمغة والضريبة (نسبة من سعر الذهب، افتراضياً 1%) — تُستبعد عند الشراء من عميل
  * - commission: عمولة الشراء من عميل (نسبة × سعر الذهب) — تُخصم عند الشراء من عميل
  */
 export function purchaseLineMath(
@@ -46,11 +50,12 @@ export function purchaseLineMath(
   supplierMaking: number,
   includeTax = true,
   commissionRate = 0,
+  taxRate = TAX_AND_STAMP_RATE,
 ): PurchaseLineMath {
   const perGram = karat > 0 ? purchasePerGram(gold21Price, karat) : 0
   const metal = perGram * weight * quantity
   const making = supplierMaking * weight * quantity
-  const taxAndStamp = includeTax ? metal * TAX_AND_STAMP_RATE : 0
+  const taxAndStamp = includeTax ? metal * (taxRate > 0 ? taxRate : 0) : 0
   const commission = includeTax ? 0 : metal * (commissionRate > 0 ? commissionRate : 0)
   return { metal, making, taxAndStamp, commission, total: metal + making + taxAndStamp - commission }
 }

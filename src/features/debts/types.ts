@@ -10,6 +10,35 @@ export interface Debt {
   paymentDate?: string | null
   clientName?: string | null
   clientPhone?: string | null
+  debtType?: number
+  balanceType?: number
+  description?: string | null
+}
+
+export type DebtType = 'debit' | 'credit'
+export type BalanceValue = 'cash' | 'gold'
+
+export function getDebtType(debt: Debt): DebtType {
+  return debt.debtType === 1 ? 'credit' : 'debit'
+}
+
+export function getBalanceType(debt: Debt): BalanceValue {
+  return debt.balanceType === 1 ? 'gold' : 'cash'
+}
+
+export const debtTypeLabels: Record<DebtType, string> = {
+  debit: 'مدين (عليه للمحل)',
+  credit: 'دائن (له رصيد لدى المحل)',
+}
+
+export const debtTypeShortLabels: Record<DebtType, string> = {
+  debit: 'مدين',
+  credit: 'دائن',
+}
+
+export const balanceTypeLabels: Record<BalanceValue, string> = {
+  cash: 'نقدي',
+  gold: 'ذهب',
 }
 
 export interface CreateDebtPayload {
@@ -21,6 +50,9 @@ export interface CreateDebtPayload {
   paidAmount: number
   dueDate: string
   paymentDate?: string | null
+  debtType?: DebtType
+  balanceType?: BalanceValue
+  description?: string | null
 }
 
 export interface UpdateDebtPayload extends CreateDebtPayload {
@@ -35,6 +67,8 @@ export interface DebtClientSummary {
   clientPhone?: string | null
   totalOwed: number
   totalPaid: number
+  debitRemaining: number
+  creditRemaining: number
   remaining: number
   invoiceCount: number
   dueDate: string

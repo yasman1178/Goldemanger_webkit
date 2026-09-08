@@ -3,9 +3,12 @@ import { RefreshCw, Pencil, Loader2, Gem } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { fetchLiveGoldPrice, saveGoldPrice } from '@/shared/lib/parties'
-import { purchasePerGram, salePerGram } from '@/shared/lib/gold'
+import type { LiveGoldPrice } from '@/shared/lib/parties'
+import { purchasePerGram, salePerGram, buyPerGram } from '@/shared/lib/gold'
 import { FormatEg } from './Money'
 import { useGoldStore } from '@/shared/stores/gold-store'
+import { useCurrencyStore } from '@/shared/stores/currency-store'
+import { currencySymbol } from '@/shared/lib/utils'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
 import { Button } from '@/shared/components/ui/button'
@@ -26,8 +29,12 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
   const setLastFetchTime = useGoldStore((s) => s.setLastFetchTime)
   const lastFetchTime = useGoldStore((s) => s.lastFetchTime)
   const freezeGold = useGoldStore((s) => s.freezeGold)
+  const currency = useCurrencyStore((s) => s.currency)
   const [editOpen, setEditOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [livePrices, setLivePrices] = useState<LiveGoldPrice | null>(null)
+
+  const country = currency === 'SAR' ? 'sa' : 'eg'
 
   const gold21Ref = useRef(gold21)
   useEffect(() => {
@@ -50,23 +57,24 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
   }, [freezeGold])
 
   async function pull() {
-    const data = await fetchLiveGoldPrice()
-    if (!data || data.gram21 <= 0) {
+    const data = await fetchLiveGoldPrice(country)
+    if (!data || data.gram21Sell <= 0) {
       toast.error('تعذّر الحصول على سعر الذهب من المصدر.')
       return false
     }
+    setLivePrices(data)
     setLastFetchTime(
       new Date().toLocaleString('ar-EG', { timeStyle: 'short' }),
     )
     if (
       !freezeRef.current &&
       !editOpenRef.current &&
-      Math.abs(data.gram21 - gold21Ref.current) > 0.1
+      Math.abs(data.gram21Sell - gold21Ref.current) > 0.1
     ) {
-      await saveGoldPrice(data.gram21, 'update')
+      await saveGoldPrice(data.gram21Sell, 'update')
     }
     if (!freezeRef.current) {
-      onPriceChangeRef.current(data.gram21)
+      onPriceChangeRef.current(data.gram21Sell)
     }
     return true
   }
@@ -78,20 +86,21 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
       if (busy) return
       busy = true
       try {
-        const data = await fetchLiveGoldPrice()
-        if (!stopped && data && data.gram21 > 0) {
+        const data = await fetchLiveGoldPrice(country)
+        if (!stopped && data && data.gram21Sell > 0) {
+          setLivePrices(data)
           setLastFetchTime(
             new Date().toLocaleString('ar-EG', { timeStyle: 'short' }),
           )
           if (
             !freezeRef.current &&
             !editOpenRef.current &&
-            Math.abs(data.gram21 - gold21Ref.current) > 0.1
+            Math.abs(data.gram21Sell - gold21Ref.current) > 0.1
           ) {
-            await saveGoldPrice(data.gram21, 'update')
+            await saveGoldPrice(data.gram21Sell, 'update')
           }
           if (!freezeRef.current) {
-            onPriceChangeRef.current(data.gram21)
+            onPriceChangeRef.current(data.gram21Sell)
           }
         }
       } finally {
@@ -107,7 +116,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
       stopped = true
       clearInterval(id)
     }
-  }, [setLastFetchTime, hidePriceRefresh])
+  }, [setLastFetchTime, hidePriceRefresh, country])
 
   async function refresh() {
     setRefreshing(true)
@@ -123,7 +132,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
           type="button"
           onClick={refresh}
           disabled={refreshing}
-          title="جلب السعر من zahabprice.com"
+          title="جلب السعر من gold-price-today.com"
           className="flex h-9 shrink-0 touch-target items-center gap-1.5 rounded-full bg-primary px-2.5 text-[12px] font-bold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
         >
           {refreshing ? (
@@ -137,11 +146,11 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
 
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
         {KARATS.map((k) => (
-          <PriceChip
+          <MarketChip
             key={k}
             karat={k}
-            buy={purchasePerGram(gold21, k)}
-            sell={salePerGram(gold21, k)}
+            sell={livePrices?.[`gram${k}Sell` as 'gram24Sell'] ?? salePerGram(gold21, k)}
+            buy={livePrices?.[`gram${k}Buy` as 'gram24Buy'] ?? buyPerGram(gold21, k)}
           />
         ))}
       </div>
@@ -173,7 +182,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
   )
 }
 
-function PriceChip({
+function MarketChip({
   karat,
   buy,
   sell,
@@ -223,6 +232,7 @@ function GoldPriceEditDialog({
   const [draft, setDraft] = useState(String(gold21))
   const [saving, setSaving] = useState(false)
   const [prevOpen, setPrevOpen] = useState(open)
+  const currency = useCurrencyStore((s) => s.currency)
 
   if (open !== prevOpen) {
     setPrevOpen(open)
@@ -248,7 +258,7 @@ function GoldPriceEditDialog({
     }
     onSave(draftValue)
     onOpenChange(false)
-    toast.success(`تم تحديث سعر الذهب إلى ${draftValue} ج.م`)
+    toast.success(`تم تحديث سعر الذهب إلى ${draftValue} ${currencySymbol(currency)}`)
   }
 
   return (
@@ -263,7 +273,7 @@ function GoldPriceEditDialog({
 
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="gold-draft">سعر الجرام عيار 21 (ج.م)</Label>
+            <Label htmlFor="gold-draft">سعر الجرام عيار 21 ({currencySymbol(currency)})</Label>
             <Input
               id="gold-draft"
               type="number"

@@ -20,6 +20,7 @@ import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
 import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
+import { StoragePicker } from '@/shared/components/StoragePicker'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
@@ -431,26 +432,16 @@ export function InventoryPage() {
             </button>
           )}
         </div>
-        <Select
+        <StoragePicker
           value={storageFilter}
-          onValueChange={(value) => {
+          storages={storages}
+          onChange={(value) => {
             reset()
             setStorageFilter(value)
             setUnitStorageFilter(value)
           }}
-        >
-          <SelectTrigger className="w-full h-11 rounded-full border-black/10 bg-white sm:w-48">
-            <SelectValue placeholder="كل المخازن" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">كل المخازن</SelectItem>
-            {storages.map((s) => (
-              <SelectItem key={s.id} value={String(s.id)}>
-                {s.location}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          triggerClassName="flex h-11 w-full items-center gap-2 rounded-full border border-black/10 bg-white px-4 text-[13px] font-medium text-foreground sm:w-48"
+        />
       </div>
 
       {isLoading ? (

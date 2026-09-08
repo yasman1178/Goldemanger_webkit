@@ -17,6 +17,21 @@ export interface PurchaseProduct {
   storageId?: number | null
 }
 
+export type PurchasePaymentType = 'cash' | 'goldTradeIn'
+
+export interface GoldExchangeLine {
+  key: number
+  sourceType: 'brokenGold' | 'storeItem'
+  productId?: number
+  productName?: string
+  weight: string
+  fromKarat: string
+  toKarat: string
+  differenceCash: string
+  differenceGoldWeight: string
+  storageId: string
+}
+
 export interface Purchase {
   id: number
   userId?: string
@@ -35,6 +50,20 @@ export interface Purchase {
   supplierPhone?: string | null
   isActive: boolean
   goldPrice21AtPurchase?: number | null
+  paymentType?: number
+  stampTaxRate?: number
+  goldExchanges?: Array<{
+    id: number
+    sourceType: number
+    productId?: number | null
+    storageId: number
+    weight: number
+    fromKarat: number
+    toKarat: number
+    convertedWeight: number
+    differenceCash: number
+    differenceGoldWeight: number
+  }>
   productsDot?: PurchaseProduct[]
 }
 
@@ -49,6 +78,7 @@ export interface PurchaseLineDraft {
   quantity: string
   committed?: boolean
   imageLink?: string
+  storageId?: string
 }
 
 export interface CreatePurchasePayload {
@@ -56,6 +86,19 @@ export interface CreatePurchasePayload {
   branchId: number
   totalAmount: number
   isInitialStock: boolean
+  paymentType: PurchasePaymentType
+  stampTaxRate: number
+  goldExchanges?: Array<{
+    sourceType: 'brokenGold' | 'storeItem'
+    productId?: number
+    storageId: number
+    weight: number
+    fromKarat: number
+    toKarat: number
+    convertedWeight: number
+    differenceCash: number
+    differenceGoldWeight: number
+  }>
   products: Array<{
     productName: string
     weight: number

@@ -18,7 +18,7 @@ import {
   type DebtClientSummary,
 } from '@/features/debts/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
-import { formatEgp } from '@/shared/lib/utils'
+import { formatEgp, cn } from '@/shared/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
@@ -75,6 +75,8 @@ export function DebtReportPage() {
     () => ({
       owed: summary.reduce((acc, s) => acc + s.totalOwed, 0),
       paid: summary.reduce((acc, s) => acc + s.totalPaid, 0),
+      debit: summary.reduce((acc, s) => acc + s.debitRemaining, 0),
+      credit: summary.reduce((acc, s) => acc + s.creditRemaining, 0),
       remaining: summary.reduce((acc, s) => acc + s.remaining, 0),
       clients: summary.length,
     }),
@@ -126,38 +128,38 @@ export function DebtReportPage() {
         <Card size="sm" className="rounded-[14px] elevation-card">
           <CardHeader>
             <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-              <span>إجمالي المستحق</span>
-              <Wallet className="size-4 text-muted-foreground/60" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-foreground">
-              {formatEgp(totals.owed)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card size="sm" className="rounded-[14px] elevation-card">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-              <span>المسدَّد</span>
-              <FileText className="size-4 text-success/60" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-success">
-              {formatEgp(totals.paid)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card size="sm" className="rounded-[14px] elevation-card">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-              <span>المتبقي</span>
+              <span>إجمالي متبقي عليهم (مدين)</span>
               <Wallet className="size-4 text-warning/60" />
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-warning">
+              {formatEgp(totals.debit)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card size="sm" className="rounded-[14px] elevation-card">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
+              <span>إجمالي متبقي لهم (دائن)</span>
+              <FileText className="size-4 text-success/60" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-success">
+              {formatEgp(totals.credit)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card size="sm" className="rounded-[14px] elevation-card">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
+              <span>متبقّي (مدين − دائن)</span>
+              <Wallet className="size-4 text-primary/60" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-primary">
               {formatEgp(totals.remaining)}
             </div>
           </CardContent>
@@ -204,9 +206,9 @@ export function DebtReportPage() {
                 <TableHead>العميل</TableHead>
                 <TableHead>الهاتف</TableHead>
                 <TableHead>الفواتير</TableHead>
-                <TableHead>المستحق</TableHead>
-                <TableHead>المدفوع</TableHead>
-                <TableHead>المتبقي</TableHead>
+                <TableHead>متبقّي مدين (عليه)</TableHead>
+                <TableHead>متبقّي دائن (له)</TableHead>
+                <TableHead>الصافي</TableHead>
                 <TableHead className="text-end">التقرير التفصيلي</TableHead>
               </TableRow>
             </TableHeader>
@@ -222,11 +224,18 @@ export function DebtReportPage() {
                   <TableCell className="tabular-nums">
                     <Badge variant="secondary">{s.invoiceCount}</Badge>
                   </TableCell>
-                  <TableCell className="tabular-nums">{formatEgp(s.totalOwed)}</TableCell>
-                  <TableCell className="tabular-nums text-success">
-                    {formatEgp(s.totalPaid)}
+                  <TableCell className="tabular-nums text-warning">
+                    {formatEgp(s.debitRemaining)}
                   </TableCell>
-                  <TableCell className="tabular-nums font-semibold text-warning">
+                  <TableCell className="tabular-nums text-success">
+                    {formatEgp(s.creditRemaining)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      'tabular-nums font-semibold',
+                      s.remaining >= 0 ? 'text-warning' : 'text-success',
+                    )}
+                  >
                     {formatEgp(s.remaining)}
                   </TableCell>
                   <TableCell className="text-end">
@@ -247,16 +256,16 @@ export function DebtReportPage() {
           </Table>
           <div className="grid grid-cols-2 gap-3 border-t border-black/5 bg-muted/40 px-4 py-3 lg:grid-cols-4">
             <div className="flex justify-between text-[13px]">
-              <span className="text-muted-foreground">إجمالي مستحق</span>
-              <span className="font-bold tabular-nums text-foreground">{formatEgp(totals.owed)}</span>
+              <span className="text-muted-foreground">إجمالي متبقي مدين</span>
+              <span className="font-bold tabular-nums text-warning">{formatEgp(totals.debit)}</span>
             </div>
             <div className="flex justify-between text-[13px]">
-              <span className="text-muted-foreground">إجمالي مدفوع</span>
-              <span className="font-bold tabular-nums text-success">{formatEgp(totals.paid)}</span>
+              <span className="text-muted-foreground">إجمالي متبقي دائن</span>
+              <span className="font-bold tabular-nums text-success">{formatEgp(totals.credit)}</span>
             </div>
             <div className="flex justify-between text-[13px]">
-              <span className="text-muted-foreground">إجمالي متبقي</span>
-              <span className="font-bold tabular-nums text-warning">{formatEgp(totals.remaining)}</span>
+              <span className="text-muted-foreground">الصافي (مدين − دائن)</span>
+              <span className="font-bold tabular-nums text-primary">{formatEgp(totals.remaining)}</span>
             </div>
           </div>
         </Card>
@@ -286,7 +295,16 @@ function ClientDetail({
     () => ({
       owed: sorted.reduce((acc, d) => acc + d.amountOwed, 0),
       paid: sorted.reduce((acc, d) => acc + d.paidAmount, 0),
-      remaining: sorted.reduce((acc, d) => acc + (d.amountOwed - d.paidAmount), 0),
+      debit: sorted.reduce(
+        (acc, d) =>
+          acc + ((d.debtType === 0 ? d.amountOwed - d.paidAmount : 0) as number),
+        0,
+      ),
+      credit: sorted.reduce(
+        (acc, d) =>
+          acc + ((d.debtType === 1 ? d.amountOwed - d.paidAmount : 0) as number),
+        0,
+      ),
     }),
     [sorted],
   )
@@ -318,10 +336,17 @@ function ClientDetail({
           </div>
           <div className="text-end">
             <div className="text-[12px] font-semibold text-muted-foreground">
-              إجمالي متبقي
+              الصافي (مدين − دائن)
             </div>
-            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-warning">
-              {formatEgp(detailTotals.remaining)}
+            <div
+              className={cn(
+                'tabular-nums text-[24px] font-bold leading-[1.1]',
+                detailTotals.debit - detailTotals.credit >= 0
+                  ? 'text-warning'
+                  : 'text-success',
+              )}
+            >
+              {formatEgp(detailTotals.debit - detailTotals.credit)}
             </div>
           </div>
         </div>
@@ -359,6 +384,7 @@ function ClientDetail({
             <TableHeader>
               <TableRow>
                 <TableHead>الفاتورة</TableHead>
+                <TableHead>النوع</TableHead>
                 <TableHead>تاريخ الاستحقاق</TableHead>
                 <TableHead>المستحق</TableHead>
                 <TableHead>المدفوع</TableHead>
@@ -371,7 +397,7 @@ function ClientDetail({
                 <DebtRow key={debt.debtId} debt={debt} />
               ))}
               <TableRow className="bg-muted/50 font-bold">
-                <TableCell colSpan={2} className="text-foreground">
+                <TableCell colSpan={3} className="text-foreground">
                   الإجمالي
                 </TableCell>
                 <TableCell className="tabular-nums text-foreground">
@@ -381,7 +407,7 @@ function ClientDetail({
                   {formatEgp(detailTotals.paid)}
                 </TableCell>
                 <TableCell className="tabular-nums text-warning">
-                  {formatEgp(detailTotals.remaining)}
+                  {formatEgp(detailTotals.debit - detailTotals.credit)}
                 </TableCell>
                 <TableCell />
               </TableRow>
@@ -396,18 +422,43 @@ function ClientDetail({
 function DebtRow({ debt }: { debt: Debt }) {
   const status = getDebtStatus(debt)
   const remaining = Math.max(0, debt.amountOwed - debt.paidAmount)
+  const isCredit = debt.debtType === 1
   return (
     <TableRow>
       <TableCell className="tabular-nums font-semibold text-primary" dir="ltr">
         #{debt.saleId ?? debt.debtId}
       </TableCell>
+      <TableCell>
+        <span className="flex flex-wrap items-center gap-1">
+          <Badge variant={isCredit ? 'default' : 'secondary'}>
+            {isCredit ? 'دائن' : 'مدين'}
+          </Badge>
+          {debt.balanceType === 1 && (
+            <Badge variant="outline">ذهب {debt.amountOwed} جم</Badge>
+          )}
+          {debt.description && (
+            <span className="block w-full text-[11px] font-normal text-muted-foreground">
+              {debt.description}
+            </span>
+          )}
+        </span>
+      </TableCell>
       <TableCell className="tabular-nums text-muted-foreground">
         {formatDate(debt.dueDate)}
       </TableCell>
-      <TableCell className="tabular-nums">{formatEgp(debt.amountOwed)}</TableCell>
-      <TableCell className="tabular-nums text-success">{formatEgp(debt.paidAmount)}</TableCell>
-      <TableCell className="tabular-nums font-semibold text-warning">
-        {formatEgp(remaining)}
+      <TableCell className="tabular-nums">
+        {debt.balanceType === 1 ? `${debt.amountOwed} جم` : formatEgp(debt.amountOwed)}
+      </TableCell>
+      <TableCell className="tabular-nums text-success">
+        {debt.balanceType === 1 ? `${debt.paidAmount} جم` : formatEgp(debt.paidAmount)}
+      </TableCell>
+      <TableCell
+        className={cn(
+          'tabular-nums font-semibold',
+          isCredit ? 'text-success' : 'text-warning',
+        )}
+      >
+        {debt.balanceType === 1 ? `${remaining} جم` : formatEgp(remaining)}
       </TableCell>
       <TableCell className="text-end">
         <Badge variant={statusVariant[status]}>

@@ -66,6 +66,23 @@ export async function createDebt(payload: CreateDebtPayload): Promise<Debt> {
   return data
 }
 
+export async function createCustomerDebt(payload: CreateDebtPayload): Promise<Debt> {
+  const { data } = await api.post('/api/Debts/CustomerDebt', {
+    branchId: payload.branchId ?? null,
+    saleId: payload.saleId ?? null,
+    clientId: payload.clientId ?? null,
+    companyId: payload.companyId ?? null,
+    amountOwed: payload.amountOwed,
+    paidAmount: payload.paidAmount,
+    dueDate: payload.dueDate,
+    paymentDate: payload.paymentDate ?? null,
+    debtType: payload.debtType === 'credit' ? 1 : 0,
+    balanceType: payload.balanceType === 'gold' ? 1 : 0,
+    description: payload.description ?? null,
+  })
+  return data
+}
+
 export async function updateDebt(id: number, payload: UpdateDebtPayload): Promise<void> {
   await api.put(`/api/Debts/Update${id}`, payload)
 }

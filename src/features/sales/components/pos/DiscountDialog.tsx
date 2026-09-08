@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Tag } from 'lucide-react'
 import { Label } from '@/shared/components/ui/label'
-import { cn } from '@/shared/lib/utils'
-import { formatNumber } from '@/shared/lib/utils'
+import { cn, currencySymbol, formatNumber } from '@/shared/lib/utils'
+import { useCurrencyStore } from '@/shared/stores/currency-store'
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,7 @@ export function DiscountDialog({
   onClear,
 }: Props) {
   const [value, setValue] = useState('')
+  const currency = useCurrencyStore((s) => s.currency)
 
   const entered = Number(value) || 0
   const valid = entered > 0 && entered <= maxMaking
@@ -42,7 +43,7 @@ export function DiscountDialog({
         <DialogHeader>
           <DialogTitle>خصم الفاتورة</DialogTitle>
           <DialogDescription>
-            الخصم يُحسم من إجمالي المصنعية ({formatNumber(maxMaking)} ج.م)
+            الخصم يُحسم من إجمالي المصنعية ({formatNumber(maxMaking)} {currencySymbol(currency)})
           </DialogDescription>
         </DialogHeader>
 
@@ -55,7 +56,7 @@ export function DiscountDialog({
             }}
             className="flex h-12 w-full touch-target items-center justify-between rounded-[14px] border border-black/10 bg-success/10 px-4 text-[15px] text-success"
           >
-            <span>الخصم الحالي: <FormatEg value={discount} /> ج.م — إزالته</span>
+            <span>الخصم الحالي: <FormatEg value={discount} /> {currencySymbol(currency)} — إزالته</span>
             <span className="text-[13px] underline">إزالة</span>
           </button>
         )}
@@ -86,7 +87,7 @@ export function DiscountDialog({
           />
           {!valid && entered > 0 && (
             <p className="text-[13px] text-error">
-              الخصم لا يتجاوز إجمالي المصنعية ({formatNumber(maxMaking)} ج.م)
+              الخصم لا يتجاوز إجمالي المصنعية ({formatNumber(maxMaking)} {currencySymbol(currency)})
             </p>
           )}
         </div>

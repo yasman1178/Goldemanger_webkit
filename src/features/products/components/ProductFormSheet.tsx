@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Info } from 'lucide-react'
 
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { JEWELRY_ITEM_NAMES } from '@/shared/lib/jewelryItems'
 import { createProduct, updateProduct } from '@/features/products/api'
 import type {
   CreateProductPayload,
@@ -179,6 +180,21 @@ export function ProductFormSheet({ open, onOpenChange, product = null }: Props) 
                   placeholder="مثال: خاتم ذهب 21"
                   className="h-12 touch-target rounded-[14px]"
                 />
+                <Select
+                  value=""
+                  onValueChange={(v) => v && setName(v)}
+                >
+                  <SelectTrigger className="h-11 w-full rounded-[14px] text-xs text-muted-foreground">
+                    <SelectValue placeholder="أو اختر من الأصناف الشائعة…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {JEWELRY_ITEM_NAMES.map((item) => (
+                      <SelectItem key={item} value={item}>
+                        {item}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2 md:col-span-2">

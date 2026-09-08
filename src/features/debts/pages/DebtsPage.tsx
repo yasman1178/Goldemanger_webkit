@@ -9,17 +9,23 @@ import {
   Clock,
   Filter,
   FileText,
+  Plus,
+  Coins,
+  Scale,
 } from 'lucide-react'
 
 import { getBranchDebtsPage, getBranchDebtsSummary, updateDebt } from '@/features/debts/api'
+import { createCustomerDebt } from '@/features/debts/api'
 import {
   getDebtStatus,
   debtStatusLabels,
   type Debt,
   type DebtStatus,
+  type DebtType,
+  type BalanceValue,
 } from '@/features/debts/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
-import { formatEgp } from '@/shared/lib/utils'
+import { formatEgp, cn } from '@/shared/lib/utils'
 import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
 import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
@@ -27,6 +33,7 @@ import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { getCustomers } from '@/shared/lib/parties'
 import {
   Table,
   TableBody,
@@ -43,6 +50,13 @@ import {
   SheetDescription,
 } from '@/shared/components/ui/sheet'
 import { Label } from '@/shared/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/components/ui/select'
 
 function formatDate(value: string): string {
   const d = new Date(value)
@@ -72,6 +86,21 @@ export function DebtsPage() {
   const [paymentSheet, setPaymentSheet] = useState<Debt | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [page, setPage] = useState(1)
+  const [newDebtOpen, setNewDebtOpen] = useState(false)
+  const [newDebtForm, setNewDebtForm] = useState({
+    clientId: '',
+    debtType: 'debit' as DebtType,
+    balanceType: 'cash' as BalanceValue,
+    amountOwed: '',
+    paidAmount: '',
+    dueDate: '',
+    description: '',
+  })
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: getCustomers,
+  })
 
   const { data: pageResult, isLoading, isError } = useQuery({
     queryKey: [
@@ -122,8 +151,14 @@ export function DebtsPage() {
         throw new Error('invalid')
       }
       await updateDebt(paymentSheet.debtId, {
-        ...paymentSheet,
+        debtId: paymentSheet.debtId,
+        clientId: paymentSheet.clientId,
+        saleId: paymentSheet.saleId,
+        branchId: paymentSheet.branchId,
+        companyId: paymentSheet.companyId,
+        amountOwed: paymentSheet.amountOwed,
         paidAmount: paymentSheet.paidAmount + amount,
+        dueDate: paymentSheet.dueDate,
         paymentDate: new Date().toISOString(),
       })
     },
@@ -138,6 +173,61 @@ export function DebtsPage() {
     },
   })
 
+  const newDebtMutation = useMutation({
+    mutationFn: async () => {
+      const clientId = Number(newDebtForm.clientId)
+      if (!clientId) {
+        throw new Error('no-client')
+      }
+      const amount = Number(newDebtForm.amountOwed) || 0
+      if (amount <= 0) {
+        throw new Error('invalid-amount')
+      }
+      const paid = Number(newDebtForm.paidAmount) || 0
+      await createCustomerDebt({
+        clientId,
+        branchId: activeBranchId ?? 0,
+        amountOwed: amount,
+        paidAmount: Math.min(paid, amount),
+        dueDate:
+          newDebtForm.dueDate ||
+          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10),
+        paymentDate: paid > 0 ? new Date().toISOString() : null,
+        debtType: newDebtForm.debtType,
+        balanceType: newDebtForm.balanceType,
+        description: newDebtForm.description.trim() || null,
+      })
+    },
+    onSuccess: () => {
+      toast.success('تم تسجيل المديونية بنجاح')
+      queryClient.invalidateQueries({ queryKey: ['debts'] })
+      queryClient.invalidateQueries({ queryKey: ['debts-summary'] })
+      setNewDebtOpen(false)
+      setNewDebtForm({
+        clientId: '',
+        debtType: 'debit',
+        balanceType: 'cash',
+        amountOwed: '',
+        paidAmount: '',
+        dueDate: '',
+        description: '',
+      })
+    },
+    onError: (error: { message?: string }) => {
+      if (error?.message === 'no-client') {
+        toast.error('اختر العميل.')
+        return
+      }
+      if (error?.message === 'invalid-amount') {
+        toast.error('أدخل قيمة مديونية صحيحة أكبر من صفر.')
+        return
+      }
+      toast.error('فشل تسجيل المديونية. تأكد من البيانات.')
+    },
+  })
+
   return (
     <div className="space-y-6 pb-20">
       <div className="flex items-start justify-between gap-3">
@@ -147,17 +237,27 @@ export function DebtsPage() {
           </h1>
           <p className="text-muted-foreground">إدارة ديون العملاء والمستحقات</p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          asChild
-          className="h-11 rounded-full touch-target"
-        >
-          <Link to="/app/debts/report">
-            <FileText className="size-4" />
-            التقرير المفصل
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={() => setNewDebtOpen(true)}
+            className="h-11 gap-2 rounded-full px-5 touch-target"
+          >
+            <Plus className="size-4" />
+            تسجيل مديونية
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            asChild
+            className="h-11 gap-2 rounded-full px-4 touch-target"
+          >
+            <Link to="/app/debts/report">
+              <FileText className="size-4" />
+              التقرير المفصل
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -295,6 +395,22 @@ export function DebtsPage() {
                   <TableRow key={debt.debtId}>
                     <TableCell className="font-semibold text-foreground">
                       {debt.clientName ?? `عميل #${debt.clientId ?? '—'}`}
+                      {debt.debtType === 1 && (
+                        <span className="ms-1.5 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">
+                          دائن
+                        </span>
+                      )}
+                      {debt.balanceType === 1 && (
+                        <span className="ms-1.5 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                          <Scale className="size-3" />
+                          ذهب
+                        </span>
+                      )}
+                      {debt.description && (
+                        <span className="block text-[11px] font-normal text-muted-foreground">
+                          {debt.description}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="tabular-nums">
                       {formatEgp(debt.amountOwed)}
@@ -387,16 +503,194 @@ export function DebtsPage() {
                 />
               </div>
 
-              <Button
-                type="button"
-                onClick={() => paymentMutation.mutate()}
-                disabled={paymentMutation.isPending || !paymentAmount || Number(paymentAmount) <= 0}
-                className="h-12 w-full gap-2 rounded-full touch-target"
-              >
-                {paymentMutation.isPending ? 'جارٍ الحفظ...' : 'تأكيد الدفعة'}
-              </Button>
+                  <Button
+                    type="button"
+                    onClick={() => paymentMutation.mutate()}
+                    disabled={paymentMutation.isPending || !paymentAmount || Number(paymentAmount) <= 0}
+                    className="h-12 w-full gap-2 rounded-full touch-target"
+                  >
+                    {paymentMutation.isPending ? 'جارٍ الحفظ...' : 'تأكيد الدفعة'}
+                  </Button>
             </div>
           )}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={newDebtOpen} onOpenChange={(o) => { if (!o) { setNewDebtOpen(false); newDebtMutation.reset() } }}>
+        <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-3xl">
+          <SheetHeader className="text-end">
+            <SheetTitle>تسجيل مديونية عميل</SheetTitle>
+            <SheetDescription>
+              سجّل رصيداً على العميل (مدين) أو رصيداً لصالحه (دائن) — نقدي أو ذهب.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 px-4 pb-6 pt-2">
+            <div className="space-y-2">
+              <Label className="text-[13px]">العميل *</Label>
+              <Select
+                value={newDebtForm.clientId}
+                onValueChange={(v) => setNewDebtForm((f) => ({ ...f, clientId: v }))}
+              >
+                <SelectTrigger className="h-12 w-full rounded-[14px]">
+                  <SelectValue placeholder="اختر العميل" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.length === 0 ? (
+                    <p className="py-3 text-center text-[13px] text-muted-foreground">
+                      لا يوجد عملاء مسجّلون.
+                    </p>
+                  ) : (
+                    customers.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[13px]">النوع</Label>
+              <div className="flex items-center gap-1 rounded-full border border-black/10 bg-black/5 p-1">
+                <button
+                  type="button"
+                  onClick={() => setNewDebtForm((f) => ({ ...f, debtType: 'debit' }))}
+                  className={cn(
+                    'flex h-10 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors',
+                    newDebtForm.debtType === 'debit'
+                      ? 'bg-primary text-white'
+                      : 'text-muted-foreground hover:bg-black/5',
+                  )}
+                >
+                  <AlertTriangle className="size-4" />
+                  مدين (عليه للمحل)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewDebtForm((f) => ({ ...f, debtType: 'credit' }))}
+                  className={cn(
+                    'flex h-10 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors',
+                    newDebtForm.debtType === 'credit'
+                      ? 'bg-success text-white'
+                      : 'text-muted-foreground hover:bg-black/5',
+                  )}
+                >
+                  <CheckCircle2 className="size-4" />
+                  دائن (له رصيد لدى المحل)
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[13px]">نوع الرصيد</Label>
+              <div className="flex items-center gap-1 rounded-full border border-black/10 bg-black/5 p-1">
+                <button
+                  type="button"
+                  onClick={() => setNewDebtForm((f) => ({ ...f, balanceType: 'cash' }))}
+                  className={cn(
+                    'flex h-10 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors',
+                    newDebtForm.balanceType === 'cash'
+                      ? 'bg-primary text-white'
+                      : 'text-muted-foreground hover:bg-black/5',
+                  )}
+                >
+                  <Coins className="size-4" />
+                  نقدي (ج.م)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewDebtForm((f) => ({ ...f, balanceType: 'gold' }))}
+                  className={cn(
+                    'flex h-10 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors',
+                    newDebtForm.balanceType === 'gold'
+                      ? 'bg-warning text-white'
+                      : 'text-muted-foreground hover:bg-black/5',
+                  )}
+                >
+                  <Scale className="size-4" />
+                  ذهب (جم)
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-[13px]">
+                  القيمة ({newDebtForm.balanceType === 'gold' ? 'جم' : 'ج.م'}) *
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newDebtForm.amountOwed}
+                  onChange={(e) => setNewDebtForm((f) => ({ ...f, amountOwed: e.target.value }))}
+                  placeholder="0.00"
+                  className="no-number-spin h-12 touch-target rounded-[14px]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[13px]">سداد فوري (اختياري)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newDebtForm.paidAmount}
+                  onChange={(e) => setNewDebtForm((f) => ({ ...f, paidAmount: e.target.value }))}
+                  placeholder="0.00"
+                  className="no-number-spin h-12 touch-target rounded-[14px]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[13px]">تاريخ الاستحقاق</Label>
+              <Input
+                type="date"
+                value={newDebtForm.dueDate}
+                onChange={(e) => setNewDebtForm((f) => ({ ...f, dueDate: e.target.value }))}
+                className="h-12 touch-target rounded-[14px]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[13px]">البيان / السبب (اختياري)</Label>
+              <Input
+                value={newDebtForm.description}
+                onChange={(e) => setNewDebtForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="مثال: فارق استبدال ذهب، رصيد سابق..."
+                className="h-12 touch-target rounded-[14px]"
+              />
+            </div>
+
+            {newDebtForm.balanceType === 'cash' &&
+              Number(newDebtForm.paidAmount) > 0 && (
+                <p className="rounded-xl bg-warning/10 px-3 py-2 text-[13px] leading-[1.6] text-foreground">
+                  سيُوجَّه السداد الفوري إلى حركة الخزينة النقدي{' '}
+                  {newDebtForm.debtType === 'credit' ? '(خروج — سداد رصيد العميل الدائن)' : '(دخول — تسديد مديونية العميل)'}.
+                </p>
+              )}
+            {newDebtForm.balanceType === 'gold' &&
+              Number(newDebtForm.paidAmount) > 0 && (
+                <p className="rounded-xl bg-secondary px-3 py-2 text-[13px] leading-[1.6] text-foreground">
+                  رصيد ذهب — لن يُضاف السداد الفوري إلى الخزينة النقدي.
+                </p>
+              )}
+
+            <Button
+              type="button"
+              onClick={() => newDebtMutation.mutate()}
+              disabled={newDebtMutation.isPending}
+              className="h-12 w-full gap-2 rounded-full touch-target"
+            >
+              {newDebtMutation.isPending ? (
+                <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              ) : (
+                <Plus className="size-5" />
+              )}
+              {newDebtMutation.isPending ? 'جارٍ الحفظ...' : 'تسجيل المديونية'}
+            </Button>
+          </div>
         </SheetContent>
       </Sheet>
     </div>

@@ -1,7 +1,8 @@
 import { Minus, Plus, Trash2, ShoppingCart, Tag } from 'lucide-react'
 
 import { TAX_AND_STAMP_RATE, cartLineMath } from '@/shared/lib/gold'
-import { cn, formatNumber } from '@/shared/lib/utils'
+import { cn, currencySymbol, formatNumber } from '@/shared/lib/utils'
+import { useCurrencyStore } from '@/shared/stores/currency-store'
 import type { CartLine, CartTotals } from './types'
 import { karatLabel } from './types'
 import { typeLabels } from '@/features/products/types'
@@ -28,6 +29,7 @@ export function CurrentCart({
   onCheckout,
   onDiscount,
 }: Props) {
+  const currency = useCurrencyStore((s) => s.currency)
   const metalIncludingMaking = totals.metal + totals.making
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -87,7 +89,7 @@ export function CurrentCart({
               <span className="text-[12px] font-bold text-foreground">الإجمالي</span>
               <span className="tab-nums text-[24px] font-bold leading-none text-foreground">
                 <FormatEg value={totals.total} />
-                <span className="text-[11px] text-muted-foreground"> ج.م</span>
+                <span className="text-[11px] text-muted-foreground"> {currencySymbol(currency)}</span>
               </span>
             </div>
 

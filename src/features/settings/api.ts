@@ -15,6 +15,8 @@ export async function createInitialCompany(payload: {
   city?: string
   location?: string
   station?: string
+  country?: string
+  currency?: string
 }): Promise<{ companyId: number; branchId: number; isActive: boolean }> {
   const { data } = await api.post('/api/Company/CreateInitialCompany', payload)
   return data
@@ -63,6 +65,8 @@ export async function addBranch(
     citey?: string
     location?: string
     station?: string
+    country?: string
+    currency?: string
     buyFromCustomerCommission?: number
   },
 ): Promise<BranchSummary> {
@@ -77,6 +81,8 @@ export async function updateBranch(
     citey?: string
     location?: string
     station?: string
+    country?: string
+    currency?: string
     buyFromCustomerCommission?: number
   },
 ): Promise<BranchSummary> {

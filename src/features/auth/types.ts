@@ -11,6 +11,8 @@ export interface EmployeeDetails {
 
 export interface BranchDetails {
   branchName: string
+  country?: string
+  currency?: string
   totalCash: number
   totalDebts: number
   totalExpenses: number

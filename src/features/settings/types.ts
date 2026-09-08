@@ -37,6 +37,8 @@ export interface BranchSummary {
   city?: string | null
   location?: string | null
   station?: string | null
+  country?: string
+  currency?: string
   buyFromCustomerCommission?: number
   totalSales: number
   cash: number

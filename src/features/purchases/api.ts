@@ -107,6 +107,32 @@ export async function createPurchase(
   form.append('SupplierId', String(payload.supplierId))
   form.append('TotalAmount', String(payload.totalAmount))
   form.append('IsInitialStock', String(payload.isInitialStock))
+  form.append(
+    'PaymentType',
+    String(payload.paymentType === 'goldTradeIn' ? 1 : 0),
+  )
+  form.append('StampTaxRate', String(payload.stampTaxRate ?? 0))
+
+  payload.goldExchanges?.forEach((x, index) => {
+    form.append(
+      `GoldExchanges[${index}].SourceType`,
+      String(x.sourceType === 'storeItem' ? 1 : 0),
+    )
+    form.append(
+      `GoldExchanges[${index}].ProductId`,
+      x.productId ? String(x.productId) : '',
+    )
+    form.append(`GoldExchanges[${index}].StorageId`, String(x.storageId))
+    form.append(`GoldExchanges[${index}].Weight`, String(x.weight))
+    form.append(`GoldExchanges[${index}].FromKarat`, String(x.fromKarat))
+    form.append(`GoldExchanges[${index}].ToKarat`, String(x.toKarat))
+    form.append(`GoldExchanges[${index}].ConvertedWeight`, String(x.convertedWeight))
+    form.append(`GoldExchanges[${index}].DifferenceCash`, String(x.differenceCash))
+    form.append(
+      `GoldExchanges[${index}].DifferenceGoldWeight`,
+      String(x.differenceGoldWeight),
+    )
+  })
 
   payload.products.forEach((p, index) => {
     form.append(`ProductsDot[${index}].ProductName`, p.productName)

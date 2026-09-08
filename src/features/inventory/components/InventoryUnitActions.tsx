@@ -3,11 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftRight, Check, Printer, X } from 'lucide-react'
 
 import { getStorages } from '@/shared/lib/parties'
-import type { StorageLocation } from '@/shared/types/api'
 import { transferUnit, verifyUnitCount } from '@/features/inventory/api'
 import { invalidateShopData } from '@/shared/lib/invalidateShop'
 import type { InventoryUnitRecord } from '@/features/inventory/types'
 import { formatNumber } from '@/shared/lib/utils'
+import { StoragePicker } from '@/shared/components/StoragePicker'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
@@ -16,13 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/components/ui/select'
 
 interface Props {
   unit: InventoryUnitRecord
@@ -47,6 +40,7 @@ export function InventoryUnitActions({ unit, onPrint }: Props) {
   })
 
   const targetOptions = storages.filter((s) => s.id !== unit.storageId)
+  const excludeIds = unit.storageId != null ? [unit.storageId] : []
 
   function reset() {
     setMessage(null)
@@ -161,18 +155,15 @@ export function InventoryUnitActions({ unit, onPrint }: Props) {
               <label className="text-[14px] font-medium text-foreground">
                 المخزن الوجهة
               </label>
-              <Select value={targetStorageId} onValueChange={setTargetStorageId}>
-                <SelectTrigger className="h-11 w-full rounded-full border-black/10 bg-white">
-                  <SelectValue placeholder="اختر المخزن الوجهة" />
-                </SelectTrigger>
-                <SelectContent>
-                  {targetOptions.map((s: StorageLocation) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <StoragePicker
+                value={targetStorageId}
+                storages={storages}
+                onChange={setTargetStorageId}
+                allowAll={false}
+                placeholder="اختر المخزن الوجهة"
+                excludeIds={excludeIds}
+                triggerClassName="w-full h-11 rounded-full border border-black/10 bg-white text-[14px] font-medium text-foreground"
+              />
               {targetOptions.length === 0 && (
                 <p className="text-[13px] text-warning">
                   لا توجد مخازن أخرى لنقل القطعة إليها.
@@ -276,23 +267,15 @@ export function InventoryUnitActions({ unit, onPrint }: Props) {
                 <label className="text-[14px] font-medium text-foreground">
                   الموقع الفعلي (إن اختلف)
                 </label>
-                <Select
+                <StoragePicker
                   value={countStorageId}
-                  onValueChange={setCountStorageId}
-                >
-                  <SelectTrigger className="h-11 w-full rounded-full border-black/10 bg-white">
-                    <SelectValue placeholder="نفس الموقع المتوقع" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {storages
-                      .filter((s) => s.id !== unit.storageId)
-                      .map((s: StorageLocation) => (
-                        <SelectItem key={s.id} value={String(s.id)}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  storages={storages}
+                  onChange={setCountStorageId}
+                  allowAll={false}
+                  placeholder="نفس الموقع المتوقع"
+                  excludeIds={excludeIds}
+                  triggerClassName="w-full h-11 rounded-full border border-black/10 bg-white text-[14px] font-medium text-foreground"
+                />
               </div>
             )}
 

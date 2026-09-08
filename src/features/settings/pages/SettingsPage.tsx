@@ -173,8 +173,10 @@ function InitialCompanySetup() {
   const [branchName, setBranchName] = useState('')
   const [city, setCity] = useState('')
   const [location, setLocation] = useState('')
+  const [country, setCountry] = useState('EG')
   const mutation = useMutation({
-    mutationFn: () => createInitialCompany({ companyName, branchName, city, location }),
+    mutationFn: () =>
+      createInitialCompany({ companyName, branchName, city, location, country }),
     onSuccess: () => {
       toast.success('تم إنشاء الشركة والفرع الأول. سجّل الدخول مجددًا بعد تفعيل الاشتراك.')
       clearAuth()
@@ -211,6 +213,17 @@ function InitialCompanySetup() {
               <Input value={location} onChange={(e) => setLocation(e.target.value)} className="h-12 rounded-[14px] touch-target" />
             </FieldRow>
           </div>
+          <FieldRow label="دولة التشغيل / العملة">
+            <Select value={country} onValueChange={setCountry}>
+              <SelectTrigger className="h-12 w-full rounded-[14px] touch-target">
+                <SelectValue placeholder="اختر الدولة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="EG">مصر — جنيه مصري (ج.م)</SelectItem>
+                <SelectItem value="SA">السعودية — ريال سعودي (ر.س)</SelectItem>
+              </SelectContent>
+            </Select>
+          </FieldRow>
           <Button
             type="button"
             className="h-12 w-full rounded-full touch-target"
@@ -526,6 +539,7 @@ function BranchDialog({
   const [city, setCity] = useState(() => (branch ? (branch.city ?? '') : ''))
   const [location, setLocation] = useState(() => (branch ? (branch.location ?? '') : ''))
   const [station, setStation] = useState(() => (branch ? (branch.station ?? '') : ''))
+  const [country, setCountry] = useState(() => (branch?.country ? branch.country : 'EG'))
   const [commissionPct, setCommissionPct] = useState(() => {
     const v = branch?.buyFromCustomerCommission
     if (v == null) return '1.5'
@@ -542,6 +556,7 @@ function BranchDialog({
         citey: city,
         location,
         station,
+        country,
         buyFromCustomerCommission: Math.max(0, pct / 100),
       }
       return isEdit && branch
@@ -591,6 +606,17 @@ function BranchDialog({
               onChange={(e) => setStation(e.target.value)}
               className="h-11 rounded-[14px] touch-target"
             />
+          </FieldRow>
+          <FieldRow label="دولة التشغيل / العملة">
+            <Select value={country} onValueChange={setCountry}>
+              <SelectTrigger className="h-11 w-full rounded-[14px] touch-target">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="EG">مصر — جنيه مصري (ج.م)</SelectItem>
+                <SelectItem value="SA">السعودية — ريال سعودي (ر.س)</SelectItem>
+              </SelectContent>
+            </Select>
           </FieldRow>
           <FieldRow label="عمولة الشراء من عميل (% من سعر الذهب)">
             <Input

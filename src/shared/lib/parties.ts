@@ -71,16 +71,24 @@ export async function getLatestGoldPrice(): Promise<number | null> {
 }
 
 export interface LiveGoldPrice {
-  gram24: number
-  gram21: number
-  gram18: number
+  gram24Sell: number
+  gram24Buy?: number | null
+  gram21Sell: number
+  gram21Buy?: number | null
+  gram18Sell: number
+  gram18Buy?: number | null
   currency: string
+  country: string
   source: string
 }
 
-export async function fetchLiveGoldPrice(): Promise<LiveGoldPrice | null> {
+export async function fetchLiveGoldPrice(
+  country: 'eg' | 'sa' = 'eg',
+): Promise<LiveGoldPrice | null> {
   try {
-    const { data } = await api.get<LiveGoldPrice>(`/api/GoldPrice/Live`)
+    const { data } = await api.get<LiveGoldPrice>(`/api/GoldPrice/Live`, {
+      params: country && country !== 'eg' ? { country } : undefined,
+    })
     return data
   } catch {
     return null
