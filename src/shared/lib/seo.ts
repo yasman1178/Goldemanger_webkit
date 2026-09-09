@@ -8,12 +8,12 @@ import { getApiBaseUrl } from '@/shared/lib/api-url'
 export const SITE_NAME = 'جولد ماستر'
 export const SITE_NAME_LATIN = 'GOLDMASTER'
 export const SITE_DESCRIPTION =
-  'نظام ERP ذكي لإدارة محلات الذهب: مخزون، مبيعات، مشتريات، خزينة، وتقارير — مصمم ليعمل بسلاسة على التابلت 10 إنش.'
+  'نظام ERP ذكي ومتكامل لإدارة محلات الذهب والصاغة: مخزون المشغولات، كاشير POS باللمس للتابلت 10 إنش، حساب كسر ومصنعية الذهب عيار 18 و 21 و 24، حركات الخزينة والتقارير.'
 
 export const SITE_PHONE_DISPLAY = '01551702595'
 export const SITE_PHONE_INTL = '+201551702595'
 export const TEL_LINK = `tel:${SITE_PHONE_INTL}`
-export const WHATSAPP_LINK = `https://wa.me/201551702595?text=${encodeURIComponent('مرحباً، أرغب في الاستفسار عن منتجات جولد ماستر.')}`
+export const WHATSAPP_LINK = `https://wa.me/201551702595?text=${encodeURIComponent('مرحباً، أرغب في الاستفسار عن نظام جولد ماستر لإدارة محلات الذهب.')}`
 
 const API_BASE = getApiBaseUrl()
 
@@ -63,7 +63,7 @@ export interface PageMeta {
 }
 
 const DEFAULT_META: PageMeta = {
-  title: `${SITE_NAME} | نظام إدارة محلات الذهب الذكي`,
+  title: `${SITE_NAME} | نظام إدارة محلات الذهب والصاغة الذكي ERP`,
   description: SITE_DESCRIPTION,
   url: '/',
   type: 'website',

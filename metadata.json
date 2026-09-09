@@ -1,0 +1,6 @@
+{
+  "name": "Gold Master",
+  "description": "Smart ERP system for gold and jewelry stores: POS touchscreen for 10-inch tablets, scrap gold & karat conversion, inventory, barcodes, and vault accounting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
