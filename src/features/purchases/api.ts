@@ -112,6 +112,7 @@ export async function createPurchase(
     String(payload.paymentType === 'goldTradeIn' ? 1 : 0),
   )
   form.append('StampTaxRate', String(payload.stampTaxRate ?? 0))
+  form.append('TradeInSettleMode', String(payload.tradeInSettleMode))
 
   payload.goldExchanges?.forEach((x, index) => {
     form.append(
@@ -126,12 +127,6 @@ export async function createPurchase(
     form.append(`GoldExchanges[${index}].Weight`, String(x.weight))
     form.append(`GoldExchanges[${index}].FromKarat`, String(x.fromKarat))
     form.append(`GoldExchanges[${index}].ToKarat`, String(x.toKarat))
-    form.append(`GoldExchanges[${index}].ConvertedWeight`, String(x.convertedWeight))
-    form.append(`GoldExchanges[${index}].DifferenceCash`, String(x.differenceCash))
-    form.append(
-      `GoldExchanges[${index}].DifferenceGoldWeight`,
-      String(x.differenceGoldWeight),
-    )
   })
 
   payload.products.forEach((p, index) => {

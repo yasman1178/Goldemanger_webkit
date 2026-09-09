@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { Camera, ImagePlus, Plus } from 'lucide-react'
+import { Camera, ChevronDown, ImagePlus, Plus } from 'lucide-react'
 
 import { amountToNumber, purchaseLineMath } from '@/shared/lib/gold'
 import { formatEgp } from '@/shared/lib/utils'
@@ -17,13 +17,6 @@ import {
 } from '@/shared/components/ui/dialog'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/components/ui/select'
 
 export interface PieceDraft {
   productName: string
@@ -53,6 +46,8 @@ const typeOptions = [
   { value: '3', label: 'كسر' },
   { value: '4', label: 'فضة' },
 ]
+
+const KARAT_OPTIONS = ['18', '21', '22', '24'] as const
 
 interface Props {
   open: boolean
@@ -108,6 +103,8 @@ function PieceForm({
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [customNameDraft, setCustomNameDraft] = useState('')
 
   useEffect(
     () => () => {
@@ -141,6 +138,13 @@ function PieceForm({
     setDraft((prev) => ({ ...prev, [key]: value }))
   }
 
+  function openNamePicker() {
+    setCustomNameDraft(
+      JEWELRY_ITEM_NAMES.some((n) => n === draft.productName) ? '' : draft.productName,
+    )
+    setPickerOpen(true)
+  }
+
   const weight = amountToNumber(draft.weight)
   const quantity = amountToNumber(draft.quantity) || 1
   const karat = amountToNumber(draft.karat)
@@ -164,7 +168,7 @@ function PieceForm({
 
   async function confirmWithPhoto() {
     if (!draft.productName.trim()) {
-      setError('اكتب اسم القطعة.')
+      setError('اختر اسم القطعة أو اكتبه.')
       return
     }
     if (weight <= 0) {
@@ -206,29 +210,24 @@ function PieceForm({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-1 rounded-[14px] border border-primary/25 bg-primary/[0.04] p-3">
+          <div className="space-y-2 rounded-[14px] border border-primary/25 bg-primary/[0.04] p-3">
             <Label className="text-[13px] font-semibold">اسم القطعة *</Label>
-            <Input
-              value={draft.productName}
-              onChange={(e) => set('productName', e.target.value)}
-              placeholder="مثال: خاتم ذهب"
-              className="h-12 touch-target rounded-[14px] border-primary/20 bg-white"
-            />
-            <Select
-              value=""
-              onValueChange={(v) => v && set('productName', v)}
+            <button
+              type="button"
+              onClick={openNamePicker}
+              className="flex h-12 w-full touch-target items-center justify-between gap-2 rounded-[14px] border border-primary/20 bg-white px-3 text-[14px]"
             >
-              <SelectTrigger className="h-11 w-full rounded-[14px] border-primary/20 bg-white text-xs text-muted-foreground">
-                <SelectValue placeholder="أو اختر من الأصناف الشائعة…" />
-              </SelectTrigger>
-              <SelectContent>
-                {JEWELRY_ITEM_NAMES.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <span
+                className={
+                  draft.productName
+                    ? 'font-medium text-foreground'
+                    : 'text-muted-foreground'
+                }
+              >
+                {draft.productName || 'اختر اسم القطعة…'}
+              </span>
+              <ChevronDown className="size-5 shrink-0 text-muted-foreground" />
+            </button>
           </div>
 
           <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
@@ -238,34 +237,86 @@ function PieceForm({
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label className="text-[13px]">العيار</Label>
-                <Select value={draft.karat} onValueChange={(v) => set('karat', v)}>
-                  <SelectTrigger className="h-11 w-full rounded-[14px] bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {['18', '21', '22', '24'].map((k) => (
-                      <SelectItem key={k} value={k}>
-                        {k}k
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-2 gap-2">
+                  {KARAT_OPTIONS.map((k) => {
+                    const selected = draft.karat === k
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => set('karat', k)}
+                        className={`touch-target rounded-[14px] border px-2 py-2.5 text-[13px] font-medium transition-colors ${
+                          selected
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-black/10 bg-white text-foreground'
+                        }`}
+                      >
+                        {k} ك
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-[13px]">النوع</Label>
-                <Select value={draft.typegolde} onValueChange={(v) => set('typegolde', v)}>
-                  <SelectTrigger className="h-11 w-full rounded-[14px] bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {typeOptions.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
+                <div className="grid grid-cols-2 gap-2">
+                  {typeOptions.map((o) => {
+                    const selected = draft.typegolde === o.value
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => set('typegolde', o.value)}
+                        className={`touch-target rounded-[14px] border px-2 py-2.5 text-[13px] font-medium transition-colors ${
+                          selected
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-black/10 bg-white text-foreground'
+                        }`}
+                      >
                         {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1">
+              <Label className="text-[13px]">الوزن (جم) *</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft.weight}
+                onChange={(e) => set('weight', e.target.value)}
+                placeholder="0.00"
+                className="h-11 touch-target rounded-[14px]"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[13px]">مصنعية المورد/جم</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft.factory}
+                onChange={(e) => set('factory', e.target.value)}
+                placeholder="0.00"
+                className="h-11 touch-target rounded-[14px]"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[13px]">العدد</Label>
+              <Input
+                type="number"
+                min="1"
+                value={draft.quantity}
+                onChange={(e) => set('quantity', e.target.value)}
+                placeholder="1"
+                className="h-11 touch-target rounded-[14px]"
+              />
             </div>
           </div>
 
@@ -314,19 +365,7 @@ function PieceForm({
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <div className="space-y-1">
-              <Label className="text-[13px]">الوزن (جم) *</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={draft.weight}
-                onChange={(e) => set('weight', e.target.value)}
-                placeholder="0.00"
-                className="h-11 touch-target rounded-[14px]"
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-[13px]">مصنعية المورد/جم</Label>
               <Input
@@ -474,6 +513,64 @@ function PieceForm({
             </Button>
           </div>
         </div>
+
+        <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-[16px]">اختر اسم القطعة</DialogTitle>
+              <DialogDescription>
+                اختر الصنف من القائمة أو اكتب اسم القطعة مباشرة.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {JEWELRY_ITEM_NAMES.map((name) => {
+                  const selected = draft.productName === name
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => {
+                        set('productName', name)
+                        setPickerOpen(false)
+                      }}
+                      className={`touch-target rounded-[14px] border px-3 py-2.5 text-[13px] font-medium transition-colors ${
+                        selected
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-black/10 bg-white text-foreground'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex items-end gap-2 border-t border-dashed border-black/10 pt-3">
+                <div className="flex-1 space-y-1">
+                  <Label className="text-[12px] text-muted-foreground">اسم مخصص</Label>
+                  <Input
+                    value={customNameDraft}
+                    onChange={(e) => setCustomNameDraft(e.target.value)}
+                    placeholder="اكتب اسم القطعة"
+                    className="h-11 touch-target rounded-[14px] bg-white"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (customNameDraft.trim()) {
+                      set('productName', customNameDraft.trim())
+                      setPickerOpen(false)
+                    }
+                  }}
+                  className="h-11 touch-target rounded-[14px] px-4"
+                >
+                  اختيار
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
     </>
   )
 }

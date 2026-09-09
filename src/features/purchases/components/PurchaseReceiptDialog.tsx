@@ -195,6 +195,9 @@ export function PurchaseReceiptDialog({
           {purchase.paymentType === 1 && (
             <div className="mt-0.5 rounded bg-primary/10 px-1.5 py-1 text-[11px] font-semibold text-primary">
               طريقة الدفع: تبديل رصيد ذهب (Trade-In)
+              {purchase.tradeInSettleMode === 1
+                ? ' — تسوية نقدية'
+                : ' — مديونية ذهب'}
             </div>
           )}
           {purchase.paymentType === 1 &&

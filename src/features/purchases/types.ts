@@ -26,10 +26,10 @@ export interface GoldExchangeLine {
   productName?: string
   weight: string
   fromKarat: string
-  toKarat: string
-  differenceCash: string
-  differenceGoldWeight: string
+  toKarat?: string
   storageId: string
+  differenceCash?: string
+  differenceGoldWeight?: string
 }
 
 export interface Purchase {
@@ -52,6 +52,7 @@ export interface Purchase {
   goldPrice21AtPurchase?: number | null
   paymentType?: number
   stampTaxRate?: number
+  tradeInSettleMode?: number
   goldExchanges?: Array<{
     id: number
     sourceType: number
@@ -88,6 +89,7 @@ export interface CreatePurchasePayload {
   isInitialStock: boolean
   paymentType: PurchasePaymentType
   stampTaxRate: number
+  tradeInSettleMode: number
   goldExchanges?: Array<{
     sourceType: 'brokenGold' | 'storeItem'
     productId?: number
@@ -95,9 +97,6 @@ export interface CreatePurchasePayload {
     weight: number
     fromKarat: number
     toKarat: number
-    convertedWeight: number
-    differenceCash: number
-    differenceGoldWeight: number
   }>
   products: Array<{
     productName: string

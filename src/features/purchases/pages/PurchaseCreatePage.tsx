@@ -5,9 +5,11 @@ import { toast } from 'sonner'
 import {
   ArrowLeftRight,
   ArrowRight,
+  Banknote,
   CheckCircle2,
   Coins,
   ImagePlus,
+  Landmark,
   Package,
   Paperclip,
   Plus,
@@ -98,9 +100,7 @@ function emptyExchange(storageId: string): GoldExchangeLine {
     sourceType: 'brokenGold',
     weight: '',
     fromKarat: '21',
-    toKarat: '18',
-    differenceCash: '',
-    differenceGoldWeight: '',
+    toKarat: '21',
     storageId,
   }
 }
@@ -140,6 +140,7 @@ export function PurchaseCreatePage() {
     party: ReceiptParty | null
     isCustomer: boolean
   } | null>(null)
+  const [settleMode, setSettleMode] = useState<0 | 1>(0)
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ['suppliers'],
@@ -246,6 +247,32 @@ export function PurchaseCreatePage() {
 
   const committedLines = lines
 
+  const given21 = useMemo(() => {
+    return round3(
+      exchanges.reduce((sum, e) => {
+        const weight = amountToNumber(e.weight)
+        const karat = amountToNumber(e.fromKarat)
+        if (weight <= 0 || karat <= 0) return sum
+        return sum + (weight * karat) / 21
+      }, 0),
+    )
+  }, [exchanges])
+
+  const received21 = useMemo(() => {
+    return round3(
+      lines.reduce((sum, l) => {
+        const weight = amountToNumber(l.weight)
+        const quantity = amountToNumber(l.quantity) || 1
+        const karat = amountToNumber(l.karat)
+        if (weight <= 0 || karat <= 0) return sum
+        return sum + (weight * quantity * karat) / 21
+      }, 0),
+    )
+  }, [lines])
+
+  const diff21 = round3(received21 - given21)
+  const diffCash = goldPrice > 0 ? round3(Math.abs(diff21) * goldPrice) : 0
+
   const mutation = useMutation({
     mutationFn: async () => {
       let resolvedSupplierId = Number(supplierId)
@@ -264,6 +291,7 @@ export function PurchaseCreatePage() {
         isInitialStock,
         paymentType,
         stampTaxRate: amountToNumber(stampTaxRate) / 100,
+        tradeInSettleMode: paymentType === 'goldTradeIn' ? settleMode : 0,
         goldExchanges:
           paymentType === 'goldTradeIn'
             ? exchanges.map((e) => ({
@@ -272,13 +300,7 @@ export function PurchaseCreatePage() {
                 storageId: Number(e.storageId),
                 weight: amountToNumber(e.weight),
                 fromKarat: amountToNumber(e.fromKarat),
-                toKarat: amountToNumber(e.toKarat),
-                convertedWeight: round3(
-                  (amountToNumber(e.weight) * amountToNumber(e.fromKarat)) /
-                    amountToNumber(e.toKarat),
-                ),
-                differenceCash: amountToNumber(e.differenceCash),
-                differenceGoldWeight: amountToNumber(e.differenceGoldWeight),
+                toKarat: amountToNumber(e.toKarat ?? ''),
               }))
             : undefined,
         invoiceImageFile: invoiceImage?.file ?? null,
@@ -319,6 +341,7 @@ export function PurchaseCreatePage() {
       setSupplierId('')
       setPartyMode('supplier')
       setPaymentType('cash')
+      setSettleMode(0)
       setStampTaxRate('1')
       setExchanges([])
       setStorageId('')
@@ -456,7 +479,7 @@ export function PurchaseCreatePage() {
         if (
           amountToNumber(e.weight) <= 0 ||
           amountToNumber(e.fromKarat) <= 0 ||
-          amountToNumber(e.toKarat) <= 0
+          amountToNumber(e.toKarat ?? '') <= 0
         ) {
           toast.error('أدخل وزناً وعيارات صحيحة لكل بند استبدال.')
           return
@@ -785,6 +808,67 @@ export function PurchaseCreatePage() {
                     إضافة بند
                   </Button>
                 </div>
+
+                {exchanges.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label className="text-[13px]">تسوية فارق الاستبدال</Label>
+                    <div className="flex items-center gap-1 rounded-full border border-black/10 bg-black/5 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setSettleMode(0)}
+                        className={cn(
+                          'flex h-8 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors',
+                          settleMode === 0
+                            ? 'bg-primary text-white'
+                            : 'text-muted-foreground hover:bg-black/5',
+                        )}
+                      >
+                        <Landmark className="size-3.5" />
+                        مديونية ذهب
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSettleMode(1)}
+                        className={cn(
+                          'flex h-8 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors',
+                          settleMode === 1
+                            ? 'bg-primary text-white'
+                            : 'text-muted-foreground hover:bg-black/5',
+                        )}
+                      >
+                        <Banknote className="size-3.5" />
+                        تسديد نقدي
+                      </button>
+                    </div>
+                    <p className="text-[12px] text-muted-foreground">
+                      {settleMode === 0
+                        ? 'الفارق يُسجَّل كمديونية ذهب (دائن/مدين) في حساب الطرف الآخر.'
+                        : 'الفارق يُسوى فوراً من/إلى رصيد الخزينة نقداً.'}
+                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-black/5 px-3 py-2 text-[12px]">
+                      <span className="text-muted-foreground">
+                        فارق عيار 21:
+                        <span
+                          className={cn(
+                            'ms-1 font-bold tabular-nums',
+                            diff21 > 0
+                              ? 'text-success'
+                              : diff21 < 0
+                                ? 'text-error'
+                                : 'text-foreground',
+                          )}
+                        >
+                          {formatNumber(diff21)} gm
+                        </span>
+                      </span>
+                      {diffCash > 0 && (
+                        <span className="text-muted-foreground">
+                          يعادل {formatEgp(diffCash)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {exchanges.length === 0 ? (
                   <button
@@ -1153,13 +1237,13 @@ function TradeInExchangeCard({
 }) {
   const weight = amountToNumber(exchange.weight)
   const fromKarat = amountToNumber(exchange.fromKarat)
-  const toKarat = amountToNumber(exchange.toKarat)
+  const toKarat = amountToNumber(exchange.toKarat ?? '')
   const convertedWeight =
     weight > 0 && fromKarat > 0 && toKarat > 0
       ? round3((weight * fromKarat) / toKarat)
       : 0
-  const diffGold = amountToNumber(exchange.differenceGoldWeight)
-  const diffCash = amountToNumber(exchange.differenceCash)
+  const diffGold = amountToNumber(exchange.differenceGoldWeight ?? '')
+  const diffCash = amountToNumber(exchange.differenceCash ?? '')
   const diffWeightValid = fromKarat > 0 && toKarat > 0
 
   return (
