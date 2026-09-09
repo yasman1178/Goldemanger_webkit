@@ -23,6 +23,7 @@ export interface GoldExchangeLine {
   key: number
   sourceType: 'brokenGold' | 'storeItem'
   productId?: number
+  inventoryUnitId?: number
   productName?: string
   weight: string
   fromKarat: string
@@ -64,6 +65,10 @@ export interface Purchase {
     convertedWeight: number
     differenceCash: number
     differenceGoldWeight: number
+    productName?: string | null
+    productKarat?: number | null
+    productWeight?: number | null
+    storageName?: string | null
   }>
   productsDot?: PurchaseProduct[]
 }

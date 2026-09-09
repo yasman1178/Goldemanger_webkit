@@ -23,6 +23,7 @@ export interface Sale {
   priceUpdateGoldeId?: number | null
   gold21Price?: number
   saleItems: SaleItem[]
+  status?: number
 }
 
 export interface CreateSaleLine {
@@ -37,7 +38,38 @@ export interface CreateSalePayload {
   totalAmount: number
   paidAmount: number
   amountOwed: number
-  paymentMethod?: 'cash' | 'card' | 'transfer'
+  paymentMethod?: 'cash' | 'card' | 'transfer' | 'hold'
   saleItems: CreateSaleLine[]
   branchId?: number | null
+  saleId?: number
+  isHold?: boolean
 }
+
+export interface HeldSaleItem extends SaleItem {
+  grams21?: number
+}
+
+/** فاتورة معلّقة (بيع محجوز) بتفاصيل القطع ومعادل عيار 21 والمديونية الذهبية. */
+export interface HeldSale {
+  saleId: number
+  branchId: number | null
+  customerId: number
+  customerName?: string | null
+  employeeId?: string | null
+  employeeName?: string | null
+  saleDate: string
+  totalAmount: number
+  discount: number
+  priceUpdateGoldeId?: number | null
+  gold21Price?: number
+  saleItems: HeldSaleItem[]
+  heldGrams: number
+  heldDebtDescription?: string | null
+}
+
+export type HeldPaymentPayload = {
+  paidAmount: number
+  paymentMethod: Exclude<PaymentMethod, 'hold'>
+}
+
+export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'hold'

@@ -1,12 +1,13 @@
 import type { Product } from '@/features/products/types'
+import type { PaymentMethod } from '@/features/sales/types'
+
+export type { PaymentMethod }
 
 export interface CartLine {
   key: number
   product: Product
   quantity: number
 }
-
-export type PaymentMethod = 'cash' | 'card' | 'transfer'
 
 export interface CartTotals {
   grams: number

@@ -70,6 +70,7 @@ export function PurchaseReceiptDialog({
     .join('، ')
 
   const gold21 = purchase.goldPrice21AtPurchase ?? 0
+  const stampTaxRate = purchase.stampTaxRate ?? TAX_AND_STAMP_RATE
   const pieces = purchase.productsDot ?? []
 
   const totalWeight = pieces.reduce(
@@ -97,7 +98,7 @@ export function PurchaseReceiptDialog({
     const metal = purchasePerGram(gold21, p.karat ?? 21) * weight * quantity
     const unit =
       purchasePerGram(gold21, p.karat ?? 21) + (p.factory ?? 0)
-    const taxAndStamp = isCustomer ? 0 : metal * TAX_AND_STAMP_RATE
+    const taxAndStamp = isCustomer ? 0 : metal * stampTaxRate
     return sum + unit * weight * quantity + taxAndStamp
   }, 0)
   const computedTotalNet = isCustomer
@@ -110,7 +111,7 @@ export function PurchaseReceiptDialog({
     return sum + (p.factory ?? 0) * weight * quantity
   }, 0)
 
-  const stampAndTaxSubtotal = isCustomer ? 0 : goldSubtotal * TAX_AND_STAMP_RATE
+  const stampAndTaxSubtotal = isCustomer ? 0 : goldSubtotal * stampTaxRate
 
   const saleValueSubtotal = pieces.reduce((sum, p) => {
     const weight = p.weight ?? 0
@@ -123,6 +124,29 @@ export function PurchaseReceiptDialog({
   }, 0)
 
   const total = purchase.totalAmount > 0 ? purchase.totalAmount : computedTotalNet
+
+  const goldExchanges = purchase.goldExchanges ?? []
+  const input21 =
+    Math.round(
+      goldExchanges.reduce(
+        (sum, x) => sum + ((x.weight ?? 0) * (x.fromKarat ?? 21)) / 21,
+        0,
+      ) * 1000,
+    ) / 1000
+  const output21 =
+    Math.round(
+      pieces.reduce((sum, p) => {
+        const weight = p.weight ?? 0
+        const quantity = p.quantity ?? 1
+        return sum + (weight * quantity * (p.karat ?? 21)) / 21
+      }, 0) * 1000,
+    ) / 1000
+  const diff21Gold = Math.round((output21 - input21) * 1000) / 1000
+  const diff21Cash = gold21 > 0 ? Math.round(diff21Gold * gold21 * 100) / 100 : 0
+  const settlementResidual =
+    Math.round((factorySubtotal + stampAndTaxSubtotal) * 100) / 100
+  const totalSettlementCash =
+    Math.round((diff21Cash + settlementResidual) * 100) / 100
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3">
@@ -193,35 +217,110 @@ export function PurchaseReceiptDialog({
             </div>
           )}
           {purchase.paymentType === 1 && (
-            <div className="mt-0.5 rounded bg-primary/10 px-1.5 py-1 text-[11px] font-semibold text-primary">
-              طريقة الدفع: تبديل رصيد ذهب (Trade-In)
-              {purchase.tradeInSettleMode === 1
-                ? ' — تسوية نقدية'
-                : ' — مديونية ذهب'}
-            </div>
-          )}
-          {purchase.paymentType === 1 &&
-            (purchase.goldExchanges?.length ?? 0) > 0 && (
-              <div className="mt-1 text-[10px] text-muted-foreground">
-                {purchase.goldExchanges?.map((x, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <span>
-                      استبدال {x.sourceType === 1 ? 'قطعة مخزن' : 'كسر'} —{' '}
-                      {x.weight} gm من {x.fromKarat}k إلى {x.toKarat}k
-                    </span>
-                    <span className="tabular-nums font-semibold text-foreground">
-                      {`فارق ${x.differenceGoldWeight > 0 ? `${x.differenceGoldWeight} gm` : ''}`}
-                      {x.differenceCash > 0
-                        ? `${x.differenceGoldWeight > 0 ? ' / ' : ''}${formatNumber(x.differenceCash)} ج.م`
-                        : ''}
+            <div className="mt-1.5 space-y-1 rounded-sm border border-dashed border-primary/30 bg-primary/5 px-1.5 py-1.5">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-primary">
+                <span>تبديل رصيد ذهب (Trade-In)</span>
+                <span>
+                  {purchase.tradeInSettleMode === 1
+                    ? 'تسوية نقدية موحّدة'
+                    : 'مديونية'}
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {purchase.tradeInSettleMode === 1
+                  ? 'الكل يُسوّى نقداً من/إلى الخزينة دفعة واحدة.'
+                  : 'فارق الذهب ذهباً، والمصنعية والدمغة نقداً لصالح المحل.'}
+              </p>
+              {(goldExchanges.length > 0 || input21 > 0 || output21 > 0) && (
+                <div className="space-y-0.5 text-[10px] text-muted-foreground">
+                  {goldExchanges.map((x, i) => {
+                    const label = x.sourceType === 1 ? 'قطعة مخزن' : 'كسر'
+                    const detail = x.productName || label
+                    const storage = x.storageName ?? `مخزن #${x.storageId}`
+                    const hasAnyDiff =
+                      (x.differenceGoldWeight ?? 0) > 0 || (x.differenceCash ?? 0) > 0
+                    return (
+                      <div
+                        key={i}
+                        className="space-y-0.5 border-b border-dashed border-black/10 pb-1"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-foreground">{detail}</span>
+                          <span>{label}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                          <span>{storage}</span>
+                          <span className="tabular-nums">
+                            {formatNumber(x.weight)} gm من {x.fromKarat}k إلى {x.toKarat}k
+                          </span>
+                        </div>
+                        {hasAnyDiff && (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-muted-foreground">فرق البند</span>
+                            <span className="tabular-nums font-semibold text-foreground">
+                              {(x.differenceGoldWeight ?? 0) > 0 &&
+                                `${formatNumber(x.differenceGoldWeight)} gm`}
+                              {(x.differenceGoldWeight ?? 0) > 0 && (x.differenceCash ?? 0) > 0 &&
+                                ' + '}
+                              {(x.differenceCash ?? 0) > 0 &&
+                                formatEgp(x.differenceCash ?? 0)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <div className="flex justify-between gap-2 font-semibold text-foreground">
+                    <span>تحويل عيار 21</span>
+                    <span className="tabular-nums" dir="ltr">
+                      {formatNumber(input21)} ← {formatNumber(output21)}
                     </span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="flex justify-between gap-2">
+                    <span>فارق عيار 21</span>
+                    <span className="tabular-nums font-semibold text-foreground">
+                      {diff21Gold > 0 ? '+' : ''}
+                      {formatNumber(diff21Gold)} gm
+                      {diff21Cash !== 0 && (
+                        <span className="font-normal text-muted-foreground">
+                          {' '}
+                          — {formatEgp(Math.abs(diff21Cash))}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {settlementResidual > 0 && (
+                    <div className="flex justify-between gap-2">
+                      <span>مصنعية ودمغة</span>
+                      <span className="tabular-nums font-semibold text-foreground">
+                        {formatEgp(settlementResidual)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-2 border-t border-dashed border-primary/20 pt-0.5 font-bold text-primary">
+                    <span>
+                      {purchase.tradeInSettleMode === 1
+                        ? 'إجمالي التسوية النقدية'
+                        : 'الحساب المسجّل'}
+                    </span>
+                    <span className="tabular-nums">
+                      {purchase.tradeInSettleMode === 1
+                        ? totalSettlementCash > 0
+                          ? `يُدفع من الخزينة ${formatEgp(totalSettlementCash)}`
+                          : totalSettlementCash < 0
+                            ? `مستحق للمحل ${formatEgp(Math.abs(totalSettlementCash))}`
+                            : 'صفر — متوازن'
+                        : `ذهب ${formatNumber(diff21Gold)} جم${
+                            settlementResidual > 0
+                              ? ` + نقد ${formatEgp(settlementResidual)}`
+                              : ''
+                          }`}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-1.5 border-t border-dashed border-black/60" />
 
@@ -273,7 +372,7 @@ export function PurchaseReceiptDialog({
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px]">
                       {!isCustomer && (
                         <span className="rounded bg-black/5 px-1.5 py-0.5 font-semibold">
-                          دمغة وضريبة: +{(goldUnit * TAX_AND_STAMP_RATE).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}/جم
+                          دمغة وضريبة: +{(goldUnit * stampTaxRate).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}/جم
                         </span>
                       )}
                       {isCustomer && commissionRate > 0 && (

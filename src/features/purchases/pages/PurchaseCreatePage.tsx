@@ -24,12 +24,16 @@ import {
 import { createPurchase } from '@/features/purchases/api'
 import { invalidateAfterPurchase } from '@/shared/lib/invalidateShop'
 import { AddPieceDialog, EMPTY_PIECE_DRAFT, type PieceDraft } from '@/features/purchases/components/AddPieceDialog'
+import { ExchangePiecePicker } from '@/features/purchases/components/ExchangePiecePicker'
 import { PurchaseReceiptDialog } from '@/features/purchases/components/PurchaseReceiptDialog'
+import { TwentyOneKConversionBar } from '@/features/purchases/components/TwentyOneKConversionBar'
 import type { ReceiptParty } from '@/features/purchases/components/PurchaseReceiptDialog'
 import type { GoldExchangeLine, Purchase, PurchaseLineDraft, PurchasePaymentType } from '@/features/purchases/types'
+import { getInventoryUnits } from '@/features/inventory/api'
+import type { InventoryUnitRecord } from '@/features/inventory/types'
 import { getProducts } from '@/features/products/api'
 import type { Product } from '@/features/products/types'
-import { StoragePicker, type StorageOption } from '@/shared/components/StoragePicker'
+import { StoragePicker } from '@/shared/components/StoragePicker'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import {
@@ -94,14 +98,18 @@ function round3(value: number): number {
   return Math.round(value * 1000) / 1000
 }
 
-function emptyExchange(storageId: string): GoldExchangeLine {
+function buildExchangeFromUnit(unit: InventoryUnitRecord): GoldExchangeLine {
+  const isScrap = unit.products?.typegolde === 3
   return {
     key: exchangeKey++,
-    sourceType: 'brokenGold',
-    weight: '',
-    fromKarat: '21',
+    sourceType: isScrap ? 'brokenGold' : 'storeItem',
+    productId: unit.productId,
+    inventoryUnitId: unit.inventoryUnitId,
+    productName: unit.products?.productName,
+    weight: String(round3(unit.weight)),
+    fromKarat: String(unit.karat || 21),
     toKarat: '21',
-    storageId,
+    storageId: unit.storageId ? String(unit.storageId) : '',
   }
 }
 
@@ -118,7 +126,8 @@ export function PurchaseCreatePage() {
   const [partyMode, setPartyMode] = useState<PartyMode>('supplier')
   const [paymentType, setPaymentType] = useState<PurchasePaymentType>('cash')
   const [stampTaxRate, setStampTaxRate] = useState('1')
-  const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
+const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
+  const [exchangeStorage, setExchangeStorage] = useState('')
   const [storageId, setStorageId] = useState('')
   const [isInitialStock, setIsInitialStock] = useState(false)
   const [newSupplierMode, setNewSupplierMode] = useState(false)
@@ -183,10 +192,32 @@ export function PurchaseCreatePage() {
     return found?.buyFromCustomerCommission ?? 0
   }, [overview, activeBranchId])
 
-  const { data: products = [], isLoading: productsLoading } = useQuery({
+const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ['products', activeBranchId],
     queryFn: () => getProducts(activeBranchId ?? undefined),
   })
+
+  const { data: inventoryUnits = [] } = useQuery({
+    queryKey: ['inventory-units', activeBranchId],
+    queryFn: () => getInventoryUnits(activeBranchId ?? undefined),
+  })
+
+  const defaultScrapStorage = useMemo(() => {
+    let best = ''
+    let bestWeight = 0
+    for (const u of inventoryUnits) {
+      if (u.status !== 'AVAILABLE' || u.products?.typegolde !== 3) continue
+      const sid = u.storageId ?? 0
+      if (sid <= 0) continue
+      if (u.weight > bestWeight) {
+        bestWeight = u.weight
+        best = String(sid)
+      }
+    }
+    return best
+  }, [inventoryUnits])
+
+  const effectiveExchangeStorage = exchangeStorage || defaultScrapStorage
 
   const totalWeight = useMemo(() => {
     return lines.reduce(
@@ -272,6 +303,25 @@ export function PurchaseCreatePage() {
 
   const diff21 = round3(received21 - given21)
   const diffCash = goldPrice > 0 ? round3(Math.abs(diff21) * goldPrice) : 0
+  const diffCashSigned =
+    goldPrice > 0 && diff21 !== 0 ? Math.round(diff21 * goldPrice * 100) / 100 : 0
+
+  // المصنعية + الدمغة/الضريبة التي لا يغطيها الذهب المستبدل (بما يطابق حساب الـ Backend).
+  const settlementResidual = useMemo(() => {
+    if (!goldPrice) return 0
+    const taxRate = amountToNumber(stampTaxRate) / 100
+    let making = 0
+    let metalValue = 0
+    for (const line of lines) {
+      const weight = amountToNumber(line.weight)
+      const quantity = amountToNumber(line.quantity) || 1
+      const karat = amountToNumber(line.karat)
+      if (weight <= 0 || karat <= 0) continue
+      making += amountToNumber(line.factory) * weight * quantity
+      metalValue += weight * quantity * ((goldPrice * karat) / 21)
+    }
+    return Math.round((making + metalValue * taxRate) * 100) / 100
+  }, [lines, goldPrice, stampTaxRate])
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -376,14 +426,8 @@ export function PurchaseCreatePage() {
     )
   }
 
-  function addExchange() {
-    setExchanges((prev) => [...prev, emptyExchange(storageId)])
-  }
-
-  function updateExchange(key: number, patch: Partial<GoldExchangeLine>) {
-    setExchanges((prev) =>
-      prev.map((e) => (e.key === key ? { ...e, ...patch } : e)),
-    )
+function addExchangeFromUnit(unit: InventoryUnitRecord) {
+    setExchanges((prev) => [...prev, buildExchangeFromUnit(unit)])
   }
 
   function removeExchange(key: number) {
@@ -466,22 +510,18 @@ export function PurchaseCreatePage() {
       toast.error('أضف قطعة واحدة على الأقل (اسم + وزن صالح).')
       return
     }
-    if (paymentType === 'goldTradeIn') {
+if (paymentType === 'goldTradeIn') {
       if (exchanges.length === 0) {
-        toast.error('أضف بند استبدال واحداً على الأقل.')
+        toast.error('اختر قطعة استبدال واحدة على الأقل.')
         return
       }
       for (const e of exchanges) {
         if (!e.storageId) {
-          toast.error('اختر المخزن لبند الاستبدال قبل الحفظ.')
+          toast.error('حدّد مخزن الاستبدال لكل قطعة قبل الحفظ.')
           return
         }
-        if (
-          amountToNumber(e.weight) <= 0 ||
-          amountToNumber(e.fromKarat) <= 0 ||
-          amountToNumber(e.toKarat ?? '') <= 0
-        ) {
-          toast.error('أدخل وزناً وعيارات صحيحة لكل بند استبدال.')
+        if (amountToNumber(e.weight) <= 0 || amountToNumber(e.fromKarat) <= 0) {
+          toast.error('تأكد من صلاحية وزن وعيار كل قطعة استبدال.')
           return
         }
         if (e.sourceType === 'storeItem' && !e.productId) {
@@ -794,113 +834,165 @@ export function PurchaseCreatePage() {
                       </Label>
                       <p className="text-[13px] text-muted-foreground">
                         الذهب الذي يُسلَّم بدل قيمة الفاتورة — يُحسب تحويل العيار
-                        تلقائياً ويُخصم من المخزن.
+تلقائياً ويُخصم من المخزن.
                       </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addExchange}
-                    className="h-10 gap-1.5 rounded-full px-4 text-sm touch-target"
-                  >
-                    <Plus className="size-4" />
-                    إضافة بند
-                  </Button>
                 </div>
 
-                {exchanges.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label className="text-[13px]">تسوية فارق الاستبدال</Label>
-                    <div className="flex items-center gap-1 rounded-full border border-black/10 bg-black/5 p-1">
-                      <button
-                        type="button"
-                        onClick={() => setSettleMode(0)}
-                        className={cn(
-                          'flex h-8 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors',
-                          settleMode === 0
-                            ? 'bg-primary text-white'
-                            : 'text-muted-foreground hover:bg-black/5',
-                        )}
-                      >
-                        <Landmark className="size-3.5" />
-                        مديونية ذهب
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSettleMode(1)}
-                        className={cn(
-                          'flex h-8 flex-1 touch-target items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors',
-                          settleMode === 1
-                            ? 'bg-primary text-white'
-                            : 'text-muted-foreground hover:bg-black/5',
-                        )}
-                      >
-                        <Banknote className="size-3.5" />
-                        تسديد نقدي
-                      </button>
-                    </div>
-                    <p className="text-[12px] text-muted-foreground">
-                      {settleMode === 0
-                        ? 'الفارق يُسجَّل كمديونية ذهب (دائن/مدين) في حساب الطرف الآخر.'
-                        : 'الفارق يُسوى فوراً من/إلى رصيد الخزينة نقداً.'}
-                    </p>
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-black/5 px-3 py-2 text-[12px]">
-                      <span className="text-muted-foreground">
-                        فارق عيار 21:
+                <TwentyOneKConversionBar
+                  branchId={activeBranchId ?? undefined}
+                  purchasedByKarat={byKarat}
+                  purchased21={received21}
+                />
+
+                <div className="space-y-2 rounded-2xl border border-primary/25 bg-primary/[0.04] p-3">
+                  <Label className="text-[13px] font-semibold">
+                    أداة تسوية الفاتورة
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSettleMode(0)}
+                      className={cn(
+                        'touch-target rounded-[16px] border p-3 text-start transition-colors',
+                        settleMode === 0
+                          ? 'border-primary bg-primary/10'
+                          : 'border-black/10 bg-white hover:bg-black/5',
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
                         <span
                           className={cn(
-                            'ms-1 font-bold tabular-nums',
-                            diff21 > 0
-                              ? 'text-success'
-                              : diff21 < 0
-                                ? 'text-error'
-                                : 'text-foreground',
+                            'flex size-4 items-center justify-center rounded-full border-2',
+                            settleMode === 0
+                              ? 'border-primary'
+                              : 'border-black/30',
                           )}
                         >
-                          {formatNumber(diff21)} gm
+                          {settleMode === 0 && (
+                            <span className="size-2 rounded-full bg-primary" />
+                          )}
+                        </span>
+                        <Landmark
+                          className={cn(
+                            'size-4',
+                            settleMode === 0
+                              ? 'text-primary'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                        <span className="text-[13px] font-bold text-foreground">
+                          مديونية
                         </span>
                       </span>
-                      {diffCash > 0 && (
-                        <span className="text-muted-foreground">
-                          يعادل {formatEgp(diffCash)}
-                        </span>
+                      <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">
+                        فارق الذهب ذهباً، والمصنعية والدمغة نقداً لصالح المحل
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSettleMode(1)}
+                      className={cn(
+                        'touch-target rounded-[16px] border p-3 text-start transition-colors',
+                        settleMode === 1
+                          ? 'border-primary bg-primary/10'
+                          : 'border-black/10 bg-white hover:bg-black/5',
                       )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'flex size-4 items-center justify-center rounded-full border-2',
+                            settleMode === 1
+                              ? 'border-primary'
+                              : 'border-black/30',
+                          )}
+                        >
+                          {settleMode === 1 && (
+                            <span className="size-2 rounded-full bg-primary" />
+                          )}
+                        </span>
+                        <Banknote
+                          className={cn(
+                            'size-4',
+                            settleMode === 1
+                              ? 'text-primary'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                        <span className="text-[13px] font-bold text-foreground">
+                          تسديد نقدي
+                        </span>
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">
+                        الفارق + المصنعية والدمغة من/إلى الخزينة دفعة واحدة
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-1 rounded-xl bg-black/5 px-3 py-2 text-[12px]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-muted-foreground">فارق عيار 21</span>
+                      <span
+                        className={cn(
+                          'font-bold tabular-nums',
+                          diff21 > 0
+                            ? 'text-success'
+                            : diff21 < 0
+                              ? 'text-error'
+                              : 'text-foreground',
+                        )}
+                      >
+                        {diff21 > 0 ? '+' : ''}
+                        {formatNumber(diff21)} gm
+                        {goldPrice > 0 && diffCash !== 0 && (
+                          <span className="font-normal text-muted-foreground">
+                            {' '}
+                            — {formatEgp(diffCash)}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    {settlementResidual > 0 && (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-muted-foreground">
+                          مصنعية ودمغة
+                        </span>
+                        <span className="font-semibold tabular-nums text-foreground">
+                          {formatEgp(settlementResidual)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-black/10 pt-1">
+                      <span className="text-muted-foreground">
+                        {settleMode === 0 ? 'يُسجَّل كالتالي' : 'إجمالي التسوية النقدية'}
+                      </span>
+                      <span className="font-bold tabular-nums text-primary">
+                        {settleMode === 0
+                          ? `ذهب ${diff21 > 0 ? '+' : ''}${formatNumber(diff21)} جم` +
+                            (settlementResidual > 0
+                              ? ` + نقد ${formatEgp(settlementResidual)}`
+                              : '')
+                          : diffCashSigned + settlementResidual > 0
+                            ? `تستحق من الخزينة ${formatEgp(diffCashSigned + settlementResidual)}`
+                            : diffCashSigned + settlementResidual < 0
+                              ? `مستحقة للمحل ${formatEgp(Math.abs(diffCashSigned + settlementResidual))}`
+                              : 'صفر — متوازن'}
+                      </span>
                     </div>
                   </div>
-                )}
+                </div>
 
-                {exchanges.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={addExchange}
-                    className="flex w-full flex-col items-center gap-2 rounded-[14px] border border-dashed border-primary/30 bg-primary/[0.04] p-5 text-center transition-colors hover:bg-primary/[0.08] touch-target"
-                  >
-                    <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <ArrowLeftRight className="size-5" />
-                    </span>
-                    <span className="text-[14px] font-bold text-foreground">
-                      لا توجد بنود استبدال
-                    </span>
-                    <span className="text-[13px] text-muted-foreground">
-                      اضغط هنا لإضافة كسر أو قطعة من المخزن تُسلَّم بدل الفاتورة
-                    </span>
-                  </button>
-                ) : (
-                  <div className="space-y-3">
-                    {exchanges.map((exchange, index) => (
-                      <TradeInExchangeCard
-                        key={exchange.key}
-                        exchange={exchange}
-                        index={index}
-                        storages={storages}
-                        products={products}
-                        onUpdate={(patch) => updateExchange(exchange.key, patch)}
-                        onRemove={() => removeExchange(exchange.key)}
-                      />
-                    ))}
-                  </div>
-                )}
+<ExchangePiecePicker
+                  storages={storages}
+                  selectedStorage={effectiveExchangeStorage}
+                  onStorageChange={setExchangeStorage}
+                  units={inventoryUnits}
+                  exchanges={exchanges}
+                  onAdd={addExchangeFromUnit}
+                  onRemove={removeExchange}
+                />
               </div>
             )}
 
@@ -1176,6 +1268,9 @@ export function PurchaseCreatePage() {
         taxRate={amountToNumber(stampTaxRate) / 100}
         storages={storages}
         defaultStorageId={storageId || undefined}
+        input21={paymentType === 'goldTradeIn' ? given21 : undefined}
+        output21={paymentType === 'goldTradeIn' ? received21 : undefined}
+        branchId={activeBranchId ?? undefined}
         onConfirm={confirmPiece}
       />
 
@@ -1216,226 +1311,6 @@ export function PurchaseCreatePage() {
         isCustomer={savedResult?.isCustomer ?? false}
         onClose={() => setSavedResult(null)}
       />
-    </div>
-  )
-}
-
-function TradeInExchangeCard({
-  exchange,
-  index,
-  storages,
-  products,
-  onUpdate,
-  onRemove,
-}: {
-  exchange: GoldExchangeLine
-  index: number
-  storages: StorageOption[]
-  products: Product[]
-  onUpdate: (patch: Partial<GoldExchangeLine>) => void
-  onRemove: () => void
-}) {
-  const weight = amountToNumber(exchange.weight)
-  const fromKarat = amountToNumber(exchange.fromKarat)
-  const toKarat = amountToNumber(exchange.toKarat ?? '')
-  const convertedWeight =
-    weight > 0 && fromKarat > 0 && toKarat > 0
-      ? round3((weight * fromKarat) / toKarat)
-      : 0
-  const diffGold = amountToNumber(exchange.differenceGoldWeight ?? '')
-  const diffCash = amountToNumber(exchange.differenceCash ?? '')
-  const diffWeightValid = fromKarat > 0 && toKarat > 0
-
-  return (
-    <div className="rounded-2xl border border-black/10 bg-white p-3">
-      <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-2">
-        <span className="flex items-center gap-2 text-[13px] font-semibold text-muted-foreground">
-          <Scale className="size-4 text-primary" />
-          بند الاستبدال {index + 1}
-        </span>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="flex size-8 shrink-0 touch-target items-center justify-center rounded-full text-error hover:bg-error/10"
-        >
-          <Trash2 className="size-4" />
-        </button>
-      </div>
-
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label className="text-[13px]">مصدر الذهب</Label>
-          <Select
-            value={exchange.sourceType}
-            onValueChange={(v) =>
-              onUpdate({
-                sourceType: v as 'brokenGold' | 'storeItem',
-                productId: undefined,
-                productName: undefined,
-              })
-            }
-          >
-            <SelectTrigger className="h-11 w-full rounded-[14px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="brokenGold">كسر (خردة ذهب)</SelectItem>
-              <SelectItem value="storeItem">قطعة من المخزن</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1">
-          <Label className="text-[13px]">المخزن *</Label>
-          <StoragePicker
-            value={exchange.storageId}
-            storages={storages}
-            onChange={(v) => onUpdate({ storageId: v })}
-            allowAll={false}
-            allowCreate={false}
-            placeholder="المخزن"
-            triggerClassName="w-full h-11 rounded-[14px] border border-black/10 bg-white text-[14px] font-medium text-foreground"
-          />
-        </div>
-
-        {exchange.sourceType === 'storeItem' && (
-          <div className="space-y-1 sm:col-span-2">
-            <Label className="text-[13px]">القطعة من المخزن</Label>
-            <Select
-              value={exchange.productId ? String(exchange.productId) : ''}
-              onValueChange={(v) => {
-                const p = products.find((x) => String(x.productId) === v)
-                onUpdate({
-                  productId: p?.productId,
-                  productName: p?.productName,
-                })
-              }}
-            >
-              <SelectTrigger className="h-11 w-full rounded-[14px]">
-                <SelectValue placeholder="اختر قطعة من المخزن…" />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((p) => (
-                  <SelectItem key={p.productId} value={String(p.productId)}>
-                    {p.productName} — {p.karat}K •{' '}
-                    {formatNumber(p.weight)} gm
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        <div className="space-y-1">
-          <Label className="text-[13px]">الوزن المسلَّم (جم) *</Label>
-          <Input
-            type="number"
-            min="0"
-            step="0.01"
-            value={exchange.weight}
-            onChange={(e) => onUpdate({ weight: e.target.value })}
-            placeholder="0.00"
-            className="h-11 touch-target rounded-[14px]"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label className="text-[13px]">من عيار</Label>
-            <Select
-              value={exchange.fromKarat}
-              onValueChange={(v) => onUpdate({ fromKarat: v })}
-            >
-              <SelectTrigger className="h-11 w-full rounded-[14px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {['18', '21', '22', '24'].map((k) => (
-                  <SelectItem key={k} value={k}>
-                    {k}k
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[13px]">إلى عيار</Label>
-            <Select value={exchange.toKarat} onValueChange={(v) => onUpdate({ toKarat: v })}>
-              <SelectTrigger className="h-11 w-full rounded-[14px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {['18', '21', '22', '24'].map((k) => (
-                  <SelectItem key={k} value={k}>
-                    {k}k
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {diffWeightValid && convertedWeight > 0 && (
-          <div className="space-y-1 rounded-xl bg-secondary/60 p-2.5 sm:col-span-2">
-            <div className="flex items-center justify-between text-[13px]">
-              <span className="text-muted-foreground">
-                الوزن المحوَّل إلى {toKarat}k
-              </span>
-              <span className="font-semibold tabular-nums text-foreground">
-                {formatNumber(convertedWeight)} gm
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[13px]">
-              <span className="text-muted-foreground">معادلة التحويل</span>
-              <span className="tabular-nums text-muted-foreground" dir="ltr">
-                {formatNumber(weight)} × {fromKarat} ÷ {toKarat}
-              </span>
-            </div>
-          </div>
-        )}
-
-        <div className="sm:col-span-2 grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label className="text-[13px]">فارق وزن (جم)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={exchange.differenceGoldWeight}
-              onChange={(e) => onUpdate({ differenceGoldWeight: e.target.value })}
-              placeholder="0.00"
-              className="h-11 touch-target rounded-[14px]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[13px]">فارق نقدي (ج.م)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={exchange.differenceCash}
-              onChange={(e) => onUpdate({ differenceCash: e.target.value })}
-              placeholder="0.00"
-              className="h-11 touch-target rounded-[14px]"
-            />
-          </div>
-        </div>
-
-        {(diffGold > 0 || diffCash > 0) && (
-          <div className="sm:col-span-2 space-y-1 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-[13px]">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">فارق وزن (ذهب)</span>
-              <span className="font-semibold tabular-nums text-foreground">
-                {formatNumber(diffGold)} gm
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">فارق نقدي</span>
-              <span className="font-semibold tabular-nums text-primary">
-                {formatEgp(diffCash)}
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   )
 }

@@ -6,6 +6,7 @@
 
 export const shopQueryPrefixes = [
   ['sales'],
+  ['held-sales'],
   ['purchases'],
   ['products'],
   ['inventory-units'],

@@ -7,6 +7,8 @@ import { JEWELRY_ITEM_NAMES } from '@/shared/lib/jewelryItems'
 import { preparePiecePhoto } from '@/shared/lib/imageCompress'
 import { uploadPieceImage } from '@/features/purchases/api'
 import { StoragePicker, type StorageOption } from '@/shared/components/StoragePicker'
+import { ScrapAvailabilityCard } from '@/features/purchases/components/ScrapAvailabilityCard'
+import { TwentyOneKConversionBar } from '@/features/purchases/components/TwentyOneKConversionBar'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
@@ -59,16 +61,21 @@ interface Props {
   taxRate?: number
   storages?: StorageOption[]
   defaultStorageId?: string
+  /** عند التبريد: إجمالي الذهب المستبدل مكافئ 21 (تعرض المعادلة كاملة). */
+  input21?: number
+  /** عند التبريد: إجمالي القطع الملتزمة مكافئ 21 قبل هذه القطعة. */
+  output21?: number
+  branchId?: number
   onConfirm: (draft: PieceDraft) => void
 }
 
-export function AddPieceDialog({ open, onOpenChange, goldPrice, initial, includeTax = true, commissionRate = 0, taxRate = 0.01, storages = [], defaultStorageId, onConfirm }: Props) {
+export function AddPieceDialog({ open, onOpenChange, goldPrice, initial, includeTax = true, commissionRate = 0, taxRate = 0.01, storages = [], defaultStorageId, input21, output21, branchId, onConfirm }: Props) {
   // إعادة تهيئة النموذج عند كل فتح عبر remount (key) بدل useEffect — متوافق مع react-hooks/set-state-in-effect.
   const formKey = open ? JSON.stringify(initial ?? EMPTY_PIECE_DRAFT) : 'closed'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <PieceForm key={formKey} goldPrice={goldPrice} initial={initial} includeTax={includeTax} commissionRate={commissionRate} taxRate={taxRate} storages={storages} defaultStorageId={defaultStorageId} onConfirm={onConfirm} onCancel={() => onOpenChange(false)} />
+        <PieceForm key={formKey} goldPrice={goldPrice} initial={initial} includeTax={includeTax} commissionRate={commissionRate} taxRate={taxRate} storages={storages} defaultStorageId={defaultStorageId} input21={input21} output21={output21} branchId={branchId} onConfirm={onConfirm} onCancel={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   )
@@ -82,6 +89,9 @@ function PieceForm({
   taxRate = 0.01,
   storages = [],
   defaultStorageId,
+  input21,
+  output21,
+  branchId,
   onConfirm,
   onCancel,
 }: {
@@ -92,6 +102,9 @@ function PieceForm({
   taxRate?: number
   storages?: StorageOption[]
   defaultStorageId?: string
+  input21?: number
+  output21?: number
+  branchId?: number
   onConfirm: (draft: PieceDraft) => void
   onCancel: () => void
 }) {
@@ -165,6 +178,10 @@ function PieceForm({
   const commission = m.commission
   const lineTotal = m.total
   const showSummary = weight > 0 && goldPrice > 0
+  const piece21 =
+    weight > 0 && karat > 0
+      ? Math.round(((weight * quantity * karat) / 21) * 1000) / 1000
+      : 0
 
   async function confirmWithPhoto() {
     if (!draft.productName.trim()) {
@@ -423,6 +440,20 @@ function PieceForm({
                   triggerClassName="bg-white"
                 />
               </div>
+            </div>
+          )}
+
+          {typeof input21 === 'number' && (
+            <div className="space-y-2">
+              <TwentyOneKConversionBar
+                input21={input21}
+                output21={(output21 ?? 0) + piece21}
+                goldPrice={goldPrice}
+              />
+              <ScrapAvailabilityCard
+                storageId={draft.storageId}
+                branchId={branchId}
+              />
             </div>
           )}
 

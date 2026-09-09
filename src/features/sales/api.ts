@@ -1,7 +1,12 @@
 import axios from 'axios'
 import api from '@/shared/lib/api'
 import { PAGE_SIZE, type PaginatedResult } from '@/shared/lib/pagination'
-import type { CreateSalePayload, Sale } from './types'
+import type {
+  CreateSalePayload,
+  HeldPaymentPayload,
+  HeldSale,
+  Sale,
+} from './types'
 
 const base = '/api/Sale'
 
@@ -85,4 +90,32 @@ export async function getSaleForPrint(saleId: number): Promise<SalePrintData> {
 export async function createSale(payload: CreateSalePayload): Promise<Sale> {
   const { data } = await api.post<Sale>(`${base}/AddSale`, payload)
   return data
+}
+
+/** قائمة الفواتير المعلّقة (القطع محجوزة + مديونية ذهبية بالجرامات). */
+export async function getHeldSales(branchId?: number): Promise<HeldSale[]> {
+  const { data } = await api.get<HeldSale[]>(`${base}/GetHeldSales`, {
+    params: branchId ? { branchId } : undefined,
+  })
+  return data ?? []
+}
+
+/** إتمام بيع معلّق: تحرير القطع وخصم المخزون وتسوية الدفع. */
+export async function completeHeldSale(
+  saleId: number,
+  payment: HeldPaymentPayload,
+): Promise<Sale> {
+  const { data } = await api.post<Sale>(`${base}/CompleteHeldSale/${saleId}`, payment)
+  return data
+}
+
+/** حفظ تعديلات فاتورة معلّقة (إضافة/إزالة قطع) مع إعادة بناء المديونية الذهبية. */
+export async function updateHeldSale(payload: CreateSalePayload): Promise<Sale> {
+  const { data } = await api.put<Sale>(`${base}/UpdateHeldSale/${payload.saleId}`, payload)
+  return data
+}
+
+/** إلغاء بيع معلّق: تحرير القطع وحذف المديونية الذهبية. */
+export async function cancelHeldSale(saleId: number): Promise<void> {
+  await api.delete(`${base}/CancelHeldSale/${saleId}`)
 }

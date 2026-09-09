@@ -1,4 +1,4 @@
-import { Minus, Plus, Trash2, ShoppingCart, Tag } from 'lucide-react'
+import { Minus, Plus, Trash2, ShoppingCart, Tag, Save } from 'lucide-react'
 
 import { TAX_AND_STAMP_RATE, cartLineMath } from '@/shared/lib/gold'
 import { cn, currencySymbol, formatNumber } from '@/shared/lib/utils'
@@ -17,6 +17,9 @@ interface Props {
   onClear: () => void
   onCheckout: () => void
   onDiscount: () => void
+  editingHeldLabel?: string
+  onSaveHeld?: () => void
+  savingHeld?: boolean
 }
 
 export function CurrentCart({
@@ -28,6 +31,9 @@ export function CurrentCart({
   onClear,
   onCheckout,
   onDiscount,
+  editingHeldLabel,
+  onSaveHeld,
+  savingHeld = false,
 }: Props) {
   const currency = useCurrencyStore((s) => s.currency)
   const metalIncludingMaking = totals.metal + totals.making
@@ -36,7 +42,9 @@ export function CurrentCart({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[15px] font-semibold text-foreground">الفاتورة</p>
-          <p className="text-[13px] text-muted-foreground">بيع جديد</p>
+          <p className="text-[13px] text-muted-foreground">
+            {editingHeldLabel ?? 'بيع جديد'}
+          </p>
         </div>
         {cart.length > 0 && (
           <button
@@ -102,12 +110,25 @@ export function CurrentCart({
               {totals.discount > 0 ? 'تعديل الخصم' : 'تطبيق خصم'}
             </button>
 
+            {onSaveHeld ? (
+              <button
+                type="button"
+                onClick={onSaveHeld}
+                disabled={savingHeld}
+                className="flex h-11 w-full touch-target items-center justify-center gap-2 rounded-full border border-warning bg-warning/10 text-[13px] font-bold text-warning hover:bg-warning/20 disabled:opacity-60"
+              >
+                <Save className="size-4" />
+                {savingHeld ? 'جارٍ الحفظ...' : 'حفظ التعليق'}
+              </button>
+            ) : null}
+
             <button
               type="button"
+              disabled={savingHeld}
               onClick={onCheckout}
-              className="h-11 w-full touch-target rounded-full bg-primary px-6 text-[13px] font-bold text-white transition-colors hover:bg-primary/90"
+              className="h-11 w-full touch-target rounded-full bg-primary px-6 text-[13px] font-bold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
             >
-              إتمام البيع
+              {editingHeldLabel ? 'إتمام البيع المعلّق' : 'إتمام البيع'}
             </button>
           </div>
         </>
