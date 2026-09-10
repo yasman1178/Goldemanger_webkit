@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -12,9 +13,21 @@ import {
   Pencil,
   Trash2,
   ShieldCheck,
+  Banknote,
+  ArrowDownLeft,
+  ArrowUpRight,
+  TrendingUp,
+  MapPin,
+  ExternalLink,
+  CheckCircle2,
 } from 'lucide-react'
 
 import { useAuthStore } from '@/shared/stores/auth-store'
+import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { invalidateShopData } from '@/shared/lib/invalidateShop'
+import { depositCash, withdrawCash } from '@/features/cash/api'
+import { DepositDialog } from '@/features/cash/components/DepositDialog'
+import { WithdrawDialog } from '@/features/cash/components/WithdrawDialog'
 import {
   getStoreProfile,
   updateStoreProfile,
@@ -94,6 +107,12 @@ export function SettingsPage() {
   const branchId = useAuthStore((s) => s.branchId)
   const isOwner = roles.includes('Owner')
 
+  const { data: overview } = useQuery({
+    queryKey: ['settings-overview'],
+    queryFn: getOverview,
+    enabled: isOwner,
+  })
+
   if (!isOwner) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
@@ -107,61 +126,215 @@ export function SettingsPage() {
 
   if (!branchId) return <InitialCompanySetup />
 
+  const totalBranchesCash = overview?.branches.reduce((acc, b) => acc + (b.cash ?? 0), 0) ?? 0
+  const totalBranchesSales = overview?.branches.reduce((acc, b) => acc + (b.totalSales ?? 0), 0) ?? 0
+  const totalBranchesCount = overview?.branches.length ?? 0
+  const totalEmployeesCount = overview?.branches.reduce((acc, b) => acc + (b.employees?.length ?? 0), 0) ?? 0
+
   return (
-    <div className="mx-auto w-full max-w-[1440px] space-y-5 pb-20 lg:space-y-6">
-      <div className="flex items-center gap-3 rounded-[18px] border border-black/5 bg-white p-4 elevation-card sm:p-5">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <Settings2 className="size-6" />
-        </div>
-        <div>
-          <h1 className="text-[28px] font-bold leading-[1.2] text-foreground sm:text-[34px]">
-            الإعدادات
-          </h1>
-          <p className="text-[13px] text-muted-foreground sm:text-[15px]">
-            إدارة بيانات المحل والفروع والموظفين
-          </p>
+    <div className="mx-auto w-full max-w-[1440px] space-y-6 pb-24">
+      {/* Executive Hero Banner */}
+      <div className="relative overflow-hidden rounded-[22px] border border-amber-500/25 bg-gradient-to-br from-slate-950 via-slate-900 to-zinc-900 p-5 text-white shadow-lg sm:p-6">
+        <div className="absolute -left-16 -top-16 size-56 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -right-16 size-56 rounded-full bg-primary/15 blur-3xl pointer-events-none" />
+
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex size-13 shrink-0 items-center justify-center rounded-[18px] border border-amber-400/30 bg-amber-400/15 text-amber-300 shadow-inner">
+              <Settings2 className="size-6" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-[24px] font-bold text-white sm:text-[30px] leading-tight">
+                  إعدادات المنظومة والفروع
+                </h1>
+                {overview?.companyName && (
+                  <span className="rounded-full border border-amber-400/35 bg-amber-400/15 px-3 py-0.5 text-[11.5px] font-bold text-amber-200">
+                    {overview.companyName}
+                  </span>
+                )}
+              </div>
+              <p className="text-[13px] text-slate-300 sm:text-[14px]">
+                إدارة شبكة الفروع، الخزينة والسيولة النقدية، بيانات المنشأة، وصلاحيات فريق العمل.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Metrics Pills */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5">
+            <div className="rounded-[14px] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-xs">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                <Building2 className="size-3.5 text-amber-400" />
+                <span>الفروع</span>
+              </div>
+              <p className="mt-0.5 text-[16px] font-bold text-white tabular-nums">
+                {totalBranchesCount} <span className="text-[11px] font-normal text-slate-300">فرع</span>
+              </p>
+            </div>
+
+            <div className="rounded-[14px] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-xs">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                <Banknote className="size-3.5 text-emerald-400" />
+                <span>إجمالي الخزينة</span>
+              </div>
+              <p className="mt-0.5 text-[15px] font-bold text-emerald-300 tabular-nums">
+                {formatEgp(totalBranchesCash)}
+              </p>
+            </div>
+
+            <div className="col-span-2 sm:col-span-1 rounded-[14px] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-xs">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                <TrendingUp className="size-3.5 text-primary" />
+                <span>إجمالي المبيعات</span>
+              </div>
+              <p className="mt-0.5 text-[15px] font-bold text-primary tabular-nums">
+                {formatEgp(totalBranchesSales)}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <Tabs defaultValue="store" dir="rtl" className="items-start md:flex-row">
-        <TabsList className="flex h-12 min-h-12 w-full max-w-full shrink-0 justify-start gap-1 overflow-x-auto rounded-2xl bg-white p-1 elevation-card md:h-fit md:w-56 md:flex-col md:items-stretch md:overflow-visible md:rounded-[18px] md:p-2">
-          <TabsTrigger value="store" className="h-11 min-w-max justify-start gap-2 rounded-xl px-4 md:w-full md:flex-none">
-            <Store className="size-4" />
-            بيانات المحل
+      {/* Executive Segmented Navigation Buttons */}
+      <Tabs defaultValue="branches" dir="rtl" className="flex flex-col gap-6">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 w-full h-auto bg-transparent p-0 border-0 shadow-none overflow-visible after:hidden">
+          {/* 1. الفروع والخزينة */}
+          <TabsTrigger
+            value="branches"
+            className="group relative flex h-auto min-h-[76px] sm:min-h-[82px] w-full flex-col items-start justify-between rounded-[18px] border border-black/8 bg-white p-3 sm:p-3.5 text-start transition-all duration-200 after:hidden hover:border-black/20 hover:bg-slate-50/90 active:scale-[0.98] focus-visible:outline-hidden shadow-xs data-[state=active]:border-slate-950 data-[state=active]:bg-gradient-to-br data-[state=active]:from-slate-950 data-[state=active]:via-slate-900 data-[state=active]:to-slate-950 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-slate-950/20 data-[state=active]:ring-2 data-[state=active]:ring-amber-400/40"
+          >
+            <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-[12px] bg-slate-100 text-slate-700 transition-all duration-200 group-hover:scale-105 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300 group-data-[state=active]:ring-1 group-data-[state=active]:ring-amber-400/40">
+                <Building2 className="size-4.5 sm:size-5" />
+              </div>
+              {totalBranchesCount > 0 && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300">
+                  {totalBranchesCount} فرع
+                </span>
+              )}
+            </div>
+            <div className="mt-2 flex flex-col min-w-0">
+              <span className="font-bold text-[13.5px] sm:text-[14px] leading-tight text-foreground group-data-[state=active]:text-white">
+                الفروع والخزينة
+              </span>
+              <span className="text-[11px] text-muted-foreground group-data-[state=active]:text-slate-300 leading-tight mt-1 truncate">
+                السيولة وشبكة الفروع
+              </span>
+            </div>
           </TabsTrigger>
-          <TabsTrigger value="branches" className="h-11 min-w-max justify-start gap-2 rounded-xl px-4 md:w-full md:flex-none">
-            <Building2 className="size-4" />
-            الفروع والمحلات
+
+          {/* 2. بيانات المتجر */}
+          <TabsTrigger
+            value="store"
+            className="group relative flex h-auto min-h-[76px] sm:min-h-[82px] w-full flex-col items-start justify-between rounded-[18px] border border-black/8 bg-white p-3 sm:p-3.5 text-start transition-all duration-200 after:hidden hover:border-black/20 hover:bg-slate-50/90 active:scale-[0.98] focus-visible:outline-hidden shadow-xs data-[state=active]:border-slate-950 data-[state=active]:bg-gradient-to-br data-[state=active]:from-slate-950 data-[state=active]:via-slate-900 data-[state=active]:to-slate-950 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-slate-950/20 data-[state=active]:ring-2 data-[state=active]:ring-amber-400/40"
+          >
+            <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-[12px] bg-slate-100 text-slate-700 transition-all duration-200 group-hover:scale-105 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300 group-data-[state=active]:ring-1 group-data-[state=active]:ring-amber-400/40">
+                <Store className="size-4.5 sm:size-5" />
+              </div>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300">
+                المنشأة
+              </span>
+            </div>
+            <div className="mt-2 flex flex-col min-w-0">
+              <span className="font-bold text-[13.5px] sm:text-[14px] leading-tight text-foreground group-data-[state=active]:text-white">
+                بيانات المتجر
+              </span>
+              <span className="text-[11px] text-muted-foreground group-data-[state=active]:text-slate-300 leading-tight mt-1 truncate">
+                السجل التجاري والضريبي
+              </span>
+            </div>
           </TabsTrigger>
-          <TabsTrigger value="employees" className="h-11 min-w-max justify-start gap-2 rounded-xl px-4 md:w-full md:flex-none">
-            <Users className="size-4" />
-            المستخدمون
+
+          {/* 3. المستخدمون والصلاحيات */}
+          <TabsTrigger
+            value="employees"
+            className="group relative flex h-auto min-h-[76px] sm:min-h-[82px] w-full flex-col items-start justify-between rounded-[18px] border border-black/8 bg-white p-3 sm:p-3.5 text-start transition-all duration-200 after:hidden hover:border-black/20 hover:bg-slate-50/90 active:scale-[0.98] focus-visible:outline-hidden shadow-xs data-[state=active]:border-slate-950 data-[state=active]:bg-gradient-to-br data-[state=active]:from-slate-950 data-[state=active]:via-slate-900 data-[state=active]:to-slate-950 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-slate-950/20 data-[state=active]:ring-2 data-[state=active]:ring-amber-400/40"
+          >
+            <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-[12px] bg-slate-100 text-slate-700 transition-all duration-200 group-hover:scale-105 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300 group-data-[state=active]:ring-1 group-data-[state=active]:ring-amber-400/40">
+                <Users className="size-4.5 sm:size-5" />
+              </div>
+              {totalEmployeesCount > 0 && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300">
+                  {totalEmployeesCount} موظف
+                </span>
+              )}
+            </div>
+            <div className="mt-2 flex flex-col min-w-0">
+              <span className="font-bold text-[13.5px] sm:text-[14px] leading-tight text-foreground group-data-[state=active]:text-white">
+                المستخدمون والصلاحيات
+              </span>
+              <span className="text-[11px] text-muted-foreground group-data-[state=active]:text-slate-300 leading-tight mt-1 truncate">
+                فريق العمل وكاشير الفروع
+              </span>
+            </div>
           </TabsTrigger>
-          <TabsTrigger value="settings" className="h-11 min-w-max justify-start gap-2 rounded-xl px-4 md:w-full md:flex-none">
-            <Settings2 className="size-4" />
-            إعدادات عامة
+
+          {/* 4. إعدادات عامة */}
+          <TabsTrigger
+            value="settings"
+            className="group relative flex h-auto min-h-[76px] sm:min-h-[82px] w-full flex-col items-start justify-between rounded-[18px] border border-black/8 bg-white p-3 sm:p-3.5 text-start transition-all duration-200 after:hidden hover:border-black/20 hover:bg-slate-50/90 active:scale-[0.98] focus-visible:outline-hidden shadow-xs data-[state=active]:border-slate-950 data-[state=active]:bg-gradient-to-br data-[state=active]:from-slate-950 data-[state=active]:via-slate-900 data-[state=active]:to-slate-950 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-slate-950/20 data-[state=active]:ring-2 data-[state=active]:ring-amber-400/40"
+          >
+            <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-[12px] bg-slate-100 text-slate-700 transition-all duration-200 group-hover:scale-105 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300 group-data-[state=active]:ring-1 group-data-[state=active]:ring-amber-400/40">
+                <Settings2 className="size-4.5 sm:size-5" />
+              </div>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300">
+                النظام
+              </span>
+            </div>
+            <div className="mt-2 flex flex-col min-w-0">
+              <span className="font-bold text-[13.5px] sm:text-[14px] leading-tight text-foreground group-data-[state=active]:text-white">
+                إعدادات عامة
+              </span>
+              <span className="text-[11px] text-muted-foreground group-data-[state=active]:text-slate-300 leading-tight mt-1 truncate">
+                الفواتير، الطباعة والضرائب
+              </span>
+            </div>
           </TabsTrigger>
-          <TabsTrigger value="onboarding" className="h-11 min-w-max justify-start gap-2 rounded-xl px-4 md:w-full md:flex-none">
-            <ClipboardCheck className="size-4" />
-            التحويل الابتدائي
+
+          {/* 5. التحويل الابتدائي */}
+          <TabsTrigger
+            value="onboarding"
+            className="col-span-2 sm:col-span-1 group relative flex h-auto min-h-[76px] sm:min-h-[82px] w-full flex-col items-start justify-between rounded-[18px] border border-black/8 bg-white p-3 sm:p-3.5 text-start transition-all duration-200 after:hidden hover:border-black/20 hover:bg-slate-50/90 active:scale-[0.98] focus-visible:outline-hidden shadow-xs data-[state=active]:border-slate-950 data-[state=active]:bg-gradient-to-br data-[state=active]:from-slate-950 data-[state=active]:via-slate-900 data-[state=active]:to-slate-950 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-slate-950/20 data-[state=active]:ring-2 data-[state=active]:ring-amber-400/40"
+          >
+            <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-[12px] bg-slate-100 text-slate-700 transition-all duration-200 group-hover:scale-105 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300 group-data-[state=active]:ring-1 group-data-[state=active]:ring-amber-400/40">
+                <ClipboardCheck className="size-4.5 sm:size-5" />
+              </div>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 group-data-[state=active]:bg-amber-400/20 group-data-[state=active]:text-amber-300">
+                افتتاحي
+              </span>
+            </div>
+            <div className="mt-2 flex flex-col min-w-0">
+              <span className="font-bold text-[13.5px] sm:text-[14px] leading-tight text-foreground group-data-[state=active]:text-white">
+                التحويل الابتدائي
+              </span>
+              <span className="text-[11px] text-muted-foreground group-data-[state=active]:text-slate-300 leading-tight mt-1 truncate">
+                الأرصدة والمخزون الافتتاحي
+              </span>
+            </div>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="store" className="mt-5">
-          <StoreSection />
-        </TabsContent>
-        <TabsContent value="branches" className="mt-5">
-          <BranchesSection />
-        </TabsContent>
-        <TabsContent value="employees" className="mt-5">
-          <EmployeesSection />
-        </TabsContent>
-        <TabsContent value="settings" className="mt-5">
-          <KeyValuesSection />
-        </TabsContent>
-        <TabsContent value="onboarding" className="mt-5">
-          <OnboardingSection />
-        </TabsContent>
+        <div className="w-full min-w-0">
+          <TabsContent value="branches" className="m-0 focus-visible:outline-hidden">
+            <BranchesSection />
+          </TabsContent>
+          <TabsContent value="store" className="m-0 focus-visible:outline-hidden">
+            <StoreSection />
+          </TabsContent>
+          <TabsContent value="employees" className="m-0 focus-visible:outline-hidden">
+            <EmployeesSection />
+          </TabsContent>
+          <TabsContent value="settings" className="m-0 focus-visible:outline-hidden">
+            <KeyValuesSection />
+          </TabsContent>
+          <TabsContent value="onboarding" className="m-0 focus-visible:outline-hidden">
+            <OnboardingSection />
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   )
@@ -361,131 +534,326 @@ function FieldRow({
 
 function BranchesSection() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const activeBranchId = useActiveBranchId()
+  const setSelectedBranchId = useAuthStore((s) => s.setSelectedBranchId)
+  const branchId = useAuthStore((s) => s.branchId)
+
   const { data, isLoading } = useQuery({
     queryKey: ['settings-overview'],
     queryFn: getOverview,
   })
+
   const [dialog, setDialog] = useState<{ mode: 'add' } | { mode: 'edit'; branch: BranchSummary } | null>(null)
+  const [depositOpen, setDepositOpen] = useState(false)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
+
+  const branches = useMemo(
+    () =>
+      data?.branches.map((b) => ({
+        branchId: b.branchId,
+        branchName: b.branchName,
+      })) ?? [],
+    [data?.branches],
+  )
+
+  const depositMutation = useMutation({
+    mutationFn: ({ amount, targetBranchId }: { amount: number; targetBranchId?: number }) =>
+      depositCash(amount, targetBranchId),
+    onSuccess: () => {
+      toast.success('تم إيداع الرصيد في الخزينة بنجاح')
+      invalidateShopData(queryClient)
+      queryClient.invalidateQueries({ queryKey: ['settings-overview'] })
+      setDepositOpen(false)
+    },
+    onError: () => {
+      toast.error('فشل إيداع الرصيد. تأكد من إدخال المبلغ.')
+    },
+  })
+
+  const withdrawMutation = useMutation({
+    mutationFn: ({ amount, targetBranchId }: { amount: number; targetBranchId?: number }) =>
+      withdrawCash(amount, targetBranchId),
+    onSuccess: () => {
+      toast.success('تم سحب الرصيد من الخزينة بنجاح')
+      invalidateShopData(queryClient)
+      queryClient.invalidateQueries({ queryKey: ['settings-overview'] })
+      setWithdrawOpen(false)
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err?.response?.data?.message ?? 'فشل سحب الرصيد. تأكد من الرصيد المتاح.')
+    },
+  })
+
+  const totalCash = data?.branches.reduce((acc, b) => acc + (b.cash ?? 0), 0) ?? 0
+  const activeBranch = data?.branches.find((b) => b.branchId === activeBranchId) ?? data?.branches[0]
 
   return (
-    <Card className="elevation-card">
-      <CardHeader className="flex-row items-center justify-between gap-2">
-        <CardTitle className="flex items-center gap-2 text-[15px] font-bold">
-          <Building2 className="size-4" />
-          الفروع والمحلات
-          {data?.companyName ? ` — ${data.companyName}` : ''}
-        </CardTitle>
-        <Button
-          type="button"
-          size="sm"
-          className="gap-2 rounded-full touch-target"
-          onClick={() => setDialog({ mode: 'add' })}
-        >
-          <Plus className="size-4" />
-          إضافة فرع
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-primary/15 bg-primary/5 p-4 text-[13px] leading-relaxed text-foreground">
-          <Building2 className="mt-0.5 size-4 shrink-0 text-primary" />
-          <p>
-            يمكنك إضافة الفروع من هذا الحساب بعد تفعيل الشركة واشتراكها بواسطة مدير النظام.
-            كل فرع جديد يحصل على نفس تاريخ انتهاء الاشتراك الحالي.
-          </p>
+    <div className="space-y-6">
+      {/* Treasury & Liquidity Control Card */}
+      <div className="relative overflow-hidden rounded-[20px] border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.06] via-white to-amber-500/[0.04] p-5 shadow-xs sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-[16px] border border-emerald-500/25 bg-emerald-500/15 text-emerald-600">
+              <Banknote className="size-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-[17px] font-bold text-foreground sm:text-[19px]">
+                  رصيد الخزينة والسيولة النقدية
+                </h2>
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-bold text-emerald-700">
+                  صاحب المحل
+                </span>
+              </div>
+              <p className="text-[13px] text-muted-foreground">
+                إيداع وسحب السيولة النقدية المركزية أو تغذية خزائن الفروع المختلفة.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              onClick={() => setDepositOpen(true)}
+              className="h-10 gap-2 rounded-[12px] bg-emerald-600 px-4 text-[13px] font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-[0.98] touch-target"
+            >
+              <ArrowDownLeft className="size-4" />
+              إيداع رصيد
+            </Button>
+            <Button
+              type="button"
+              onClick={() => setWithdrawOpen(true)}
+              variant="outline"
+              className="h-10 gap-2 rounded-[12px] border-rose-200 bg-rose-50/60 px-4 text-[13px] font-bold text-rose-600 hover:bg-rose-100 hover:text-rose-700 active:scale-[0.98] touch-target"
+            >
+              <ArrowUpRight className="size-4" />
+              سحب رصيد
+            </Button>
+          </div>
         </div>
+
+        {/* Treasury Metrics Grid */}
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-[14px] border border-black/5 bg-white p-3.5 shadow-2xs">
+            <span className="text-[12px] font-medium text-muted-foreground">إجمالي النقدية بالفروع</span>
+            <p className="mt-1 text-[20px] font-bold tabular-nums text-emerald-600">
+              {formatEgp(totalCash)}
+            </p>
+          </div>
+
+          <div className="rounded-[14px] border border-black/5 bg-white p-3.5 shadow-2xs">
+            <span className="text-[12px] font-medium text-muted-foreground">الفرع الحالي النشط</span>
+            <div className="mt-1 flex items-center justify-between">
+              <p className="text-[15px] font-bold text-foreground truncate">
+                {activeBranch?.branchName ?? '—'}
+              </p>
+              <span className="text-[14px] font-bold tabular-nums text-primary">
+                {formatEgp(activeBranch?.cash ?? 0)}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-[14px] border border-black/5 bg-white p-3.5 shadow-2xs sm:col-span-2 lg:col-span-1">
+            <span className="text-[12px] font-medium text-muted-foreground">العمليات النقدية</span>
+            <p className="mt-1 text-[13px] font-semibold text-foreground/85">
+              تنعكس فوراً على تقارير كشف حركة الخزينة وإغلاق اليوم
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Branches Network Section */}
+      <div className="rounded-[20px] border border-black/5 bg-white p-5 shadow-xs sm:p-6 space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-black/5 pb-4">
+          <div>
+            <h3 className="text-[17px] font-bold text-foreground flex items-center gap-2">
+              <Building2 className="size-5 text-primary" />
+              شبكة الفروع والمحلات
+              {data?.companyName && (
+                <span className="text-[13px] font-normal text-muted-foreground">
+                  ({data.companyName})
+                </span>
+              )}
+            </h3>
+            <p className="text-[12.5px] text-muted-foreground">
+              يمكنك إضافة فروع جديدة، متابعة مبيعاتها وكاش الخزينة، وتحديد الفرع النشط لمبيعات الكاشير.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            className="gap-2 rounded-[12px] bg-primary text-white h-9.5 px-3.5 text-[12.5px] font-bold shadow-xs hover:bg-primary/90 touch-target"
+            onClick={() => setDialog({ mode: 'add' })}
+          >
+            <Plus className="size-4" />
+            إضافة فرع جديد
+          </Button>
+        </div>
+
         {isLoading ? (
           <div className="space-y-3 py-3">
-            <Skeleton className="h-20 w-full rounded-2xl" />
-            <Skeleton className="h-20 w-full rounded-2xl" />
+            <Skeleton className="h-24 w-full rounded-2xl" />
+            <Skeleton className="h-24 w-full rounded-2xl" />
           </div>
         ) : !data || data.branches.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">
-            لا توجد فروع بعد. أضف أول فرع.
+            لا توجد فروع مسجلة بعد. أضف أول فرع لشركتك.
           </div>
         ) : (
-          <div className="grid gap-3 xl:grid-cols-2">
-            {data.branches.map((branch) => (
-              <div
-                key={branch.branchId}
-                className="rounded-2xl border border-black/5 bg-black/[0.02] p-4"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[15px] font-bold text-foreground">
-                      {branch.branchName}
-                    </p>
-                    <p className="text-[13px] text-muted-foreground">
-                      {[branch.city, branch.location, branch.station]
-                        .filter(Boolean)
-                        .join(' — ') || 'لا يوجد عنوان'}
-                    </p>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label="تعديل الفرع"
-                      className="rounded-full touch-target"
-                      onClick={() => setDialog({ mode: 'edit', branch })}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label="حذف الفرع"
-                      className="rounded-full text-error hover:text-error touch-target"
-                      onClick={() => {
-                        if (!window.confirm(`هل تريد حذف فرع «${branch.branchName}»؟`)) return
-                        void deleteBranch(branch.branchId)
-                          .then(() => {
-                            toast.success('تم حذف الفرع')
-                            queryClient.invalidateQueries({ queryKey: ['settings-overview'] })
-                          })
-                          .catch(() => toast.error('تعذّر حذف الفرع. قد يكون مرتبطاً ببيانات.'))
-                      }}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  <Stat label="المبيعات" value={formatEgp(branch.totalSales)} />
-                  <Stat label="الكاش" value={formatEgp(branch.cash)} positive />
-                  <Stat label="الموظفون" value={String(branch.employees.length)} />
-                </div>
-
-                {branch.buyFromCustomerCommission != null && (
-                  <p className="mt-2 text-[12px] text-muted-foreground">
-                    عمولة الشراء من عميل:{' '}
-                    <span className="font-bold text-foreground tabular-nums">
-                      {(branch.buyFromCustomerCommission * 100).toFixed(2)}%
-                    </span>
-                  </p>
-                )}
-
-                {branch.employees.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {branch.employees.map((emp) => (
-                      <Badge key={emp.id} variant="outline" className="gap-1">
-                        {emp.fullName}
-                        {emp.roles[0] && (
-                          <span className="text-muted-foreground">
-                            ({roleLabels[emp.roles[0]] ?? emp.roles[0]})
+          <div className="grid gap-4 xl:grid-cols-2">
+            {data.branches.map((branch) => {
+              const isCurrentActive = branch.branchId === activeBranchId
+              return (
+                <div
+                  key={branch.branchId}
+                  className={cn(
+                    'group relative rounded-[16px] border p-4 sm:p-5 transition-all duration-200',
+                    isCurrentActive
+                      ? 'border-primary/40 bg-gradient-to-br from-primary/[0.03] to-white shadow-xs ring-1 ring-primary/20'
+                      : 'border-black/6 bg-slate-50/40 hover:bg-white hover:border-black/12 hover:shadow-xs',
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-[16px] font-bold text-foreground">
+                          {branch.branchName}
+                        </p>
+                        {isCurrentActive && (
+                          <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 border border-emerald-500/20">
+                            <span className="size-1.5 rounded-full bg-emerald-500" />
+                            الفرع النشط حالياً
                           </span>
                         )}
-                      </Badge>
-                    ))}
+                      </div>
+                      <p className="flex items-center gap-1 text-[12.5px] text-muted-foreground">
+                        <MapPin className="size-3.5 shrink-0" />
+                        {[branch.city, branch.location, branch.station]
+                          .filter(Boolean)
+                          .join(' — ') || 'لا يوجد عنوان مسجل'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label="تعديل الفرع"
+                        className="rounded-full touch-target hover:bg-muted"
+                        onClick={() => setDialog({ mode: 'edit', branch })}
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label="حذف الفرع"
+                        className="rounded-full text-error hover:bg-error/10 hover:text-error touch-target"
+                        onClick={() => {
+                          if (!window.confirm(`هل تريد حذف فرع «${branch.branchName}»؟`)) return
+                          void deleteBranch(branch.branchId)
+                            .then(() => {
+                              toast.success('تم حذف الفرع')
+                              queryClient.invalidateQueries({ queryKey: ['settings-overview'] })
+                            })
+                            .catch(() => toast.error('تعذّر حذف الفرع. قد يكون مرتبطاً ببيانات.'))
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Financial Stats Grid */}
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-[12px] bg-white p-2.5 border border-black/5">
+                      <span className="text-[11px] text-muted-foreground">المبيعات</span>
+                      <p className="mt-0.5 text-[14px] font-bold tabular-nums text-foreground">
+                        {formatEgp(branch.totalSales)}
+                      </p>
+                    </div>
+                    <div className="rounded-[12px] bg-white p-2.5 border border-black/5">
+                      <span className="text-[11px] text-muted-foreground">الخزينة</span>
+                      <p className="mt-0.5 text-[14px] font-bold tabular-nums text-emerald-600">
+                        {formatEgp(branch.cash)}
+                      </p>
+                    </div>
+                    <div className="rounded-[12px] bg-white p-2.5 border border-black/5">
+                      <span className="text-[11px] text-muted-foreground">الموظفون</span>
+                      <p className="mt-0.5 text-[14px] font-bold tabular-nums text-foreground">
+                        {branch.employees.length}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Commission and Actions */}
+                  <div className="mt-3 flex flex-col gap-2 pt-2 border-t border-black/5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-[12px] text-muted-foreground">
+                      عمولة الشراء من عميل:{' '}
+                      <span className="font-bold text-foreground tabular-nums">
+                        {branch.buyFromCustomerCommission != null
+                          ? `${(branch.buyFromCustomerCommission * 100).toFixed(2)}%`
+                          : '1.50%'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {!isCurrentActive ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBranchId(branch.branchId)
+                            toast.success(`تم التبديل إلى ${branch.branchName}`)
+                          }}
+                          className="h-8 rounded-[10px] text-[11px] font-bold text-foreground gap-1.5 touch-target"
+                        >
+                          <CheckCircle2 className="size-3.5 text-muted-foreground" />
+                          تعيين كفرع حالي
+                        </Button>
+                      ) : null}
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedBranchId(branch.branchId)
+                          navigate('/app/sales')
+                        }}
+                        className="h-8 rounded-[10px] bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold gap-1.5 touch-target"
+                      >
+                        <ExternalLink className="size-3" />
+                        نقطة البيع (POS)
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Staff Pills */}
+                  {branch.employees.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1 pt-1">
+                      {branch.employees.map((emp) => (
+                        <Badge key={emp.id} variant="outline" className="gap-1 text-[10.5px] py-0">
+                          {emp.fullName}
+                          {emp.roles[0] && (
+                            <span className="text-muted-foreground text-[10px]">
+                              ({roleLabels[emp.roles[0]] ?? emp.roles[0]})
+                            </span>
+                          )}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
-      </CardContent>
+      </div>
 
       <BranchDialog
         key={dialog?.mode === 'edit' ? `edit-${dialog.branch.branchId}` : dialog === null ? 'closed' : 'add'}
@@ -496,30 +864,28 @@ function BranchesSection() {
           setDialog(null)
         }}
       />
-    </Card>
-  )
-}
 
-function Stat({
-  label,
-  value,
-  positive,
-}: {
-  label: string
-  value: string
-  positive?: boolean
-}) {
-  return (
-    <div className="rounded-xl bg-white p-3">
-      <p className="text-[12px] text-muted-foreground">{label}</p>
-      <p
-        className={cn(
-          'text-[16px] font-bold tabular-nums',
-          positive ? 'text-success' : 'text-foreground',
-        )}
-      >
-        {value}
-      </p>
+      <DepositDialog
+        open={depositOpen}
+        onOpenChange={setDepositOpen}
+        submitting={depositMutation.isPending}
+        onSubmit={(amount, targetBranchId) =>
+          depositMutation.mutate({ amount, targetBranchId })
+        }
+        branches={branches}
+        defaultBranchId={branchId}
+      />
+
+      <WithdrawDialog
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
+        submitting={withdrawMutation.isPending}
+        onSubmit={(amount, targetBranchId) =>
+          withdrawMutation.mutate({ amount, targetBranchId })
+        }
+        branches={branches}
+        defaultBranchId={branchId}
+      />
     </div>
   )
 }
@@ -564,7 +930,7 @@ function BranchDialog({
         : addBranch(payload)
     },
     onSuccess: () => {
-      toast.success(isEdit ? 'تم تعديل الفرع' : 'تمت إضافة الفرع')
+      toast.success(isEdit ? 'تم تعديل الفرع بنجاح' : 'تمت إضافة الفرع بنجاح')
       onSaved()
     },
     onError: () => toast.error('تعذّر حفظ الفرع'),
@@ -572,72 +938,88 @@ function BranchDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'تعديل فرع' : 'إضافة فرع'}</DialogTitle>
-          <DialogDescription>أدخل بيانات الفرع</DialogDescription>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="flex size-9 items-center justify-center rounded-[12px] bg-amber-500/15 text-amber-600">
+              <Building2 className="size-5" />
+            </div>
+            <DialogTitle>{isEdit ? 'تعديل بيانات الفرع' : 'إضافة فرع جديد'}</DialogTitle>
+          </div>
+          <DialogDescription>
+            {isEdit
+              ? 'تحديث بيانات الموقع، المدينة وعمولة الشراء الخاصة بالفرع.'
+              : 'أدخل تفاصيل الفرع الجديد لربطه بالنظام والخزينة المركزية.'}
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-6 space-y-4">
           <FieldRow label="اسم الفرع">
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="مثال: فرع وسط البلد"
-              className="h-11 rounded-[14px] touch-target"
+              className="h-11 rounded-[14px] touch-target focus:border-amber-500 focus:ring-amber-500/20"
             />
           </FieldRow>
-          <FieldRow label="المدينة">
-            <Input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="h-11 rounded-[14px] touch-target"
-            />
-          </FieldRow>
-          <FieldRow label="العنوان">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FieldRow label="المدينة">
+              <Input
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="مثال: القاهرة"
+                className="h-11 rounded-[14px] touch-target focus:border-amber-500 focus:ring-amber-500/20"
+              />
+            </FieldRow>
+            <FieldRow label="المنطقة / المحطة">
+              <Input
+                value={station}
+                onChange={(e) => setStation(e.target.value)}
+                placeholder="مثال: الصاغة"
+                className="h-11 rounded-[14px] touch-target focus:border-amber-500 focus:ring-amber-500/20"
+              />
+            </FieldRow>
+          </div>
+          <FieldRow label="العنوان بالتفصيل">
             <Input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="h-11 rounded-[14px] touch-target"
+              placeholder="مثال: شارع المعز، مبنى 12"
+              className="h-11 rounded-[14px] touch-target focus:border-amber-500 focus:ring-amber-500/20"
             />
           </FieldRow>
-          <FieldRow label="المنطقة/المحطة">
-            <Input
-              value={station}
-              onChange={(e) => setStation(e.target.value)}
-              className="h-11 rounded-[14px] touch-target"
-            />
-          </FieldRow>
-          <FieldRow label="دولة التشغيل / العملة">
-            <Select value={country} onValueChange={setCountry}>
-              <SelectTrigger className="h-11 w-full rounded-[14px] touch-target">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="EG">مصر — جنيه مصري (ج.م)</SelectItem>
-                <SelectItem value="SA">السعودية — ريال سعودي (ر.س)</SelectItem>
-              </SelectContent>
-            </Select>
-          </FieldRow>
-          <FieldRow label="عمولة الشراء من عميل (% من سعر الذهب)">
-            <Input
-              value={commissionPct}
-              onChange={(e) => setCommissionPct(e.target.value)}
-              type="number"
-              step="0.01"
-              min="0"
-              inputMode="decimal"
-              dir="ltr"
-              placeholder="1.5"
-              className="h-11 rounded-[14px] touch-target"
-            />
-          </FieldRow>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FieldRow label="دولة التشغيل / العملة">
+              <Select value={country} onValueChange={setCountry}>
+                <SelectTrigger className="h-11 w-full rounded-[14px] touch-target focus:border-amber-500 focus:ring-amber-500/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EG">مصر — جنيه مصري (ج.م)</SelectItem>
+                  <SelectItem value="SA">السعودية — ريال سعودي (ر.س)</SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldRow>
+            <FieldRow label="عمولة الشراء من عميل (%)">
+              <Input
+                value={commissionPct}
+                onChange={(e) => setCommissionPct(e.target.value)}
+                type="number"
+                step="0.01"
+                min="0"
+                inputMode="decimal"
+                dir="ltr"
+                placeholder="1.5"
+                className="h-11 rounded-[14px] touch-target focus:border-amber-500 focus:ring-amber-500/20"
+              />
+            </FieldRow>
+          </div>
         </div>
         <DialogFooter className="gap-2 sm:justify-end">
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
-            className="h-11 rounded-full touch-target"
+            className="h-11 rounded-[14px] px-5 font-bold touch-target"
           >
             إلغاء
           </Button>
@@ -645,9 +1027,9 @@ function BranchDialog({
             type="button"
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending || !name.trim()}
-            className="h-11 rounded-full touch-target"
+            className="h-11 rounded-[14px] bg-slate-900 hover:bg-slate-800 text-white px-6 font-bold shadow-sm touch-target"
           >
-            {mutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+            {mutation.isPending ? 'جارٍ الحفظ...' : isEdit ? 'حفظ التعديلات' : 'إضافة الفرع'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -893,49 +1275,63 @@ function EmployeeDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'تعديل موظف' : 'إضافة موظف'}</DialogTitle>
-          <DialogDescription>أدخل بيانات الموظف وأدواره</DialogDescription>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="flex size-9 items-center justify-center rounded-[12px] bg-sky-500/15 text-sky-600">
+              <UserCog className="size-5" />
+            </div>
+            <DialogTitle>{isEdit ? 'تعديل بيانات الموظف' : 'إضافة موظف جديد'}</DialogTitle>
+          </div>
+          <DialogDescription>
+            {isEdit
+              ? 'تحديث بيانات الحساب، تعيين الفرع أو كلمة المرور للموظف.'
+              : 'أدخل بيانات الموظف وصلاحيته وحدد الفرع التابع له.'}
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-6 space-y-4">
           <FieldRow label="الاسم الكامل">
             <Input
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="h-11 rounded-[14px] touch-target"
+              placeholder="مثال: أحمد محمد محمود"
+              className="h-11 rounded-[14px] touch-target focus:border-sky-500 focus:ring-sky-500/20"
             />
           </FieldRow>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FieldRow label="رقم الهاتف">
               <Input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="h-11 rounded-[14px] touch-target"
+                placeholder="010xxxxxxxx"
+                className="h-11 rounded-[14px] touch-target focus:border-sky-500 focus:ring-sky-500/20"
               />
             </FieldRow>
-            <FieldRow label="رقم البطاقة">
+            <FieldRow label="رقم البطاقة الشخصية">
               <Input
                 value={cardNumber}
                 onChange={(e) => setCardNumber(e.target.value)}
-                className="h-11 rounded-[14px] touch-target"
+                placeholder="الرقم القومي"
+                className="h-11 rounded-[14px] touch-target focus:border-sky-500 focus:ring-sky-500/20"
               />
             </FieldRow>
           </div>
-          <FieldRow label="البريد الإلكتروني">
+          <FieldRow label="البريد الإلكتروني (لتسجيل الدخول)">
             <Input
               value={email}
+              type="email"
               onChange={(e) => setEmail(e.target.value)}
-              className="h-11 rounded-[14px] touch-target"
+              placeholder="name@jeweler.com"
+              className="h-11 rounded-[14px] touch-target focus:border-sky-500 focus:ring-sky-500/20"
             />
           </FieldRow>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FieldRow label="الفرع">
               <Select
                 value={branchId}
                 onValueChange={(v) => setBranchId(v)}
               >
-                <SelectTrigger className="h-11 w-full rounded-[14px] touch-target">
+                <SelectTrigger className="h-11 w-full rounded-[14px] touch-target focus:border-sky-500 focus:ring-sky-500/20">
                   <SelectValue placeholder="اختر الفرع" />
                 </SelectTrigger>
                 <SelectContent>
@@ -947,7 +1343,7 @@ function EmployeeDialog({
                 </SelectContent>
               </Select>
             </FieldRow>
-            <FieldRow label="الدور">
+            <FieldRow label="الدور والصلاحية">
               <Select
                 value={roleDraft}
                 onValueChange={(v) => {
@@ -956,25 +1352,26 @@ function EmployeeDialog({
                 }}
                 disabled={rolesLocked}
               >
-                <SelectTrigger className="h-11 w-full rounded-[14px] touch-target">
+                <SelectTrigger className="h-11 w-full rounded-[14px] touch-target focus:border-sky-500 focus:ring-sky-500/20">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Sale">بائع</SelectItem>
-                  <SelectItem value="Manager">مدير</SelectItem>
+                  <SelectItem value="Sale">بائع / كاشير</SelectItem>
+                  <SelectItem value="Manager">مدير فرع</SelectItem>
                 </SelectContent>
               </Select>
             </FieldRow>
           </div>
           <FieldRow
-            label={isEdit ? 'كلمة المرور الجديدة (اتركها فارغة لإبقائها)' : 'كلمة المرور'}
+            label={isEdit ? 'كلمة المرور الجديدة (اتركها فارغة لإبقائها كما هي)' : 'كلمة المرور'}
           >
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isEdit && Boolean(emp?.roles.includes('Owner'))}
-              className="h-11 rounded-[14px] touch-target"
+              placeholder={isEdit ? '••••••••' : 'أدخل كلمة مرور قوية'}
+              className="h-11 rounded-[14px] touch-target focus:border-sky-500 focus:ring-sky-500/20"
             />
           </FieldRow>
         </div>
@@ -983,7 +1380,7 @@ function EmployeeDialog({
             type="button"
             variant="outline"
             onClick={onClose}
-            className="h-11 rounded-full touch-target"
+            className="h-11 rounded-[14px] px-5 font-bold touch-target"
           >
             إلغاء
           </Button>
@@ -996,9 +1393,9 @@ function EmployeeDialog({
               !branchId ||
               (!isEdit && !password.trim())
             }
-            className="h-11 rounded-full touch-target"
+            className="h-11 rounded-[14px] bg-slate-900 hover:bg-slate-800 text-white px-6 font-bold shadow-sm touch-target"
           >
-            {pending ? 'جارٍ الحفظ...' : 'حفظ'}
+            {pending ? 'جارٍ الحفظ...' : isEdit ? 'حفظ التعديلات' : 'إضافة الموظف'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -13,25 +13,58 @@ import {
   MessageCircle,
   Clock,
   ShieldCheck,
+  RefreshCw,
+  ArrowDown,
 } from 'lucide-react'
 import { WHATSAPP_LINK } from '@/shared/lib/seo'
 import { goldTabletPosImg } from '@/assets/images'
-
-// أسعار الذهب التقديرية الحية للسوق
-const livePrices = [
-  { karat: 'عيار 24', price: '4,480 ج.م', change: '+15 ج.م', up: true },
-  { karat: 'عيار 21 (الأكثر تداولاً)', price: '3,920 ج.م', change: '+12 ج.م', up: true },
-  { karat: 'عيار 18', price: '3,360 ج.م', change: '+10 ج.م', up: true },
-  { karat: 'الأونصة عالمياً', price: '$2,885 USD', change: '+0.4%', up: true },
-]
+import { useSaghaPrices } from '@/shared/lib/sagha-prices'
 
 export function Hero() {
+  const { prices, loading, refreshPrices } = useSaghaPrices()
   const [calcWeight, setCalcWeight] = useState<number>(10)
   const [calcKarat, setCalcKarat] = useState<24 | 21 | 18>(18)
 
-  // حساب التحويل التلقائي لعيار 21 (معادلة الصاغة القياسية: الوزن * العيار / 21)
+  // حساب التحويل التلقائي لعيار 21 (معادلة الصاغة القياسية: الوزن * العيار / 21) بالسعر الحي
   const weight21 = ((calcWeight || 0) * calcKarat) / 21
-  const estimatedValue = Math.round(weight21 * 3920)
+  const estimatedValue = Math.round(weight21 * (prices.gold21Sell || 4120))
+
+  const tickerItems = [
+    {
+      karat: 'عيار 24 (سبائك)',
+      price: `${prices.gold24Sell.toLocaleString('ar-EG')} ج.م`,
+      buyPrice: `${prices.gold24Buy.toLocaleString('ar-EG')} ج.م`,
+      change: '+18 ج.م',
+    },
+    {
+      karat: 'عيار 21 (الأكثر تداولاً)',
+      price: `${prices.gold21Sell.toLocaleString('ar-EG')} ج.م`,
+      buyPrice: `${prices.gold21Buy.toLocaleString('ar-EG')} ج.م`,
+      change: '+15 ج.م',
+    },
+    {
+      karat: 'عيار 18',
+      price: `${prices.gold18Sell.toLocaleString('ar-EG')} ج.م`,
+      buyPrice: `${prices.gold18Buy.toLocaleString('ar-EG')} ج.م`,
+      change: '+12 ج.م',
+    },
+    {
+      karat: 'الجنيه الذهب (8g)',
+      price: `${prices.goldPoundSell.toLocaleString('ar-EG')} ج.م`,
+      buyPrice: `${prices.goldPoundBuy.toLocaleString('ar-EG')} ج.م`,
+      change: '+120 ج.م',
+    },
+    {
+      karat: 'الأونصة عالمياً',
+      price: `$${prices.ounceUsd.toLocaleString()} USD`,
+      buyPrice: `${prices.ounceEgp.toLocaleString('ar-EG')} ج.م`,
+      change: '+0.4%',
+    },
+  ]
+
+  const scrollToSagha = () => {
+    document.getElementById('sagha-prices')?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   return (
     <section className="relative overflow-hidden bg-[#0a0a0c] text-white pt-6 pb-20 lg:pt-10 lg:pb-28">
@@ -42,25 +75,49 @@ export function Hero() {
 
       {/* Live Gold Ticker Strip */}
       <div className="relative mx-auto max-w-6xl px-4 mb-8">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-950/40 via-neutral-900/80 to-neutral-950/80 p-2.5 sm:px-5 backdrop-blur-md shadow-[0_4px_20px_rgba(217,119,6,0.12)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-950/50 via-neutral-900/90 to-neutral-950/90 p-2.5 sm:px-5 backdrop-blur-md shadow-[0_4px_20px_rgba(217,119,6,0.15)]">
           <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-amber-400">
             <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
             <TrendingUp className="h-4 w-4" />
-            <span>مؤشر أسعار الذهب لحظة بلحظة:</span>
+            <span className="hidden sm:inline">مؤشر أسعار الذهب بالصاغة لحظة بلحظة:</span>
+            <span className="sm:hidden">أسعار الصاغة الآن:</span>
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
-            {livePrices.map((item) => (
+
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm">
+            {tickerItems.slice(0, 3).map((item) => (
               <div key={item.karat} className="flex items-center gap-1.5 font-medium">
                 <span className="text-neutral-400">{item.karat}:</span>
                 <span className="font-bold text-white tabular-nums">{item.price}</span>
-                <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/20">
                   {item.change}
                 </span>
               </div>
             ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => refreshPrices()}
+              disabled={loading}
+              title="تحديث أسعار الذهب من الصاغة"
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-300 hover:bg-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden md:inline">{prices.lastUpdatedFormatted}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={scrollToSagha}
+              className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-[11px] font-black text-neutral-950 hover:bg-amber-400 transition-all cursor-pointer shadow"
+            >
+              <span>جدول الصاغة</span>
+              <ArrowDown className="h-3 w-3" />
+            </button>
           </div>
         </div>
       </div>

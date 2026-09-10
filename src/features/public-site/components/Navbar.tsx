@@ -4,6 +4,7 @@ import { Menu, X, Gem, LogIn, Sparkles, MessageCircle } from 'lucide-react'
 import { WHATSAPP_LINK } from '@/shared/lib/seo'
 
 const navLinks = [
+  { href: '#sagha-prices', label: 'أسعار الذهب بالصاغة' },
   { href: '#features', label: 'المميزات' },
   { href: '#modules', label: 'الأنظمة والوحدات' },
   { href: '#how', label: 'كيف يعمل' },

@@ -8,12 +8,12 @@ import { getApiBaseUrl } from '@/shared/lib/api-url'
 export const SITE_NAME = 'جولد ماستر'
 export const SITE_NAME_LATIN = 'GOLDMASTER'
 export const SITE_DESCRIPTION =
-  'نظام ERP ذكي ومتكامل لإدارة محلات الذهب والصاغة: مخزون المشغولات، كاشير POS باللمس للتابلت 10 إنش، حساب كسر ومصنعية الذهب عيار 18 و 21 و 24، حركات الخزينة والتقارير.'
+  'أسعار الذهب اليوم في مصر بالصاغة مباشر لحظة بلحظة: سعر الذهب عيار 21 بالمصنعية والدمغة، عيار 18 و 24، سعر الجنيه الذهب، كسر الذهب، سبائك BTC، مع نظام ERP الذكي لإدارة محلات الذهب والصاغة.'
 
 export const SITE_PHONE_DISPLAY = '01551702595'
 export const SITE_PHONE_INTL = '+201551702595'
 export const TEL_LINK = `tel:${SITE_PHONE_INTL}`
-export const WHATSAPP_LINK = `https://wa.me/201551702595?text=${encodeURIComponent('مرحباً، أرغب في الاستفسار عن نظام جولد ماستر لإدارة محلات الذهب.')}`
+export const WHATSAPP_LINK = `https://wa.me/201551702595?text=${encodeURIComponent('مرحباً، أرغب في الاستفسار عن نظام جولد ماستر لإدارة محلات الذهب وأسعار الصاغة.')}`
 
 const API_BASE = getApiBaseUrl()
 
@@ -63,7 +63,7 @@ export interface PageMeta {
 }
 
 const DEFAULT_META: PageMeta = {
-  title: `${SITE_NAME} | نظام إدارة محلات الذهب والصاغة الذكي ERP`,
+  title: `${SITE_NAME} | أسعار الذهب اليوم في مصر بالصاغة مباشر عيار 21 ونظام ERP الصاغة`,
   description: SITE_DESCRIPTION,
   url: '/',
   type: 'website',
@@ -134,4 +134,92 @@ export function removeJsonLd(id: string): void {
       `script[data-seo-jsonld][data-id="${id}"]`,
     )
     ?.remove()
+}
+
+/** حقن سكيما أسعار الصاغة المباشرة (FinancialProduct / ItemList) */
+export function setSaghaPricesSchema(prices: {
+  gold24Sell: number
+  gold21Sell: number
+  gold18Sell: number
+  goldPoundSell: number
+  lastUpdatedFormatted: string
+}): void {
+  const siteUrl = getSiteUrl()
+  const payload = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'أسعار الذهب اليوم في مصر بالصاغة مباشر',
+    description: 'تحديث لحظي لأسعار الذهب عيار 21، 18، 24، الجنيه الذهب وسبائك BTC بمحلات الصاغة',
+    url: `${siteUrl}/#sagha-prices`,
+    numberOfItems: 4,
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'سعر الذهب عيار 21 اليوم في مصر بالصاغة',
+        item: {
+          '@type': 'FinancialProduct',
+          name: 'جرام الذهب عيار 21',
+          currency: 'EGP',
+          description: 'سعر بيع جرام الذهب عيار 21 الأكثر تداولاً في محلات الصاغة المصرية',
+          offers: {
+            '@type': 'Offer',
+            price: prices.gold21Sell,
+            priceCurrency: 'EGP',
+            priceValidUntil: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+            availability: 'https://schema.org/InStock',
+          },
+        },
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'سعر الذهب عيار 24 سبائك اليوم',
+        item: {
+          '@type': 'FinancialProduct',
+          name: 'جرام الذهب عيار 24',
+          currency: 'EGP',
+          offers: {
+            '@type': 'Offer',
+            price: prices.gold24Sell,
+            priceCurrency: 'EGP',
+            availability: 'https://schema.org/InStock',
+          },
+        },
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: 'سعر الجنيه الذهب عيار 21 (8 جرام)',
+        item: {
+          '@type': 'FinancialProduct',
+          name: 'الجنيه الذهب 8 جرام',
+          currency: 'EGP',
+          offers: {
+            '@type': 'Offer',
+            price: prices.goldPoundSell,
+            priceCurrency: 'EGP',
+            availability: 'https://schema.org/InStock',
+          },
+        },
+      },
+      {
+        '@type': 'ListItem',
+        position: 4,
+        name: 'سعر الذهب عيار 18 اليوم',
+        item: {
+          '@type': 'FinancialProduct',
+          name: 'جرام الذهب عيار 18',
+          currency: 'EGP',
+          offers: {
+            '@type': 'Offer',
+            price: prices.gold18Sell,
+            priceCurrency: 'EGP',
+            availability: 'https://schema.org/InStock',
+          },
+        },
+      },
+    ],
+  }
+  setJsonLd('sagha-prices-live', payload)
 }

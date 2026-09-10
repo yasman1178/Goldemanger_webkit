@@ -8,7 +8,6 @@ import {
   Package,
   Boxes,
   Plus,
-  Minus,
   ReceiptText,
   ChevronLeft,
   Clock3,
@@ -18,20 +17,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { cn, formatEgp, formatNumber } from '@/shared/lib/utils'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/shared/components/ui/card'
+import { Card } from '@/shared/components/ui/card'
 import { Fab } from '@/shared/components/ui/fab'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import { depositCash, withdrawCash } from '@/features/cash/api'
 import { invalidateShopData } from '@/shared/lib/invalidateShop'
-import { DepositDialog } from '@/features/cash/components/DepositDialog'
-import { WithdrawDialog } from '@/features/cash/components/WithdrawDialog'
-import { getOverview } from '@/features/settings/api'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { useAuthStore } from '@/shared/stores/auth-store'
 import { getSales } from '@/features/sales/api'
@@ -43,7 +33,6 @@ import { getDashboardStats, closeDay } from '@/features/dashboard/api'
 import type { DayCloseSummary } from '@/features/dashboard/types'
 import { SaleReceiptDialog } from '@/features/sales/components/pos/SaleReceiptDialog'
 import { CloseDayDialog } from '@/features/dashboard/components/CloseDayDialog'
-import { InstallAppButton } from '@/features/public-site/components/InstallAppButton'
 
 interface Metric {
   label: string
@@ -52,33 +41,18 @@ interface Metric {
   tone: 'neutral' | 'success' | 'warning' | 'error'
 }
 
-const toneText: Record<Metric['tone'], string> = {
-  neutral: 'text-foreground',
-  success: 'text-success',
-  warning: 'text-warning',
-  error: 'text-error',
-}
-
-const toneChip: Record<Metric['tone'], string> = {
-  neutral: 'bg-foreground/10 text-foreground',
-  success: 'bg-success/10 text-success',
-  warning: 'bg-warning/10 text-warning',
-  error: 'bg-error/10 text-error',
-}
-
 const quickActions = [
-  { label: 'بيع جديد', icon: ShoppingCart, to: '/app/sales', chip: 'bg-success/10 text-success' },
-  { label: 'فاتورة شراء', icon: Store, to: '/app/purchases/new', chip: 'bg-amber-500/10 text-amber-600' },
-  { label: 'تعريف منتج', icon: Package, to: '/app/products', chip: 'bg-primary/10 text-primary' },
-  { label: 'الجرد', icon: Boxes, to: '/app/inventory', chip: 'bg-warning/10 text-warning' },
-  { label: 'الخزينة', icon: Banknote, to: '/app/cash', chip: 'bg-foreground/10 text-foreground' },
-  { label: 'المديونيات', icon: Wallet, to: '/app/debts', chip: 'bg-error/10 text-error' },
+  { label: 'بيع', icon: ShoppingCart, to: '/app/sales', chip: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+  { label: 'مشتريات', icon: Store, to: '/app/purchases/new', chip: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
+  { label: 'منتجات', icon: Package, to: '/app/products', chip: 'bg-primary/15 text-primary' },
+  { label: 'جرد', icon: Boxes, to: '/app/inventory', chip: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
+  { label: 'خزينة', icon: Banknote, to: '/app/cash', chip: 'bg-purple-500/15 text-purple-600 dark:text-purple-400' },
+  { label: 'مديونيات', icon: Wallet, to: '/app/debts', chip: 'bg-rose-500/15 text-rose-600 dark:text-rose-400' },
 ]
 
 export function DashboardPage() {
   const navigate = useNavigate()
   const branchDetails = useAuthStore((s) => s.branchDetails)
-  const branchId = useAuthStore((s) => s.branchId)
   const activeBranchId = useActiveBranchId()
   const [receiptSaleId, setReceiptSaleId] = useState<number | null>(null)
   const [receiptPurchase, setReceiptPurchase] = useState<{
@@ -86,8 +60,6 @@ export function DashboardPage() {
     party: ReceiptParty | null
     isCustomer: boolean
   } | null>(null)
-  const [depositOpen, setDepositOpen] = useState(false)
-  const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [closeDaySummary, setCloseDaySummary] = useState<DayCloseSummary | null>(null)
   const queryClient = useQueryClient()
   const isOwner = useAuthStore((s) => s.user?.roles ?? []).includes('Owner')
@@ -95,49 +67,6 @@ export function DashboardPage() {
   const isManager = useAuthStore((s) => s.user?.roles ?? []).includes('Manager')
   const isSale = useAuthStore((s) => s.user?.roles ?? []).includes('Sale')
   const canCloseDay = isOwner || isResponsible || isManager || isSale
-
-  const { data: overview } = useQuery({
-    queryKey: ['overview'],
-    queryFn: getOverview,
-    enabled: isOwner,
-  })
-
-  const setSelectedBranchId = useAuthStore((s) => s.setSelectedBranchId)
-
-  const branches = useMemo(
-    () =>
-      overview?.branches.map((b) => ({
-        branchId: b.branchId,
-        branchName: b.branchName,
-      })) ?? [],
-    [overview],
-  )
-
-  const depositMutation = useMutation({
-    mutationFn: ({ amount, targetBranchId }: { amount: number; targetBranchId?: number }) =>
-      depositCash(amount, targetBranchId),
-    onSuccess: () => {
-      toast.success('تم إيداع الرصيد بنجاح')
-      invalidateShopData(queryClient)
-      setDepositOpen(false)
-    },
-    onError: () => {
-      toast.error('فشل إيداع الرصيد. تأكد من المبلغ.')
-    },
-  })
-
-  const withdrawMutation = useMutation({
-    mutationFn: ({ amount, targetBranchId }: { amount: number; targetBranchId?: number }) =>
-      withdrawCash(amount, targetBranchId),
-    onSuccess: () => {
-      toast.success('تم سحب الرصيد بنجاح')
-      invalidateShopData(queryClient)
-      setWithdrawOpen(false)
-    },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err?.response?.data?.message ?? 'فشل سحب الرصيد. تأكد من الرصيد المتاح.')
-    },
-  })
 
   const closeDayMutation = useMutation({
     mutationFn: closeDay,
@@ -251,182 +180,148 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold leading-[1.45] text-foreground">لوحة التحكم</h1>
-        <InstallAppButton />
-      </div>
       <div
         className={cn(
-          'grid grid-cols-2 gap-3',
-          canCloseDay ? 'sm:grid-cols-3 md:grid-cols-5' : 'sm:grid-cols-4',
+          'grid grid-cols-2 gap-2.5 sm:gap-3',
+          canCloseDay
+            ? 'sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5'
+            : 'sm:grid-cols-2 md:grid-cols-4',
         )}
       >
-        {stats.map((s) => (
-          <Card
-            key={s.label}
-            size="sm"
-            className="rounded-[14px] elevation-card"
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-                <span>{s.label}</span>
+        {stats.map((s) => {
+          const config = {
+            success: {
+              border: 'border-emerald-500/25 hover:border-emerald-500/45',
+              bg: 'bg-gradient-to-br from-white via-white to-emerald-50/60',
+              iconBg: 'bg-emerald-500/15 text-emerald-600',
+              valueColor: 'text-emerald-700 dark:text-emerald-400',
+              badge: 'حركة البيع',
+              badgeColor: 'bg-emerald-500/10 text-emerald-700',
+            },
+            neutral: {
+              border: 'border-blue-500/25 hover:border-blue-500/45',
+              bg: 'bg-gradient-to-br from-white via-white to-blue-50/60',
+              iconBg: 'bg-blue-500/15 text-blue-600',
+              valueColor: 'text-blue-900 dark:text-blue-200',
+              badge: 'الرصيد النقدي',
+              badgeColor: 'bg-blue-500/10 text-blue-700',
+            },
+            warning: {
+              border: 'border-amber-500/25 hover:border-amber-500/45',
+              bg: 'bg-gradient-to-br from-white via-white to-amber-50/60',
+              iconBg: 'bg-amber-500/15 text-amber-600',
+              valueColor: 'text-amber-700 dark:text-amber-400',
+              badge: 'آجل ومستحق',
+              badgeColor: 'bg-amber-500/10 text-amber-700',
+            },
+            error: {
+              border: 'border-rose-500/25 hover:border-rose-500/45',
+              bg: 'bg-gradient-to-br from-white via-white to-rose-50/60',
+              iconBg: 'bg-rose-500/15 text-rose-600',
+              valueColor: 'text-rose-700 dark:text-rose-400',
+              badge: 'منصرفات',
+              badgeColor: 'bg-rose-500/10 text-rose-700',
+            },
+          }[s.tone]
+
+          return (
+            <div
+              key={s.label}
+              className={cn(
+                'group relative flex flex-col justify-between rounded-[14px] border p-3 sm:p-3.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm',
+                config.border,
+                config.bg,
+              )}
+            >
+              <div className="flex items-center justify-between gap-1.5 pb-1">
+                <span className="text-[12px] font-bold text-foreground/85 truncate">
+                  {s.label}
+                </span>
                 <span
                   className={cn(
-                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
-                    toneChip[s.tone],
+                    'flex size-7 shrink-0 items-center justify-center rounded-[9px] transition-transform group-hover:scale-105',
+                    config.iconBg,
                   )}
                 >
-                  <s.icon className="size-4" />
+                  <s.icon className="size-3.5" />
                 </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-7 w-24 rounded-lg" />
-              ) : (
-                <div
-                  className={cn(
-                    'tabular-nums text-[24px] font-bold leading-[1.1]',
-                    toneText[s.tone],
-                  )}
-                >
-                  {s.value}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+              </div>
+
+              <div className="pt-0.5">
+                {loading ? (
+                  <Skeleton className="h-6 w-20 rounded-md" />
+                ) : (
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span
+                      className={cn(
+                        'tabular-nums text-[18px] sm:text-[20px] font-black tracking-tight leading-tight',
+                        config.valueColor,
+                      )}
+                    >
+                      {s.value}
+                    </span>
+                    <span
+                      className={cn(
+                        'hidden xl:inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold',
+                        config.badgeColor,
+                      )}
+                    >
+                      {config.badge}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
 
         {canCloseDay && (
-          <Card
-            size="sm"
-            className="rounded-[14px] border border-primary/15 bg-primary/[0.03] elevation-card"
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-                <span>إغلاق اليوم</span>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Clock3 className="size-4" />
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('هل تريد إغلاق اليوم؟ سيتم جلب كل العمليات وطباعة التقرير.')) {
-                    closeDayMutation.mutate()
-                  }
-                }}
-                disabled={closeDayMutation.isPending}
-                className="h-11 w-full gap-2 rounded-full text-[14px] font-semibold touch-target"
-              >
-                <Clock3 className="size-4" />
-                {closeDayMutation.isPending ? 'جارٍ الإغلاق...' : 'إغلاق اليوم'}
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="group relative flex flex-col justify-between rounded-[14px] border border-primary/25 bg-gradient-to-br from-white via-white to-primary/[0.06] p-3 sm:p-3.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm hover:border-primary/40">
+            <div className="flex items-center justify-between gap-1.5 pb-1">
+              <span className="text-[12px] font-bold text-foreground/85">
+                إغلاق اليوم
+              </span>
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-[9px] bg-primary/10 text-primary">
+                <Clock3 className="size-3.5" />
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => {
+                if (window.confirm('هل تريد إغلاق اليوم؟ سيتم جلب كل العمليات وطباعة التقرير.')) {
+                  closeDayMutation.mutate()
+                }
+              }}
+              disabled={closeDayMutation.isPending}
+              className="mt-1 h-8 w-full gap-1.5 rounded-[10px] bg-primary px-2 text-[11px] font-bold text-white shadow-xs transition-all hover:bg-primary/90 active:scale-[0.98] touch-target"
+            >
+              <Clock3 className="size-3" />
+              <span>{closeDayMutation.isPending ? 'جارٍ الإغلاق...' : 'إغلاق اليوم'}</span>
+            </Button>
+          </div>
         )}
       </div>
 
-      {isOwner && overview && overview.branches.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-[17px] font-semibold leading-[1.45] text-foreground">
-            الفروع
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {overview.branches.map((b) => (
-              <Card
-                key={b.branchId}
-                size="sm"
-                onClick={() => {
-                  setSelectedBranchId(b.branchId)
-                  navigate('/app/sales')
-                }}
-                className="cursor-pointer rounded-[14px] elevation-card"
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-[15px] font-semibold leading-[1.35] text-foreground">
-                    <Store className="size-4 text-primary" />
-                    {b.branchName}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-muted-foreground">المبيعات</span>
-                    <span className="font-bold tabular-nums text-foreground">
-                      {formatEgp(Math.round(b.totalSales ?? 0))}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-muted-foreground">الخزينة</span>
-                    <span className="font-bold tabular-nums text-foreground">
-                      {formatEgp(Math.round(b.cash ?? 0))}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {isOwner && (
-        <Card size="sm" className="rounded-[14px] elevation-card">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-              <span>رصيد الخزينة</span>
-              <Banknote className="size-4 text-muted-foreground/60" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm leading-[1.6] text-muted-foreground">
-              أضف أو اسحب نقداً من الخزينة. هذه العمليات متاحة لصاحب المحل فقط.
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                onClick={() => setDepositOpen(true)}
-                className="h-11 flex-1 gap-2 rounded-full touch-target"
-              >
-                <Plus className="size-4" />
-                إيداع رصيد
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setWithdrawOpen(true)}
-                variant="destructive"
-                className="h-11 flex-1 gap-2 rounded-full touch-target"
-              >
-                <Minus className="size-4" />
-                سحب رصيد
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <section>
-        <h2 className="mb-3 text-[17px] font-semibold leading-[1.45] text-foreground">
-          إجراءات سريعة
-        </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <section aria-label="أزرار الوصول السريع">
+        <div className="grid grid-cols-6 gap-1.5 sm:gap-2.5">
           {quickActions.map((a) => (
             <button
               key={a.label}
               type="button"
               onClick={() => navigate(a.to)}
-              className="flex items-center gap-3 rounded-2xl bg-card p-3 text-start transition-colors hover:bg-muted elevation-card touch-target"
+              className="group flex flex-col items-center justify-center gap-1 sm:flex-row sm:gap-2 rounded-[12px] border border-black/5 bg-white p-1.5 sm:px-2.5 sm:py-2 text-center sm:text-start shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-black/10 hover:bg-slate-50/90 hover:shadow-sm active:translate-y-0 touch-target"
+              title={a.label}
             >
               <span
                 className={cn(
-                  'flex size-11 shrink-0 items-center justify-center rounded-xl',
+                  'flex size-6 sm:size-7 shrink-0 items-center justify-center rounded-[8px] transition-transform duration-150 group-hover:scale-110',
                   a.chip,
                 )}
               >
-                <a.icon className="size-5" />
+                <a.icon className="size-3.5 sm:size-4" />
               </span>
-              <span className="text-[14px] font-semibold leading-[1.3] text-foreground">
+              <span className="truncate text-[11px] sm:text-[12.5px] font-bold text-foreground/90 group-hover:text-foreground">
                 {a.label}
               </span>
             </button>
@@ -635,28 +530,6 @@ export function DashboardPage() {
         party={receiptPurchase?.party ?? null}
         isCustomer={receiptPurchase?.isCustomer ?? false}
         onClose={() => setReceiptPurchase(null)}
-      />
-
-      <DepositDialog
-        open={depositOpen}
-        onOpenChange={setDepositOpen}
-        submitting={depositMutation.isPending}
-        onSubmit={(amount, targetBranchId) =>
-          depositMutation.mutate({ amount, targetBranchId })
-        }
-        branches={branches}
-        defaultBranchId={branchId}
-      />
-
-      <WithdrawDialog
-        open={withdrawOpen}
-        onOpenChange={setWithdrawOpen}
-        submitting={withdrawMutation.isPending}
-        onSubmit={(amount, targetBranchId) =>
-          withdrawMutation.mutate({ amount, targetBranchId })
-        }
-        branches={branches}
-        defaultBranchId={branchId}
       />
 
       <CloseDayDialog

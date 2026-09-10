@@ -1,6 +1,6 @@
 {
   "name": "Gold Master",
-  "description": "Smart ERP system for gold and jewelry stores: POS touchscreen for 10-inch tablets, scrap gold & karat conversion, inventory, barcodes, and vault accounting.",
+  "description": "Live gold prices in Egypt Sagha market (21K, 18K, 24K, Gold Pound, BTC bullions) and smart ERP system for jewelry stores with 10-inch tablet POS, scrap calculations, and inventory.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

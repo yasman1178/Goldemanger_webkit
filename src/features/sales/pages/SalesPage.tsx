@@ -401,8 +401,8 @@ export function SalesPage() {
         </div>
       ) : (
         <>
-          <div className="hidden min-h-0 flex-1 gap-3 xl:flex">
-            <div className="flex min-h-0 flex-[1.4] flex-col">
+          <div className="hidden min-h-0 flex-1 gap-3 lg:flex">
+            <div className="flex min-h-0 flex-[1.3] flex-col">
               <ProductGrid
                 products={products}
                 cart={cart}
@@ -422,7 +422,7 @@ export function SalesPage() {
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col xl:hidden">
+          <div className="flex min-h-0 flex-1 flex-col lg:hidden">
             <ProductGrid
               products={products}
               cart={cart}
@@ -436,7 +436,7 @@ export function SalesPage() {
 
           <div
             className={cn(
-              'fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-black/5 bg-white px-4 py-3 xl:hidden',
+              'fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-black/5 bg-white px-4 py-3 lg:hidden',
               cartItemsCount === 0 && 'hidden',
             )}
           >

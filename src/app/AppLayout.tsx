@@ -28,6 +28,7 @@ import { useAuthStore } from '@/shared/stores/auth-store'
 import { useCurrencyStore } from '@/shared/stores/currency-store'
 import { getOverview } from '@/features/settings/api'
 import { BranchSelector } from '@/shared/components/BranchSelector'
+import { SidebarInstallButton } from '@/features/public-site/components/InstallAppButton'
 import { GoldPriceBar } from '@/features/sales/components/pos/GoldPriceBar'
 import { OnboardingBanner } from '@/features/settings/components/OnboardingBanner'
 import { ChangePasswordDialog } from '@/features/auth/components/ChangePasswordDialog'
@@ -68,21 +69,46 @@ const navItems: NavItem[] = [
 ]
 
 function Brand({ collapsed = false, onToggle }: { collapsed?: boolean; onToggle?: () => void }) {
-  return (
-    <div className={cn('flex items-center gap-2 py-4 md:max-lg:justify-center md:max-lg:px-2', collapsed ? 'justify-center px-2' : 'px-4')}>
-      <div className="flex size-9 items-center justify-center rounded-[14px] bg-primary">
-        <Gem className="size-5 text-white" />
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-2 border-b border-black/5 py-3 px-1">
+        <div className="flex size-10 items-center justify-center rounded-[12px] bg-primary text-white shadow-xs">
+          <Gem className="size-5" />
+        </div>
+        {onToggle && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="توسيع القائمة"
+            title="توسيع القائمة"
+            onClick={onToggle}
+            className="size-8 rounded-lg text-muted-foreground hover:bg-black/5 hover:text-foreground touch-target"
+          >
+            <PanelLeftOpen className="size-4.5" />
+          </Button>
+        )}
       </div>
-      {!collapsed && <span className="text-[17px] font-semibold text-foreground md:max-lg:hidden">Gold Master</span>}
+    )
+  }
+
+  return (
+    <div className="flex h-16 items-center justify-between border-b border-black/5 px-3.5">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-primary text-white shadow-xs">
+          <Gem className="size-5" />
+        </div>
+        <span className="truncate text-[16px] font-bold tracking-tight text-foreground">Gold Master</span>
+      </div>
       {onToggle && (
         <Button
           variant="ghost"
           size="icon"
-          aria-label={collapsed ? 'إظهار القائمة' : 'إخفاء القائمة'}
+          aria-label="طي القائمة"
+          title="طي القائمة"
           onClick={onToggle}
-          className="ms-auto rounded-full text-muted-foreground touch-target md:max-lg:ms-0"
+          className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-black/5 hover:text-foreground touch-target"
         >
-          {collapsed ? <PanelLeftOpen className="size-5" /> : <PanelLeftClose className="size-5" />}
+          <PanelLeftClose className="size-4.5" />
         </Button>
       )}
     </div>
@@ -108,15 +134,19 @@ function NavLinkItem({
       end={end}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 rounded-[14px] px-3 py-3 text-[15px] font-semibold leading-[1.45] transition-colors touch-target',
-          collapsed && 'justify-center px-0',
-          'md:max-lg:justify-center md:max-lg:px-0',
-          isActive ? 'bg-primary text-white' : 'text-foreground hover:bg-muted',
+          'flex items-center gap-3 rounded-[12px] transition-colors touch-target',
+          collapsed
+            ? 'size-11 justify-center mx-auto p-0'
+            : 'px-3 py-2.5 text-[14px] font-semibold leading-tight',
+          isActive
+            ? 'bg-primary text-white shadow-xs'
+            : 'text-foreground/80 hover:bg-black/5 hover:text-foreground',
         )
       }
+      title={collapsed ? label : undefined}
     >
       <Icon className="size-5 shrink-0" />
-      {!collapsed && <span className="md:max-lg:hidden">{label}</span>}
+      {!collapsed && <span className="truncate">{label}</span>}
     </NavLink>
   )
 }
@@ -148,36 +178,73 @@ function UserFooter({ collapsed = false }: { collapsed?: boolean }) {
   const [passwordOpen, setPasswordOpen] = useState(false)
   const initial = user?.userName?.trim().charAt(0) ?? '؟'
 
-  return (
-    <div className="border-t border-black/5 px-3 py-3">
-      <div className={cn('flex items-center gap-3 rounded-[14px] py-2 md:max-lg:justify-center md:max-lg:px-0', collapsed ? 'justify-center px-0' : 'px-2')}>
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-[17px] font-bold text-foreground">
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-2 border-t border-black/5 py-3 px-1">
+        <div
+          title={user?.userName}
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-[14px] font-bold text-foreground"
+        >
           {initial}
         </div>
-        {!collapsed && <div className="min-w-0 flex-1 md:max-lg:hidden">
-          <p className="truncate text-[15px] font-semibold text-foreground">
+        <div className="flex flex-col gap-1 items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="تغيير كلمة المرور"
+            title="تغيير كلمة المرور"
+            className="size-8 rounded-lg text-muted-foreground hover:text-primary touch-target"
+            onClick={() => setPasswordOpen(true)}
+          >
+            <KeyRound className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="تسجيل الخروج"
+            title="تسجيل الخروج"
+            className="size-8 rounded-lg text-muted-foreground hover:text-destructive touch-target"
+            onClick={clearAuth}
+          >
+            <LogOut className="size-4" />
+          </Button>
+        </div>
+        <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="border-t border-black/5 p-3">
+      <div className="flex items-center gap-2.5 rounded-[12px] p-1.5 hover:bg-black/[0.02]">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-[14px] font-bold text-foreground">
+          {initial}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-bold text-foreground">
             {user?.userName}
           </p>
-          <p className="truncate text-[13px] text-muted-foreground">{user?.email}</p>
-        </div>}
+          <p className="truncate text-[11px] text-muted-foreground">{user?.email}</p>
+        </div>
         <Button
           variant="ghost"
           size="icon"
           aria-label="تغيير كلمة المرور"
           title="تغيير كلمة المرور"
-          className="shrink-0 rounded-full text-muted-foreground hover:text-primary touch-target"
+          className="size-8 shrink-0 rounded-lg text-muted-foreground hover:text-primary touch-target"
           onClick={() => setPasswordOpen(true)}
         >
-          <KeyRound className="size-5" />
+          <KeyRound className="size-4" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
           aria-label="تسجيل الخروج"
-          className="shrink-0 rounded-full text-muted-foreground hover:text-destructive touch-target"
+          title="تسجيل الخروج"
+          className="size-8 shrink-0 rounded-lg text-muted-foreground hover:text-destructive touch-target"
           onClick={clearAuth}
         >
-          <LogOut className="size-5" />
+          <LogOut className="size-4" />
         </Button>
       </div>
       <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
@@ -225,7 +292,12 @@ function BottomNav({ onMore }: { onMore: () => void }) {
 
 export function AppLayout() {
   const [open, setOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024
+    }
+    return false
+  })
   const { pathname } = useLocation()
   const branchName = useAuthStore((s) => s.branchDetails?.branchName)
   const branchDetails = useAuthStore((s) => s.branchDetails)
@@ -252,11 +324,22 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen bg-secondary">
-      <aside className={cn('hidden shrink-0 border-e border-black/5 bg-white transition-[width] duration-300 md:block md:w-[88px] lg:w-[280px]', sidebarCollapsed ? 'lg:w-[88px]' : 'lg:w-[280px]')}>
+      <aside
+        className={cn(
+          'hidden shrink-0 border-e border-black/5 bg-white transition-[width] duration-300 md:block',
+          sidebarCollapsed ? 'w-[76px]' : 'w-[260px] lg:w-[280px]',
+        )}
+      >
         <div className="sticky top-0 flex h-screen flex-col">
           <Brand collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((value) => !value)} />
-          <div className="flex-1 overflow-y-auto px-3 py-2">
+          <div className="px-2.5 pb-2">
+            <BranchSelector inSidebar collapsed={sidebarCollapsed} />
+          </div>
+          <div className="flex-1 overflow-y-auto px-2.5 py-2">
             <NavLinks collapsed={sidebarCollapsed} />
+          </div>
+          <div className="px-2.5 py-2">
+            <SidebarInstallButton collapsed={sidebarCollapsed} />
           </div>
           <UserFooter collapsed={sidebarCollapsed} />
         </div>
@@ -272,14 +355,20 @@ export function AppLayout() {
             <Menu className="size-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="right" className="w-72 border-0 bg-white p-0">
+        <SheetContent side="right" className="w-80 border-0 bg-white p-0">
           <SheetHeader className="sr-only">
             <SheetTitle>القائمة</SheetTitle>
           </SheetHeader>
           <div className="flex h-full flex-col">
             <Brand />
+            <div className="px-3 pb-2">
+              <BranchSelector inSidebar />
+            </div>
             <div className="flex-1 overflow-y-auto px-3 py-2">
               <NavLinks />
+            </div>
+            <div className="px-3 py-2">
+              <SidebarInstallButton />
             </div>
             <UserFooter />
           </div>
@@ -296,8 +385,12 @@ export function AppLayout() {
             {branchName && <span className="text-sm text-muted-foreground">| {branchName}</span>}
           </div>
         </div>
-        <div className={cn('flex flex-1 flex-col gap-3 p-4 md:p-6', !isPos && 'pb-24 md:pb-6')}>
-          <BranchSelector />
+        <div
+          className={cn(
+            'flex flex-1 flex-col gap-3.5 p-3.5 sm:p-4 md:p-5 lg:p-6 min-w-0 max-w-full overflow-x-hidden',
+            !isPos && 'pb-24 md:pb-6',
+          )}
+        >
           <GoldPriceBar hidePriceRefresh={isPos} />
           <OnboardingBanner />
           <Outlet />

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Navbar } from '@/features/public-site/components/Navbar'
 import { Hero } from '@/features/public-site/components/Hero'
+import { SaghaPricesSection } from '@/features/public-site/components/SaghaPricesSection'
 import { Features } from '@/features/public-site/components/Features'
 import { Modules } from '@/features/public-site/components/Modules'
 import { HowItWorks } from '@/features/public-site/components/HowItWorks'
@@ -20,6 +21,7 @@ export function LandingPage() {
       <Navbar />
       <main>
         <Hero />
+        <SaghaPricesSection />
         <Features />
         <Modules />
         <HowItWorks />
@@ -31,3 +33,4 @@ export function LandingPage() {
     </div>
   )
 }
+

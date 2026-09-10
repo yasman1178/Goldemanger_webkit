@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { RefreshCw, Pencil, Loader2, Gem } from 'lucide-react'
+import { RefreshCw, Pencil, Loader2, Gem, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { fetchLiveGoldPrice, saveGoldPrice } from '@/shared/lib/parties'
@@ -8,7 +8,7 @@ import { purchasePerGram, salePerGram, buyPerGram } from '@/shared/lib/gold'
 import { FormatEg } from './Money'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import { useCurrencyStore } from '@/shared/stores/currency-store'
-import { currencySymbol } from '@/shared/lib/utils'
+import { currencySymbol, cn } from '@/shared/lib/utils'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
 import { Button } from '@/shared/components/ui/button'
@@ -23,6 +23,10 @@ import {
 
 const KARATS = [24, 21, 18]
 
+/**
+ * شريط وكروت أسعار الذهب اللحظية — إعادة تصميم شاملة وفق design.md
+ * تضمن إبراز الأسعار بأعلى درجات الوضوح والشفافية للكاشير وصاحب المحل، مع تفريق قاطع بين البيع والشراء.
+ */
 export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: boolean } = {}) {
   const gold21 = useGoldStore((s) => s.gold21)
   const setGold21 = useGoldStore((s) => s.setGold21)
@@ -35,6 +39,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
   const [livePrices, setLivePrices] = useState<LiveGoldPrice | null>(null)
 
   const country = currency === 'SAR' ? 'sa' : 'eg'
+  const symbol = currencySymbol(currency)
 
   const gold21Ref = useRef(gold21)
   useEffect(() => {
@@ -122,54 +127,190 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
     setRefreshing(true)
     const ok = await pull()
     setRefreshing(false)
-    if (ok) toast.success('تم تحديث سعر الذهب من المصدر')
+    if (ok) toast.success('تم تحديث سعر الذهب من البورصة بنجاح')
   }
 
   return (
-    <div className="flex h-[50px] shrink-0 items-center gap-2 overflow-hidden rounded-[14px] bg-white px-2 elevation-card sm:gap-3 sm:px-3 xl:px-4">
-      {!hidePriceRefresh && (
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={refreshing}
-          title="جلب السعر من gold-price-today.com"
-          className="flex h-9 shrink-0 touch-target items-center gap-1.5 rounded-full bg-primary px-2.5 text-[12px] font-bold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
-        >
-          {refreshing ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="size-3.5" />
-          )}
-          <span>جلب السعر</span>
-        </button>
-      )}
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
+        {/* كارت عيار 24 (السبائك النقية) */}
+        <div className="flex flex-col justify-between rounded-[14px] border border-black/5 bg-white p-2 sm:p-2.5 shadow-xs elevation-card transition-all duration-200 hover:shadow-sm">
+          {/* ترويسة الكارت */}
+          <div className="flex items-center justify-between pb-1 border-b border-black/5">
+            <div className="flex items-center gap-1.5">
+              <span className="flex size-5.5 items-center justify-center rounded-[6px] bg-slate-900 text-white text-[10px] font-black">
+                24K
+              </span>
+              <p className="text-[12px] font-bold text-foreground leading-none">ذهب نقي 24</p>
+            </div>
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-700">
+              999.9
+            </span>
+          </div>
 
-      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
-        {KARATS.map((k) => (
-          <MarketChip
-            key={k}
-            karat={k}
-            sell={livePrices?.[`gram${k}Sell` as 'gram24Sell'] ?? salePerGram(gold21, k)}
-            buy={livePrices?.[`gram${k}Buy` as 'gram24Buy'] ?? buyPerGram(gold21, k)}
-          />
-        ))}
-      </div>
+          {/* أسعار البيع والشراء */}
+          <div className="my-1.5 flex flex-col gap-1 rounded-[10px] bg-secondary/50 p-1.5 sm:p-2">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary">
+                <ArrowUpRight className="size-2.5" />
+                بيع
+              </span>
+              <span className="tabular-nums font-black text-[13px] sm:text-[14px] text-primary whitespace-nowrap">
+                <FormatEg value={livePrices?.gram24Sell ?? salePerGram(gold21, 24)} />
+                <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
+              </span>
+            </div>
 
-      <div className="flex shrink-0 items-center gap-2">
-        {lastFetchTime && (
-          <span className="hidden text-[11px] text-muted-foreground xl:inline">
-            آخر جلب: {lastFetchTime}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => setEditOpen(true)}
-          title="تعديل سعر الذهب"
-          className="flex size-9 shrink-0 touch-target items-center justify-center rounded-full bg-secondary text-foreground hover:bg-black/5"
-          aria-label="تعديل السعر"
-        >
-          <Pencil className="size-3.5" />
-        </button>
+            <div className="flex items-center justify-between border-t border-black/5 pt-1">
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600">
+                <ArrowDownLeft className="size-2.5" />
+                شراء
+              </span>
+              <span className="tabular-nums font-bold text-[12px] text-foreground whitespace-nowrap">
+                <FormatEg value={livePrices?.gram24Buy ?? buyPerGram(gold21, 24)} />
+                <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* تذييل الكارت */}
+          <div className="mt-auto flex h-7 items-center justify-between border-t border-black/5 pt-1 text-[9px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 font-medium text-slate-600">
+              <Gem className="size-2.5 text-slate-400" />
+              سبائك وجنيهات
+            </span>
+            <span className="font-semibold text-slate-500">نقاء 100%</span>
+          </div>
+        </div>
+
+        {/* كارت عيار 21 (العيار الرئيسي المرجعي) */}
+        <div className="relative flex flex-col justify-between rounded-[14px] border-2 border-amber-400/80 bg-gradient-to-b from-amber-50/60 via-white to-amber-50/20 p-2 sm:p-2.5 shadow-xs elevation-card transition-all duration-200 hover:shadow-sm">
+          {/* ترويسة الكارت */}
+          <div className="flex items-center justify-between pb-1 border-b border-amber-200/60">
+            <div className="flex items-center gap-1.5">
+              <span className="flex size-5.5 items-center justify-center rounded-[6px] bg-amber-500 text-white text-[10px] font-black shadow-xs">
+                21K
+              </span>
+              <p className="text-[12px] font-bold text-amber-950 leading-none">ذهب رئيسي 21</p>
+            </div>
+            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black text-amber-800">
+              الأساسي
+            </span>
+          </div>
+
+          {/* أسعار البيع والشراء */}
+          <div className="my-1.5 flex flex-col gap-1 rounded-[10px] bg-amber-100/40 border border-amber-200/50 p-1.5 sm:p-2">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-900">
+                <ArrowUpRight className="size-2.5 text-amber-600" />
+                بيع
+              </span>
+              <span className="tabular-nums font-black text-[13px] sm:text-[14px] text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                <FormatEg value={livePrices?.gram21Sell ?? salePerGram(gold21, 21)} />
+                <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-amber-200/50 pt-1">
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700">
+                <ArrowDownLeft className="size-2.5" />
+                شراء
+              </span>
+              <span className="tabular-nums font-bold text-[12px] text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                <FormatEg value={livePrices?.gram21Buy ?? buyPerGram(gold21, 21)} />
+                <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* تذييل الكارت */}
+          <div className="mt-auto flex h-7 items-center justify-between border-t border-amber-200/60 pt-1 text-[9px] text-amber-900/80">
+            <span className="inline-flex items-center gap-1 font-medium">
+              <span className="relative flex size-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+              </span>
+              بث حي
+            </span>
+            <span className="font-semibold text-amber-800">
+              {lastFetchTime ? `تحديث ${lastFetchTime}` : 'لحظي'}
+            </span>
+          </div>
+        </div>
+
+        {/* كارت عيار 18 (المشغولات الذهبية) مع أزرار الإدخال والتحديث */}
+        <div className="flex flex-col justify-between rounded-[14px] border border-black/5 bg-white p-2 sm:p-2.5 shadow-xs elevation-card transition-all duration-200 hover:shadow-sm">
+          {/* ترويسة الكارت */}
+          <div className="flex items-center justify-between pb-1 border-b border-black/5">
+            <div className="flex items-center gap-1.5">
+              <span className="flex size-5.5 items-center justify-center rounded-[6px] bg-amber-700 text-white text-[10px] font-black">
+                18K
+              </span>
+              <p className="text-[12px] font-bold text-foreground leading-none">ذهب مشغول 18</p>
+            </div>
+            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-800 border border-amber-200/50">
+              750
+            </span>
+          </div>
+
+          {/* أسعار البيع والشراء */}
+          <div className="my-1.5 flex flex-col gap-1 rounded-[10px] bg-secondary/50 p-1.5 sm:p-2">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary">
+                <ArrowUpRight className="size-2.5" />
+                بيع
+              </span>
+              <span className="tabular-nums font-black text-[13px] sm:text-[14px] text-primary whitespace-nowrap">
+                <FormatEg value={livePrices?.gram18Sell ?? salePerGram(gold21, 18)} />
+                <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-black/5 pt-1">
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600">
+                <ArrowDownLeft className="size-2.5" />
+                شراء
+              </span>
+              <span className="tabular-nums font-bold text-[12px] text-foreground whitespace-nowrap">
+                <FormatEg value={livePrices?.gram18Buy ?? buyPerGram(gold21, 18)} />
+                <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* أزرار الإدخال والتحديث في أسفل آخر كارت */}
+          <div className="mt-auto flex h-7 items-center gap-1.5 border-t border-black/5 pt-1">
+            {!hidePriceRefresh && (
+              <button
+                type="button"
+                onClick={refresh}
+                disabled={refreshing}
+                title="تحديث من البورصة"
+                className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-[8px] bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-[10px] font-bold touch-target disabled:opacity-60"
+              >
+                {refreshing ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3" />
+                )}
+                <span>تحديث</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              title="إدخال أو تعديل السعر يدوياً"
+              className={cn(
+                'inline-flex items-center justify-center gap-1 h-7 rounded-[8px] bg-amber-500 text-white hover:bg-amber-600 transition-all text-[10px] font-bold shadow-xs touch-target',
+                hidePriceRefresh ? 'w-full' : 'flex-1',
+              )}
+            >
+              <Pencil className="size-3" />
+              <span>إدخال السعر</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <GoldPriceEditDialog
@@ -178,43 +319,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
         gold21={gold21}
         onSave={setGold21}
       />
-    </div>
-  )
-}
-
-function MarketChip({
-  karat,
-  buy,
-  sell,
-}: {
-  karat: number
-  buy: number
-  sell: number
-}) {
-  return (
-    <div className="flex shrink-0 items-center gap-2 rounded-[10px] border border-black/5 bg-black/[0.03] px-2 py-1">
-      <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-gradient-to-b from-amber-300 to-amber-500">
-        <Gem className="size-3 text-white" />
-      </span>
-      <span className="text-[12px] font-bold text-foreground">{karat}K</span>
-      <span className="flex flex-col leading-none">
-        <span className="text-[9px] font-medium text-muted-foreground">
-          شراء
-        </span>
-        <span className="tabular-nums text-[12px] font-bold text-foreground">
-          <FormatEg value={buy} />
-        </span>
-      </span>
-      <span className="flex h-4 w-px bg-black/10" />
-      <span className="flex flex-col leading-none">
-        <span className="text-[9px] font-medium text-muted-foreground">
-          بيع
-        </span>
-        <span className="tabular-nums text-[12px] font-bold text-primary">
-          <FormatEg value={sell} />
-        </span>
-      </span>
-    </div>
+    </>
   )
 }
 
@@ -271,7 +376,7 @@ function GoldPriceEditDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-6 space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="gold-draft">سعر الجرام عيار 21 ({currencySymbol(currency)})</Label>
             <Input
