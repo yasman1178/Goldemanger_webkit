@@ -61,29 +61,19 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          /* Base layout: Frosted luxury glass style aligned with design.md */
+          /* Base layout: Frosted luxury glass style aligned with DESIGN.md — centered on all screens */
           "fixed z-50 flex flex-col w-full max-h-[min(92vh,780px)]",
           "bg-white/95 backdrop-blur-2xl text-foreground outline-none duration-200",
           "border border-white/80 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.22),0_0_0_1px_rgba(0,0,0,0.05)] ring-1 ring-black/[0.04]",
-          /* Mobile (< 768px): Centered in screen with clean margin */
-          "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-w-[calc(100%-1.75rem)] sm:max-w-md rounded-[26px]",
-          /* Tablet (768px - 1023px): Bottom-Sheet docked at bottom, fully visible and elevated */
-          "md:top-auto md:bottom-0 md:left-1/2 md:-translate-x-1/2 md:translate-y-0 md:max-w-xl md:max-h-[86vh] md:rounded-t-[30px] md:rounded-b-none md:border-b-0 md:shadow-[0_-16px_50px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.6)]",
-          /* Desktop (>= 1024px): Perfectly centered */
-          "lg:bottom-auto lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:max-w-lg lg:rounded-[26px] lg:border lg:shadow-[0_25px_65px_-12px_rgba(15,23,42,0.24)]",
+          /* All screens: Centered in viewport */
+          "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+          "max-w-[calc(100%-1.75rem)] sm:max-w-md md:max-w-xl lg:max-w-lg rounded-[26px]",
           /* Animation states */
           "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          /* Tablet slide-up animation */
-          "md:data-open:slide-in-from-bottom-8 md:data-closed:slide-out-to-bottom-8",
           className
         )}
         {...props}
       >
-        {/* Tablet drag handle bar indicator */}
-        <div className="hidden md:flex lg:hidden w-full items-center justify-center pt-3 pb-1 shrink-0">
-          <span className="h-1.5 w-12 rounded-full bg-slate-300/80 hover:bg-slate-400 transition-colors" />
-        </div>
-
         {children}
 
         {showCloseButton && (
@@ -128,7 +118,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "mt-auto flex flex-col-reverse gap-2.5 border-t border-black/[0.06] bg-slate-50/70 backdrop-blur-md px-6 py-4 sm:px-7 sm:py-4.5 sm:flex-row sm:justify-end shrink-0 md:rounded-b-none lg:rounded-b-[26px] rounded-b-[26px]",
+        "mt-auto flex flex-col-reverse gap-2.5 border-t border-black/[0.06] bg-slate-50/70 backdrop-blur-md px-6 py-4 sm:px-7 sm:py-4.5 sm:flex-row sm:justify-end shrink-0 lg:rounded-b-[26px] rounded-b-[26px]",
         className
       )}
       {...props}

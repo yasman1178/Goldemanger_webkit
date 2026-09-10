@@ -6,10 +6,22 @@ import {
   Plus,
   TriangleAlert,
   ScanBarcode,
+  LayoutGrid,
+  Gem,
+  Link2,
+  CircleDashed,
+  Ear,
+  Layers,
+  Package,
+  Scale,
+  Lock,
+  LockOpen,
+  ChevronDown,
+  Clock,
 } from 'lucide-react'
 
 import type { Product } from '@/features/products/types'
-import { designLabels, typeLabels } from '@/features/products/types'
+import { typeLabels } from '@/features/products/types'
 import { salePerGram } from '@/shared/lib/gold'
 import { cn, formatNumber } from '@/shared/lib/utils'
 import type { StorageLocation } from '@/shared/types/api'
@@ -29,13 +41,13 @@ import {
 import { StoragePicker } from '@/shared/components/StoragePicker'
 
 const categories = [
-  { key: 'all', label: 'الكل' },
-  { key: 'ring', label: 'خواتم' },
-  { key: 'chain', label: 'سلاسل' },
-  { key: 'bracelet', label: 'أساور' },
-  { key: 'earring', label: 'حلق' },
-  { key: 'set', label: 'أطقم' },
-  { key: 'bar', label: 'سبائك' },
+  { key: 'all', label: 'الكل', icon: LayoutGrid },
+  { key: 'ring', label: 'خواتم', icon: Gem },
+  { key: 'chain', label: 'سلاسل', icon: Link2 },
+  { key: 'bracelet', label: 'أساور', icon: CircleDashed },
+  { key: 'earring', label: 'حلق', icon: Ear },
+  { key: 'set', label: 'أطقم', icon: Layers },
+  { key: 'bar', label: 'سبائك', icon: Package },
 ]
 
 function matchCategory(product: Product, key: string): boolean {
@@ -68,6 +80,9 @@ interface Props {
   freezeGold: boolean
   onToggleFreezeGold: () => void
   storages: StorageLocation[]
+  view?: 'pos' | 'held'
+  heldCount?: number
+  onViewChange?: (view: 'pos' | 'held') => void
 }
 
 export function ProductGrid({
@@ -78,12 +93,16 @@ export function ProductGrid({
   freezeGold,
   onToggleFreezeGold,
   storages,
+  view = 'pos',
+  heldCount = 0,
+  onViewChange,
 }: Props) {
   const [query, setQuery] = useState('')
   const [barcode, setBarcode] = useState('')
   const [category, setCategory] = useState('all')
   const [storageFilter, setStorageFilter] = useState('all')
   const [preview, setPreview] = useState<Product | null>(null)
+  const [categoryOpen, setCategoryOpen] = useState(false)
   const [barcodeStatus, setBarcodeStatus] = useState<
     'idle' | 'notfound' | 'found'
   >('idle')
@@ -133,113 +152,154 @@ export function ProductGrid({
   }
 
   const selectedStorage = storages.find((s) => String(s.id) === storageFilter)
+  const activeCategory = categories.find((c) => c.key === category)
+  const ActiveCategoryIcon = activeCategory?.icon ?? LayoutGrid
+  const isFreezed = freezeGold
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {/* شريط واحد مدمج: كل أدوات POS في سطر واحد لتوفير المساحة */}
       <div className="-mx-1 overflow-x-auto px-1 pb-1">
-        <div className="flex min-w-max items-center gap-2">
-          <label className="flex h-10 shrink-0 touch-target cursor-pointer items-center gap-1 rounded-full border border-black/10 bg-white px-2">
-            <input
-              type="checkbox"
-              checked={freezeGold}
-              onChange={onToggleFreezeGold}
-              className="size-4 accent-primary"
-            />
-            <span className="text-[11px] font-semibold text-foreground">
-              {freezeGold
-                ? 'سعر الذهب مثبّت (لا يتحدث تلقائياً)'
-                : 'تثبيت سعر الذهب الحالي'}
-            </span>
-          </label>
-
-          <div className="relative w-[min(24vw,250px)] min-w-[190px] shrink-0">
-          <Search className="pointer-events-none absolute start-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="ابحث باسم القطعة أو SKU أو الباركود"
-            className="h-11 w-full touch-target rounded-full border border-input bg-white ps-10 pe-10 text-[12px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-          {query && (
-            <button
-              type="button"
-              aria-label="مسح البحث"
-              onClick={() => setQuery('')}
-              className="absolute end-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/5 text-muted-foreground touch-target"
-            >
-              <X className="size-4" />
-            </button>
+        <div className="flex min-w-max items-center gap-1.5">
+          {/* تبديل الشاشة (شاشة البيع / المعلقات) */}
+          {onViewChange && (
+            <div className="flex shrink-0 items-center gap-0.5 rounded-full bg-black/5 p-0.5">
+              <button
+                type="button"
+                onClick={() => onViewChange('pos')}
+                className={cn(
+                  'h-10 touch-target rounded-full px-3.5 text-[12px] font-bold transition-colors',
+                  view === 'pos'
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'text-foreground/70 hover:text-foreground',
+                )}
+              >
+                شاشة البيع
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewChange('held')}
+                className={cn(
+                  'flex h-10 touch-target items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition-colors',
+                  view === 'held'
+                    ? 'bg-warning text-white shadow-xs'
+                    : 'text-foreground/70 hover:text-foreground',
+                )}
+              >
+                <Clock className="size-3.5" />
+                المعلقات
+                {heldCount > 0 && (
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 py-0.5 text-[10px] leading-none',
+                      view === 'held'
+                        ? 'bg-white/25 text-white'
+                        : 'bg-warning/15 text-warning',
+                    )}
+                  >
+                    {heldCount}
+                  </span>
+                )}
+              </button>
+            </div>
           )}
+
+          <span className="h-8 w-px shrink-0 bg-black/10" aria-hidden />
+
+          {/* تثبيت سعر الذهب */}
+          <button
+            type="button"
+            onClick={onToggleFreezeGold}
+            aria-pressed={isFreezed}
+            className={cn(
+              'flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold transition-colors',
+              isFreezed
+                ? 'border-amber-300 bg-amber-50 text-amber-700'
+                : 'border-black/10 bg-white text-muted-foreground hover:border-amber-300/60 hover:text-amber-700',
+            )}
+          >
+            {isFreezed ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5" />}
+            {isFreezed ? 'مثبّت' : 'تثبيت السعر'}
+          </button>
+
+          {/* البحث */}
+          <div className="relative w-[min(24vw,220px)] min-w-[160px] shrink-0">
+            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="ابحث باسم القطعة أو SKU أو الباركود"
+              className="h-10 w-full touch-target rounded-full border border-input bg-white ps-9 pe-9 text-[12px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+            {query && (
+              <button
+                type="button"
+                aria-label="مسح البحث"
+                onClick={() => setQuery('')}
+                className="absolute end-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/5 text-muted-foreground touch-target"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
           </div>
 
+          {/* الباركود */}
           <form
             onSubmit={handleBarcodeSubmit}
-            className="relative flex w-[min(24vw,250px)] min-w-[190px] shrink-0 items-center"
+            className={cn(
+              'relative flex w-[min(24vw,220px)] min-w-[160px] shrink-0 items-center',
+              barcodeStatus === 'found'
+                ? '[&_input]:border-emerald-400'
+                : barcodeStatus === 'notfound'
+                  ? '[&_input]:border-rose-400'
+                  : '',
+            )}
           >
-          <ScanBarcode className="pointer-events-none absolute start-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={barcode}
-            onChange={(e) => {
-              setBarcode(e.target.value)
-              setBarcodeStatus('idle')
-            }}
-            onFocus={() => setBarcodeStatus('idle')}
-            dir="ltr"
-            placeholder="أدخل الباركود ثم Enter لإضافة القطعة مباشرة"
-            className="h-11 w-full touch-target rounded-full border border-input bg-white ps-10 pe-10 text-end text-[12px] tabular-nums text-foreground outline-none placeholder:text-muted-foreground placeholder:text-start focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
+            <ScanBarcode className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={barcode}
+              onChange={(e) => {
+                setBarcode(e.target.value)
+                setBarcodeStatus('idle')
+              }}
+              onFocus={() => setBarcodeStatus('idle')}
+              dir="ltr"
+              placeholder="أدخل الباركود ثم Enter"
+              className="h-10 w-full touch-target rounded-full border border-input bg-white ps-9 pe-9 text-end text-[12px] tabular-nums text-foreground outline-none placeholder:text-muted-foreground placeholder:text-start focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
           </form>
-          {barcodeStatus === 'found' && (
-            <span className="h-11 shrink-0 text-[13px] font-semibold text-success">
-              تمت الإضافة
+
+          {/* التصنيفات (في ديالوج لتوفير المساحة) */}
+          <button
+            type="button"
+            onClick={() => setCategoryOpen(true)}
+            className="flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition-colors hover:border-primary/50 hover:text-primary"
+            aria-haspopup="dialog"
+          >
+            <ActiveCategoryIcon className="size-4 text-amber-500" />
+            <span className={category === 'all' ? 'text-muted-foreground' : 'text-foreground'}>
+              {activeCategory?.label ?? 'التصنيفات'}
             </span>
-          )}
-          {barcodeStatus === 'notfound' && (
-            <span className="h-11 shrink-0 text-[13px] font-semibold text-error">
-              لم نجد هذا الباركود
-            </span>
-          )}
+            <ChevronDown className="size-3.5 text-muted-foreground" />
+          </button>
+
+          {/* المخزن (في ديالوج) */}
+          <StoragePicker
+            value={storageFilter}
+            storages={storages}
+            onChange={(value) => setStorageFilter(value)}
+            allLabel="كل المخازن"
+            placeholder="المخزن"
+            triggerClassName={
+              selectedStorage
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-dashed border-black/25 bg-white text-muted-foreground hover:border-primary/60 hover:text-primary'
+            }
+          />
         </div>
       </div>
 
-      <div
-        className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
-        role="tablist"
-        aria-label="تصنيفات المنتجات"
-      >
-        {categories.map((c) => (
-          <button
-            key={c.key}
-            role="tab"
-            aria-selected={category === c.key}
-            onClick={() => setCategory(c.key)}
-            className={cn(
-              'h-11 shrink-0 touch-target rounded-full px-4 text-[15px] font-semibold transition-colors',
-              category === c.key
-                ? 'bg-primary text-white'
-                : 'bg-secondary text-foreground hover:bg-black/5',
-            )}
-          >
-            {c.label}
-          </button>
-        ))}
-
-        <span className="ms-1 h-8 w-px shrink-0 bg-black/10" aria-hidden />
-
-        <StoragePicker
-          value={storageFilter}
-          storages={storages}
-          onChange={(value) => setStorageFilter(value)}
-          allLabel="المخزن"
-          placeholder="المخزن"
-          triggerClassName={
-            selectedStorage
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-dashed border-black/25 bg-white text-muted-foreground hover:border-primary/60 hover:text-primary'
-          }
-        />
-      </div>
-
+      {/* شبكة المنتجات */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
@@ -257,6 +317,7 @@ export function ProductGrid({
               const available =
                 product.isActive && product.quantity > 0 && product.productId != null
               const inCart = available ? (cartCount.get(product.productId!) ?? 0) : 0
+              const karatText = karatLabel(product.karat)
               return (
                 <div
                   key={product.productId}
@@ -271,8 +332,8 @@ export function ProductGrid({
                     }
                   }}
                   className={cn(
-                    'group relative flex touch-target flex-col gap-1 rounded-[10px] border border-black/5 bg-white p-1.5 text-start elevation-card transition-transform active:scale-[0.98]',
-                    available ? 'cursor-pointer' : 'cursor-not-allowed opacity-50',
+                    'group relative flex touch-target flex-col gap-1.5 rounded-[14px] border border-black/5 bg-white p-1.5 text-start elevation-card transition-transform active:scale-[0.98]',
+                    available ? 'cursor-pointer hover:border-amber-200' : 'cursor-not-allowed opacity-50',
                   )}
                 >
                   <button
@@ -287,7 +348,7 @@ export function ProductGrid({
                     <Eye className="size-3" />
                   </button>
 
-                  <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-[6px] bg-secondary">
+                  <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-[10px] bg-secondary">
                     {product.primaryImageUrl ? (
                       <img
                         src={product.primaryImageUrl}
@@ -301,6 +362,7 @@ export function ProductGrid({
                       </span>
                     )}
                   </div>
+
                   <div className="min-w-0">
                     <p className="truncate text-[11px] font-semibold leading-[1.35] text-foreground">
                       {product.productName}
@@ -319,9 +381,18 @@ export function ProductGrid({
                         <span className="text-error">غير متاح</span>
                       )}
                     </p>
-                    <p className="truncate text-[10px] text-muted-foreground">
-                      {karatLabel(product.karat)} • {product.weight} جم
-                    </p>
+
+                    {/* العيار (ذهبي) + الوزن (محايد) — ألوان مميزة للقراءة الفورية */}
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      <span className="inline-flex items-center rounded-[6px] bg-amber-100 px-1.5 py-px text-[9px] font-black leading-[1.5] text-amber-700">
+                        {karatText}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 rounded-[6px] bg-black/5 px-1.5 py-px text-[9px] font-bold leading-[1.5] text-foreground">
+                        <Scale className="size-2.5 text-muted-foreground" />
+                        {formatNumber(product.weight)} جم
+                      </span>
+                    </div>
+
                     {(product.sku || product.barcode) && (
                       <p
                         dir="ltr"
@@ -333,15 +404,17 @@ export function ProductGrid({
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="tabular-nums text-[12px] font-bold text-foreground">
+
+                  {/* السعر بارز */}
+                  <div className="mt-auto flex items-center justify-between border-t border-black/5 pt-1">
+                    <span className="tabular-nums text-[13px] font-black text-primary">
                       <FormatEg value={salePriceFor(product, goldPrice)} />
-                      <span className="text-[9px] font-semibold text-muted-foreground">
-                        {' '}ج.م
+                      <span className="ms-0.5 text-[9px] font-bold text-amber-600">
+                        ج.م
                       </span>
                     </span>
                     {inCart > 0 && (
-                      <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white">
+                      <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white shadow-xs">
                         {inCart}
                       </span>
                     )}
@@ -353,6 +426,17 @@ export function ProductGrid({
         )}
       </div>
 
+      {/* ديالوج التصنيفات */}
+      <CategoryDialog
+        open={categoryOpen}
+        onOpenChange={setCategoryOpen}
+        value={category}
+        onChange={(key) => {
+          setCategory(key)
+          setCategoryOpen(false)
+        }}
+      />
+
       <ProductQuickView
         product={preview}
         goldPrice={goldPrice}
@@ -362,8 +446,79 @@ export function ProductGrid({
           setPreview(null)
         }}
       />
-
     </div>
+  )
+}
+
+function CategoryDialog({
+  open,
+  onOpenChange,
+  value,
+  onChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  value: string
+  onChange: (key: string) => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-[18px]">
+            <LayoutGrid className="size-5 text-amber-500" />
+            اختيار التصنيف
+          </DialogTitle>
+          <DialogDescription>
+            اعرض القطع بالتصنيف الذي تريده — توفيراً للمساحة على شاشة البيع
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {categories.map(({ key, label, icon: Icon }) => {
+            const active = value === key
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onChange(key)}
+                className={cn(
+                  'flex h-16 touch-target flex-col items-center justify-center gap-1.5 rounded-2xl border-2 transition-colors',
+                  active
+                    ? 'border-primary bg-primary/10'
+                    : 'border-black/10 bg-white hover:border-primary/50',
+                )}
+              >
+                <Icon
+                  className={cn(
+                    'size-5',
+                    active ? 'text-primary' : 'text-amber-500',
+                  )}
+                />
+                <span
+                  className={cn(
+                    'text-[12px] font-bold',
+                    active ? 'text-primary' : 'text-foreground',
+                  )}
+                >
+                  {label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="h-11 flex-1 rounded-full touch-target"
+          >
+            إغلاق
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -390,7 +545,7 @@ function ProductQuickView({
           <DialogDescription>
             {product
               ? `${typeLabels[product.typegolde as keyof typeof typeLabels] ?? '—'} • ${
-                  designLabels[product.design as keyof typeof designLabels] ?? '—'
+                  designLabel(product)
                 }`
               : ''}
           </DialogDescription>
@@ -461,6 +616,16 @@ function ProductQuickView({
       </DialogContent>
     </Dialog>
   )
+}
+
+function designLabel(product: Product): string {
+  const map: Record<number, string> = {
+    0: 'كلاسيك',
+    1: 'بسيط',
+    2: 'مخرّز',
+    3: 'مودرن',
+  }
+  return map[product.design] ?? '—'
 }
 
 function QuickViewRow({ label, value }: { label: string; value: string }) {

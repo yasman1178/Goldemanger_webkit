@@ -5,7 +5,7 @@ import { amountToNumber, purchaseLineMath } from '@/shared/lib/gold'
 import { formatEgp } from '@/shared/lib/utils'
 import { JEWELRY_ITEM_NAMES } from '@/shared/lib/jewelryItems'
 import { preparePiecePhoto } from '@/shared/lib/imageCompress'
-import { uploadPieceImage } from '@/features/purchases/api'
+import { uploadProductImage } from '@/shared/lib/product-image-upload'
 import { StoragePicker, type StorageOption } from '@/shared/components/StoragePicker'
 import { ScrapAvailabilityCard } from '@/features/purchases/components/ScrapAvailabilityCard'
 import { TwentyOneKConversionBar } from '@/features/purchases/components/TwentyOneKConversionBar'
@@ -200,11 +200,22 @@ function PieceForm({
     setUploading(true)
     setError('')
     try {
-      const uploaded = await uploadPieceImage(photoFile)
+      const uploaded = await uploadProductImage(photoFile)
       onConfirm({ ...draft, imageLink: uploaded.url })
       onCancel()
-    } catch {
-      setError('تعذّر رفع الصورة إلى الاستضافة. تأكد من الاتصال وحاول مرة أخرى.')
+    } catch (err) {
+      const res = (err as {
+        response?: { status?: number; data?: { message?: string } }
+      })?.response
+      const detail = (err as { message?: string })?.message
+      setError(
+        res?.data?.message ??
+          (res?.status
+            ? `تعذّر رفع الصورة إلى الاستضافة (كود ${res.status}).`
+            : detail
+              ? `تعذّر رفع الصورة: ${detail}`
+              : 'تعذّر رفع الصورة إلى الاستضافة. تأكد من الاتصال وحاول مرة أخرى.'),
+      )
     } finally {
       setUploading(false)
     }
@@ -253,7 +264,10 @@ function PieceForm({
             </p>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label className="text-[13px]">العيار</Label>
+                <Label className="flex items-center gap-1.5 text-[13px] font-bold text-amber-700">
+                  <span className="size-1.5 rounded-full bg-amber-500" />
+                  العيار
+                </Label>
                 <div className="grid grid-cols-2 gap-2">
                   {KARAT_OPTIONS.map((k) => {
                     const selected = draft.karat === k
@@ -264,7 +278,7 @@ function PieceForm({
                         onClick={() => set('karat', k)}
                         className={`touch-target rounded-[14px] border px-2 py-2.5 text-[13px] font-medium transition-colors ${
                           selected
-                            ? 'border-primary bg-primary text-primary-foreground'
+                            ? 'border-amber-500 bg-gradient-to-b from-amber-400 to-amber-500 text-white shadow-sm'
                             : 'border-black/10 bg-white text-foreground'
                         }`}
                       >
@@ -275,7 +289,10 @@ function PieceForm({
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="text-[13px]">النوع</Label>
+                <Label className="flex items-center gap-1.5 text-[13px] font-bold text-sky-700">
+                  <span className="size-1.5 rounded-full bg-sky-500" />
+                  النوع
+                </Label>
                 <div className="grid grid-cols-2 gap-2">
                   {typeOptions.map((o) => {
                     const selected = draft.typegolde === o.value
@@ -286,7 +303,7 @@ function PieceForm({
                         onClick={() => set('typegolde', o.value)}
                         className={`touch-target rounded-[14px] border px-2 py-2.5 text-[13px] font-medium transition-colors ${
                           selected
-                            ? 'border-primary bg-primary text-primary-foreground'
+                            ? 'border-primary bg-gradient-to-b from-sky-400 to-sky-600 text-white shadow-sm'
                             : 'border-black/10 bg-white text-foreground'
                         }`}
                       >
@@ -299,9 +316,12 @@ function PieceForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-[13px]">الوزن (جم) *</Label>
+              <Label className="flex items-center gap-1.5 text-[13px] font-bold text-sky-700">
+                <span className="size-1.5 rounded-full bg-sky-500" />
+                الوزن (جم) *
+              </Label>
               <Input
                 type="number"
                 min="0"
@@ -309,11 +329,14 @@ function PieceForm({
                 value={draft.weight}
                 onChange={(e) => set('weight', e.target.value)}
                 placeholder="0.00"
-                className="h-11 touch-target rounded-[14px]"
+                className="h-11 touch-target rounded-[14px] border-sky-300 bg-sky-50/50 focus-visible:ring-sky-300/40"
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[13px]">مصنعية المورد/جم</Label>
+              <Label className="flex items-center gap-1.5 text-[13px] font-bold text-emerald-700">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                مصنعية المورد/جم
+              </Label>
               <Input
                 type="number"
                 min="0"
@@ -321,18 +344,36 @@ function PieceForm({
                 value={draft.factory}
                 onChange={(e) => set('factory', e.target.value)}
                 placeholder="0.00"
-                className="h-11 touch-target rounded-[14px]"
+                className="h-11 touch-target rounded-[14px] border-emerald-300 bg-emerald-50/50 focus-visible:ring-emerald-300/40"
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[13px]">العدد</Label>
+              <Label className="flex items-center gap-1.5 text-[13px] font-bold text-amber-700">
+                <span className="size-1.5 rounded-full bg-amber-500" />
+                العدد
+              </Label>
               <Input
                 type="number"
                 min="1"
                 value={draft.quantity}
                 onChange={(e) => set('quantity', e.target.value)}
                 placeholder="1"
-                className="h-11 touch-target rounded-[14px]"
+                className="h-11 touch-target rounded-[14px] border-amber-300 bg-amber-50/50 focus-visible:ring-amber-300/40"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-1.5 text-[13px] font-bold text-rose-700">
+                <span className="size-1.5 rounded-full bg-rose-500" />
+                مصنعية المحل/جم (أسعار البيع — لا تُضاف)
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft.factoryForSale}
+                onChange={(e) => set('factoryForSale', e.target.value)}
+                placeholder="0.00"
+                className="h-11 touch-target rounded-[14px] border-rose-300 bg-rose-50/50 focus-visible:ring-rose-300/40"
               />
             </div>
           </div>
@@ -382,50 +423,14 @@ function PieceForm({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label className="text-[13px]">مصنعية المورد/جم</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={draft.factory}
-                onChange={(e) => set('factory', e.target.value)}
-                placeholder="0.00"
-                className="h-11 touch-target rounded-[14px]"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[13px]">العدد</Label>
-              <Input
-                type="number"
-                min="1"
-                value={draft.quantity}
-                onChange={(e) => set('quantity', e.target.value)}
-                placeholder="1"
-                className="h-11 touch-target rounded-[14px]"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-[13px]">مصنعية المحل/جم (أسعار البيع — لا تُضاف)</Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={draft.factoryForSale}
-              onChange={(e) => set('factoryForSale', e.target.value)}
-              placeholder="0.00"
-              className="h-11 touch-target rounded-[14px]"
-            />
-          </div>
-
           {storages.length > 0 && (
             <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <Label className="text-[13px] font-semibold">المخزن</Label>
+                  <Label className="flex items-center gap-1.5 text-[13px] font-bold text-violet-700">
+                    <span className="size-1.5 rounded-full bg-violet-500" />
+                    المخزن
+                  </Label>
                   <p className="text-[11px] text-muted-foreground">
                     يُخصم الذهب من هذا المخزن. فارغ = مخزن الفاتورة.
                   </p>
@@ -437,7 +442,7 @@ function PieceForm({
                   allowAll={false}
                   allowCreate={false}
                   placeholder="المخزن"
-                  triggerClassName="bg-white"
+                  variant="violet"
                 />
               </div>
             </div>

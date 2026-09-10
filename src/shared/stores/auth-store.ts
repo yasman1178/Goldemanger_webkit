@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { BranchDetails } from '@/features/auth/types'
 
 export interface User {
@@ -66,6 +66,24 @@ export const useAuthStore = create<AuthState>()(
         })
       },
     }),
-    { name: 'auth-storage' },
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => (state) => {
+        // فحص ذاتي: إن كانت الحالة المحفوظة تدّعي تسجيل الدخول
+        // لكن لا يوجد أي توكن خام في localStorage (حالة فقدان تزامن حدثت
+        // من تسجيل خروج سابق لم يُحدّث الحالة المحفوظة) تُعاد الحالة إلى
+        // غير مسجّل حتى لا تفتح /app ثم تُطرد فوراً إلى /login.
+        try {
+          const persistedHasToken = !!state?.accessToken || !!state?.refreshToken
+          const hasRawToken = !!localStorage.getItem('access_token')
+          if (persistedHasToken && !hasRawToken) {
+            useAuthStore.getState().clearAuth()
+          }
+        } catch {
+          // تجاهل أي خطأ في القراءة
+        }
+      },
+    },
   ),
 )

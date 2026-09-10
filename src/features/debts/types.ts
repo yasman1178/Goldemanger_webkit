@@ -75,7 +75,7 @@ export interface DebtClientSummary {
 }
 
 export function getDebtStatus(debt: Debt): DebtStatus {
-  const remaining = debt.amountOwed - debt.paidAmount
+  const remaining = Math.round(debt.amountOwed - debt.paidAmount)
   if (remaining <= 0) return 'paid'
   if (new Date(debt.dueDate) < new Date()) return 'overdue'
   if (debt.paidAmount > 0) return 'partial'

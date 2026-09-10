@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ShoppingCart, AlertTriangle, Clock } from 'lucide-react'
+import { ShoppingCart, AlertTriangle } from 'lucide-react'
 
 import { getProducts } from '@/features/products/api'
 import { invalidateAfterSale } from '@/shared/lib/invalidateShop'
@@ -351,44 +351,6 @@ export function SalesPage() {
 
   return (
     <div className="flex h-[calc(100dvh-10.25rem)] min-h-0 flex-col gap-3 lg:h-[calc(100dvh-8.25rem)]">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setView('pos')}
-          className={cn(
-            'h-10 touch-target rounded-full px-4 text-[13px] font-bold transition-colors',
-            view === 'pos'
-              ? 'bg-primary text-white'
-              : 'bg-black/5 text-muted-foreground hover:bg-black/10',
-          )}
-        >
-          شاشة البيع
-        </button>
-        <button
-          type="button"
-          onClick={() => setView('held')}
-          className={cn(
-            'flex h-10 touch-target items-center gap-2 rounded-full px-4 text-[13px] font-bold transition-colors',
-            view === 'held'
-              ? 'bg-warning text-white'
-              : 'bg-black/5 text-muted-foreground hover:bg-black/10',
-          )}
-        >
-          <Clock className="size-4" />
-          المعلقات
-          {heldSales.length > 0 ? (
-            <span
-              className={cn(
-                'rounded-full px-2 py-0.5 text-[11px]',
-                view === 'held' ? 'bg-white/20' : 'bg-warning/10 text-warning',
-              )}
-            >
-              {heldSales.length}
-            </span>
-          ) : null}
-        </button>
-      </div>
-
       {view === 'held' ? (
         <div className="min-h-0 flex-1 rounded-2xl border border-black/5 bg-white p-3">
           <HeldSalesList
@@ -411,6 +373,9 @@ export function SalesPage() {
                 freezeGold={freezeGold}
                 onToggleFreezeGold={() => setFreezeGold(!freezeGold)}
                 storages={storages}
+                view={view}
+                heldCount={heldSales.length}
+                onViewChange={setView}
               />
             </div>
 
@@ -431,6 +396,9 @@ export function SalesPage() {
               freezeGold={freezeGold}
               onToggleFreezeGold={() => setFreezeGold(!freezeGold)}
               storages={storages}
+              view={view}
+              heldCount={heldSales.length}
+              onViewChange={setView}
             />
           </div>
 

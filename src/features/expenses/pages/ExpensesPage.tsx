@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2, Plus, ReceiptText, Trash2 } from 'lucide-react'
+import { Loader2, Plus, ReceiptText } from 'lucide-react'
 
 import {
   createExpense,
-  deleteExpense,
   getExpenses,
 } from '@/features/expenses/api'
 import { formatEgp } from '@/shared/lib/utils'
@@ -69,15 +68,6 @@ export function ExpensesPage() {
     onError: (error: { response?: { data?: { message?: string } } }) => {
       toast.error(error.response?.data?.message ?? 'تعذّر تسجيل المصروف.')
     },
-  })
-
-  const removeMutation = useMutation({
-    mutationFn: (id: number) => deleteExpense(id),
-    onSuccess: () => {
-      toast.success('تم حذف المصروف')
-      queryClient.invalidateQueries({ queryKey: ['expenses'] })
-    },
-    onError: () => toast.error('تعذّر حذف المصروف.'),
   })
 
   const canAdd = Number(amount) > 0 && descraption.trim().length > 0
@@ -149,18 +139,6 @@ export function ExpensesPage() {
                       <Badge variant="destructive">{formatEgp(e.amount)}</Badge>
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="حذف"
-                    onClick={() => {
-                      if (window.confirm('حذف هذا المصروف؟')) removeMutation.mutate(e.expenseId)
-                    }}
-                    className="shrink-0 rounded-full text-muted-foreground hover:text-destructive touch-target"
-                  >
-                    <Trash2 className="size-5" />
-                  </Button>
                 </div>
               </li>
             ))}

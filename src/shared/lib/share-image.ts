@@ -206,6 +206,39 @@ function drawProductHero(
   ctx.fillStyle = shine
   ctx.fillRect(cx - r, cy - r, r * 2, r * 2)
   ctx.restore()
+
+  // ── لمسات عصرية: توهج حول القطعة + ظل أرضي + لمعات ──
+  ctx.save()
+  const bloom = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r + 58)
+  bloom.addColorStop(0, 'rgba(255,236,160,0)')
+  bloom.addColorStop(0.7, 'rgba(255,236,160,0.20)')
+  bloom.addColorStop(1, 'rgba(255,236,160,0)')
+  ctx.fillStyle = bloom
+  ctx.beginPath()
+  ctx.arc(cx, cy, r + 58, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  ctx.save()
+  const ground = ctx.createRadialGradient(cx, cy + r + 26, 10, cx, cy + r + 26, r + 44)
+  ground.addColorStop(0, 'rgba(0,0,0,0.18)')
+  ground.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = ground
+  ctx.beginPath()
+  ctx.ellipse(cx, cy + r + 26, r + 34, 30, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  for (const ang of [0.785, 2.356, 3.927, 5.498]) {
+    drawSparkle(
+      ctx,
+      cx + Math.cos(ang) * (r + 46),
+      cy + Math.sin(ang) * (r + 46),
+      13,
+      0.85,
+      '#fff6d8',
+    )
+  }
 }
 
 function drawProductHalo(
@@ -224,6 +257,130 @@ function drawProductHalo(
   ctx.beginPath()
   ctx.arc(cx, cy, r * 1.8, 0, Math.PI * 2)
   ctx.fill()
+  ctx.restore()
+}
+
+/* ============================================================
+ * لمسات عصرية موحّدة — نجم، نسيج، عمق، وشعار المحل
+ * ============================================================ */
+
+function drawSparkle(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  alpha: number,
+  color = '#ffffff',
+) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.globalAlpha = alpha
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.moveTo(0, -size)
+  ctx.lineTo(size * 0.24, -size * 0.24)
+  ctx.lineTo(size, 0)
+  ctx.lineTo(size * 0.24, size * 0.24)
+  ctx.lineTo(0, size)
+  ctx.lineTo(-size * 0.24, size * 0.24)
+  ctx.lineTo(-size, 0)
+  ctx.lineTo(-size * 0.24, -size * 0.24)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+}
+
+function applyModernTexture(ctx: CanvasRenderingContext2D) {
+  // فينيت خفيف حول الأطراف يمنح التركيز
+  const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.98)
+  v.addColorStop(0, 'rgba(0,0,0,0)')
+  v.addColorStop(1, 'rgba(0,0,0,0.15)')
+  ctx.save()
+  ctx.fillStyle = v
+  ctx.fillRect(0, 0, W, H)
+  ctx.restore()
+
+  // توهجات زجاجية ناعمة في الزوايا
+  const blobs: Array<[number, number, number, string]> = [
+    [W * 0.08, H * 0.16, 260, 'rgba(255,255,255,0.06)'],
+    [W * 0.92, H * 0.8, 300, 'rgba(255,255,255,0.05)'],
+  ]
+  for (const [bx, by, br, col] of blobs) {
+    const g = ctx.createRadialGradient(bx, by, 0, bx, by, br)
+    g.addColorStop(0, col)
+    g.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.save()
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, W, H)
+    ctx.restore()
+  }
+
+  // نسيج نقاط ناعم
+  ctx.save()
+  ctx.globalAlpha = 0.045
+  ctx.fillStyle = '#ffffff'
+  const step = 34
+  const offset = 10
+  for (let yy = offset; yy < H; yy += step) {
+    for (let xx = offset + ((yy / step) % 2) * (step / 2); xx < W; xx += step) {
+      ctx.beginPath()
+      ctx.arc(xx, yy, 1.6, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+  ctx.restore()
+}
+
+function drawBrandEmblem(
+  ctx: CanvasRenderingContext2D,
+  c: RenderCtx,
+  tone: 'light' | 'dark',
+) {
+  const textCol = tone === 'light' ? 'rgba(255,255,255,0.96)' : '#2a1d05'
+  const subCol = tone === 'light' ? 'rgba(255,255,255,0.66)' : 'rgba(42,29,5,0.74)'
+  const strokeCol = tone === 'light' ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.40)'
+  const logoX = 44
+  const logoY = 40
+
+  ctx.save()
+  // خلفية زجاجية
+  roundedRect(ctx, logoX - 8, logoY - 8, 296, 60, 16)
+  const glass = ctx.createLinearGradient(0, logoY, 0, logoY + 52)
+  glass.addColorStop(0, 'rgba(255,255,255,0.10)')
+  glass.addColorStop(1, 'rgba(255,255,255,0.03)')
+  ctx.fillStyle = glass
+  ctx.fill()
+  ctx.strokeStyle = strokeCol
+  ctx.lineWidth = 1
+  ctx.stroke()
+
+  // مربع الشعار الذهبي
+  const logo = ctx.createLinearGradient(0, logoY, 0, logoY + 36)
+  logo.addColorStop(0, '#f3d375')
+  logo.addColorStop(0.5, '#e7b94a')
+  logo.addColorStop(1, '#a8742a')
+  ctx.fillStyle = logo
+  roundedRect(ctx, logoX, logoY, 36, 36, 10)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(42,29,5,0.35)'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+  ctx.fillStyle = '#2a1d05'
+  ctx.font = `900 22px ${CERTIFIED_FONT}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('G', logoX + 18, logoY + 18)
+
+  // الاسم والوصف (RTL)
+  const brand = (c.storeName || 'GOLD MASTER').trim() || 'GOLD MASTER'
+  ctx.textAlign = 'right'
+  ctx.direction = 'rtl'
+  ctx.font = `800 20px ${CERTIFIED_FONT}`
+  ctx.fillStyle = textCol
+  ctx.fillText(brand, logoX + 56, logoY + 16)
+  ctx.font = `600 14px ${CERTIFIED_FONT}`
+  ctx.fillStyle = subCol
+  ctx.fillText('قطعة ذهبية مختارة بعناية', logoX + 56, logoY + 37)
   ctx.restore()
 }
 
@@ -348,15 +505,29 @@ function defaultSpecs(
     const valueW = ctx.measureText(chip.value).width
     const w = labelW + valueW + padX * 2 + 14
     x -= w
+    ctx.shadowColor = 'rgba(0,0,0,0.22)'
+    ctx.shadowBlur = 14
+    ctx.shadowOffsetY = 5
     roundedRect(ctx, x, y, w, h, h / 2)
     const fill = ctx.createLinearGradient(0, y, 0, y + h)
     fill.addColorStop(0, theme.fill[0])
     fill.addColorStop(1, theme.fill[1])
     ctx.fillStyle = fill
     ctx.fill()
+    ctx.shadowColor = 'transparent'
     ctx.strokeStyle = theme.stroke
     ctx.lineWidth = 1.5
+    ctx.globalAlpha = 0.9
     ctx.stroke()
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+    ctx.lineWidth = 1.5
+    ctx.globalAlpha = 0.4
+    ctx.beginPath()
+    ctx.moveTo(x + h / 2, y + 2.5)
+    ctx.lineTo(x + w - h / 2, y + 2.5)
+    ctx.stroke()
+    ctx.globalAlpha = 1
     ctx.textBaseline = 'middle'
     ctx.font = `800 20px ${CERTIFIED_FONT}`
     ctx.textAlign = 'right'
@@ -381,35 +552,70 @@ function defaultBottomBar(
     subtext: string
   },
 ) {
-  const y0 = 552
-  const barH = 60
+  const y0 = 550
+  const barH = 66
   ctx.save()
   const barGrad = ctx.createLinearGradient(0, y0, 0, y0 + barH)
   barGrad.addColorStop(0, theme.bg[0])
   barGrad.addColorStop(1, theme.bg[1])
   ctx.fillStyle = barGrad
   ctx.fillRect(0, y0, W, barH)
-  ctx.fillStyle = theme.accent
+  const lineGrad = ctx.createLinearGradient(0, y0, W, y0)
+  lineGrad.addColorStop(0, 'rgba(255,255,255,0)')
+  lineGrad.addColorStop(0.5, theme.accent)
+  lineGrad.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = lineGrad
   ctx.fillRect(0, y0, W, 3)
 
   ctx.textBaseline = 'middle'
   ctx.direction = 'rtl'
+  const centerY = y0 + barH / 2
+
+  // ── اليمين: الهاتف داخل كبسولة زجاجية ──
   const phone = c.phoneDisplay.trim() || '—'
+  const phoneLabel = `📞 ${phone}`
   ctx.textAlign = 'right'
-  ctx.font = `800 26px ${CERTIFIED_FONT}`
+  ctx.font = `800 24px ${CERTIFIED_FONT}`
+  const pw = ctx.measureText(phoneLabel).width + 48
+  const px = W - 44
+  roundedRect(ctx, px - pw, y0 + 13, pw, barH - 26, (barH - 26) / 2)
+  const pillFill = ctx.createLinearGradient(0, y0, 0, y0 + barH)
+  pillFill.addColorStop(0, 'rgba(255,255,255,0.12)')
+  pillFill.addColorStop(1, 'rgba(255,255,255,0.04)')
+  ctx.fillStyle = pillFill
+  ctx.fill()
+  ctx.strokeStyle = theme.accent
+  ctx.lineWidth = 1.5
+  ctx.globalAlpha = 0.55
+  ctx.stroke()
+  ctx.globalAlpha = 1
   ctx.fillStyle = theme.text
-  ctx.fillText(`📞 ${phone}`, W - 40, y0 + barH / 2)
-  ctx.font = `600 18px ${CERTIFIED_FONT}`
-  ctx.fillStyle = theme.subtext
-  ctx.fillText('هاتف المحل — تواصل واتساب واتصال مباشر', W - 40, y0 + barH / 2 + 22)
+  ctx.fillText(phoneLabel, px - 20, centerY)
+
+  // ── اليسار: الشعار الذهبي + الاسم ──
+  const logoX = 44
+  const logoY = centerY - 18
+  const logo = ctx.createLinearGradient(0, logoY, 0, logoY + 36)
+  logo.addColorStop(0, theme.accent)
+  logo.addColorStop(1, '#8a5d20')
+  ctx.fillStyle = logo
+  roundedRect(ctx, logoX, logoY, 36, 36, 10)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+  ctx.fillStyle = '#1a1206'
+  ctx.textAlign = 'center'
+  ctx.font = `900 22px ${CERTIFIED_FONT}`
+  ctx.fillText('G', logoX + 18, logoY + 18)
 
   ctx.textAlign = 'left'
   ctx.font = `800 24px ${CERTIFIED_FONT}`
-  ctx.fillStyle = theme.accent
-  ctx.fillText('GOLD MASTER', 40, y0 + barH / 2)
+  ctx.fillStyle = theme.text
+  ctx.fillText('GOLD MASTER', logoX + 48, centerY - 8)
   ctx.font = `600 16px ${CERTIFIED_FONT}`
   ctx.fillStyle = theme.subtext
-  ctx.fillText('برنامج إدارة محل الذهب', 40, y0 + barH / 2 + 22)
+  ctx.fillText('برنامج إدارة محل الذهب', logoX + 48, centerY + 15)
   ctx.restore()
 }
 
@@ -1014,6 +1220,7 @@ export async function buildProductShareImage(
   }
 
   style.bg(ctx, renderCtx)
+  applyModernTexture(ctx)
 
   if (styleId === 'gold-luxury' || styleId === 'minimal-white' || styleId === 'dark-noir') {
     ctx.save()
@@ -1026,6 +1233,12 @@ export async function buildProductShareImage(
     ctx.fillText(renderCtx.storeName, W - 60, H * 0.5)
     ctx.restore()
   }
+
+  const lightBg =
+    styleId === 'gold-luxury' ||
+    styleId === 'minimal-white' ||
+    styleId === 'marble-classic'
+  drawBrandEmblem(ctx, renderCtx, lightBg ? 'dark' : 'light')
 
   drawProductHalo(
     ctx,

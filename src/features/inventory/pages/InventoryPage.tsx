@@ -52,24 +52,38 @@ function StatCard({
   label,
   value,
   unit,
+  color = 'amber',
 }: {
   icon: typeof Boxes
   label: string
   value: string
   unit?: string
+  color?: 'amber' | 'blue' | 'emerald' | 'rose'
 }) {
+  const colorMap = {
+    amber: 'from-amber-300 to-amber-500',
+    blue: 'from-sky-300 to-sky-500',
+    emerald: 'from-emerald-300 to-emerald-500',
+    rose: 'from-rose-300 to-rose-500',
+  }
+  const valueColorMap = {
+    amber: 'text-amber-600',
+    blue: 'text-sky-600',
+    emerald: 'text-emerald-600',
+    rose: 'text-rose-600',
+  }
   return (
     <Card className="elevation-card">
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-amber-300 to-amber-500 shadow-sm">
-          <Icon className="size-6 text-white" />
+      <CardContent className="flex items-center gap-2.5 px-3 py-2.5">
+        <div className={`flex size-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b ${colorMap[color]} shadow-sm`}>
+          <Icon className="size-4 text-white" />
         </div>
         <div className="min-w-0">
-          <p className="text-[13px] text-muted-foreground">{label}</p>
-          <p className="truncate text-[22px] font-bold leading-[1.2] tabular-nums text-foreground">
+          <p className="text-[11px] leading-tight text-muted-foreground">{label}</p>
+          <p className={`truncate text-[17px] font-bold leading-tight tabular-nums ${valueColorMap[color]}`}>
             {value}
             {unit && (
-              <span className="text-[13px] font-semibold text-muted-foreground">
+              <span className="text-[11px] font-semibold text-muted-foreground">
                 {' '}
                 {unit}
               </span>
@@ -230,20 +244,6 @@ export function InventoryPage() {
     }
   }, [availableProducts])
 
-  const karatTotals = useMemo(() => {
-    const map = new Map<number, { pieces: number; weight: number }>()
-    for (const p of availableProducts) {
-      const current = map.get(p.karat) ?? { pieces: 0, weight: 0 }
-      map.set(p.karat, {
-        pieces: current.pieces + (p.quantity ?? 0),
-        weight: current.weight + (p.quantity ?? 0) * (p.weight ?? 0),
-      })
-    }
-    return Array.from(map, ([karat, values]) => ({ karat, ...values })).sort(
-      (first, second) => second.karat - first.karat,
-    )
-  }, [availableProducts])
-
   const selectedStorageName =
     storageFilter === 'all'
       ? 'كل المخازن'
@@ -291,81 +291,61 @@ export function InventoryPage() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
-              <CardContent className="flex items-center gap-3 p-4">
-                <Skeleton className="size-11 rounded-2xl" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-6 w-16" />
+              <CardContent className="flex items-center gap-2.5 px-3 py-2.5">
+                <Skeleton className="size-8 rounded-xl" />
+                <div className="space-y-1">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-5 w-12" />
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <StatCard
             icon={Layers}
             label="الأصناف المتاحة"
             value={formatNumber(totals.items)}
+            color="amber"
           />
           <StatCard
             icon={Boxes}
             label="القطع المتاحة فعلياً"
             value={formatNumber(totals.pieces)}
+            color="blue"
           />
           <StatCard
             icon={Scale}
             label="الوزن المتاح فعلياً"
             value={formatNumber(totals.weight)}
             unit="gm"
+            color="emerald"
           />
           <StatCard
             icon={MapPin}
             label="المخازن ذات الرصيد"
             value={formatNumber(totals.storages)}
+            color="rose"
           />
         </div>
       )}
 
-      <Card className="elevation-card">
-        <CardContent className="space-y-3 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="font-bold text-foreground">ملخص الرصيد الفعلي</p>
-              <p className="text-[13px] text-muted-foreground">{selectedStorageName}</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Card className="elevation-card border-amber-200/60 bg-gradient-to-br from-amber-50/80 to-card">
+          <CardContent className="space-y-1.5 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="inline-block size-2 rounded-full bg-amber-400" />
+              <p className="text-[13px] font-bold text-amber-700">رصيد الكسر</p>
             </div>
-            <span className="text-[13px] font-semibold text-success">متاح للبيع</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {karatTotals.length === 0 ? (
-              <span className="text-sm text-muted-foreground">لا توجد قطع متاحة</span>
-            ) : (
-              karatTotals.map((entry) => (
-                <div key={entry.karat} className="rounded-xl bg-secondary px-3 py-2 text-[13px]">
-                  <span className="font-bold">عيار {entry.karat}</span>
-                  <span className="mx-1 text-muted-foreground">•</span>
-                  <span className="tabular-nums">{formatNumber(entry.pieces)} قطعة</span>
-                  <span className="mx-1 text-muted-foreground">•</span>
-                  <span className="tabular-nums">{formatNumber(entry.weight)} جم</span>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card className="elevation-card">
-          <CardContent className="space-y-2 p-4">
-            <p className="font-bold text-foreground">رصيد الكسر (جرام)</p>
             {kaserShop.kaser.rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">لا يوجد رصيد كسر</p>
+              <p className="text-[12px] text-muted-foreground">لا يوجد رصيد كسر</p>
             ) : (
               kaserShop.kaser.rows.map((entry) => (
-                <div key={entry.karat} className="flex items-center justify-between gap-2 text-[14px]">
+                <div key={entry.karat} className="flex items-center justify-between gap-2 text-[12px]">
                   <span className="font-semibold text-foreground">عيار {entry.karat}</span>
                   <span className="tabular-nums text-muted-foreground">
                     {formatNumber(entry.pieces)} قطعة • {formatNumber(entry.weight)} جم
@@ -373,22 +353,25 @@ export function InventoryPage() {
                 </div>
               ))
             )}
-            <div className="flex items-center justify-between gap-2 border-t border-black/5 pt-2 text-[14px]">
+            <div className="flex items-center justify-between gap-2 border-t border-amber-200/40 pt-1.5 text-[12px]">
               <span className="font-bold text-foreground">الإجمالي</span>
-              <span className="font-bold tabular-nums text-foreground">
+              <span className="font-bold tabular-nums text-amber-600">
                 {formatNumber(kaserShop.kaser.totalWeight)} جم
               </span>
             </div>
           </CardContent>
         </Card>
-        <Card className="elevation-card">
-          <CardContent className="space-y-2 p-4">
-            <p className="font-bold text-foreground">رصيد المحل (جرام)</p>
+        <Card className="elevation-card border-sky-200/60 bg-gradient-to-br from-sky-50/80 to-card">
+          <CardContent className="space-y-1.5 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="inline-block size-2 rounded-full bg-sky-400" />
+              <p className="text-[13px] font-bold text-sky-700">رصيد المحل</p>
+            </div>
             {kaserShop.shop.rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">لا يوجد رصيد بالمحل</p>
+              <p className="text-[12px] text-muted-foreground">لا يوجد رصيد بالمحل</p>
             ) : (
               kaserShop.shop.rows.map((entry) => (
-                <div key={entry.karat} className="flex items-center justify-between gap-2 text-[14px]">
+                <div key={entry.karat} className="flex items-center justify-between gap-2 text-[12px]">
                   <span className="font-semibold text-foreground">عيار {entry.karat}</span>
                   <span className="tabular-nums text-muted-foreground">
                     {formatNumber(entry.pieces)} قطعة • {formatNumber(entry.weight)} جم
@@ -396,9 +379,9 @@ export function InventoryPage() {
                 </div>
               ))
             )}
-            <div className="flex items-center justify-between gap-2 border-t border-black/5 pt-2 text-[14px]">
+            <div className="flex items-center justify-between gap-2 border-t border-sky-200/40 pt-1.5 text-[12px]">
               <span className="font-bold text-foreground">الإجمالي</span>
-              <span className="font-bold tabular-nums text-foreground">
+              <span className="font-bold tabular-nums text-sky-600">
                 {formatNumber(kaserShop.shop.totalWeight)} جم
               </span>
             </div>

@@ -35,7 +35,19 @@ interface StoragePickerProps {
   excludeIds?: number[]
   allowCreate?: boolean
   onCreateStorage?: (name: string) => Promise<StorageOption>
+  variant?: 'primary' | 'violet'
   triggerClassName?: string
+}
+
+const triggerVariants = {
+  primary: {
+    idle: 'border-dashed border-black/25 bg-white text-muted-foreground hover:border-primary/60 hover:text-primary',
+    selected: 'border-primary bg-primary/10 text-primary',
+  },
+  violet: {
+    idle: 'border-dashed border-violet-300 bg-violet-50/60 text-violet-700 hover:border-violet-400 hover:bg-violet-100/70 hover:text-violet-800',
+    selected: 'border-violet-500 bg-violet-100/80 text-violet-800',
+  },
 }
 
 export function StoragePicker({
@@ -48,6 +60,7 @@ export function StoragePicker({
   excludeIds = [],
   allowCreate = false,
   onCreateStorage,
+  variant = 'primary',
   triggerClassName,
 }: StoragePickerProps) {
   const [open, setOpen] = useState(false)
@@ -94,8 +107,8 @@ export function StoragePicker({
         className={cn(
           'flex h-11 shrink-0 touch-target items-center gap-2 rounded-xl border-2 px-4 text-[13px] font-semibold transition-colors',
           selected
-            ? 'border-primary bg-primary/10 text-primary'
-            : 'border-dashed border-black/25 bg-white text-muted-foreground hover:border-primary/60 hover:text-primary',
+            ? triggerVariants[variant].selected
+            : triggerVariants[variant].idle,
           triggerClassName,
         )}
       >

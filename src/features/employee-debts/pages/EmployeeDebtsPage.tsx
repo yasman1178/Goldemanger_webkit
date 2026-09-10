@@ -7,14 +7,12 @@ import {
   CheckCircle2,
   Plus,
   Loader2,
-  Trash2,
   Users,
   Banknote,
 } from 'lucide-react'
 
 import {
   createEmployeeDebt,
-  deleteEmployeeDebt,
   getBranchEmployeeDebts,
   getEmployees,
   payEmployeeDebt,
@@ -116,15 +114,6 @@ export function EmployeeDebtsPage() {
       setPayAmount('')
     },
     onError: () => toast.error('قيمة دفع غير صالحة.'),
-  })
-
-  const removeMutation = useMutation({
-    mutationFn: (id: number) => deleteEmployeeDebt(id),
-    onSuccess: () => {
-      toast.success('تم الحذف')
-      queryClient.invalidateQueries({ queryKey: ['employee-debts'] })
-    },
-    onError: () => toast.error('تعذّر حذف السلفة.'),
   })
 
   const summary = useMemo(
@@ -283,18 +272,6 @@ export function EmployeeDebtsPage() {
                         سداد
                       </Button>
                     )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="حذف"
-                      onClick={() => {
-                        if (window.confirm('حذف هذه السلفة؟')) removeMutation.mutate(d.employeeDebtId)
-                      }}
-                      className="shrink-0 rounded-full text-muted-foreground hover:text-destructive touch-target"
-                    >
-                      <Trash2 className="size-5" />
-                    </Button>
                   </div>
                 </li>
               )

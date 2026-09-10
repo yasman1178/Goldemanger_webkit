@@ -24,7 +24,7 @@ import {
 const KARATS = [24, 21, 18]
 
 /**
- * شريط وكروت أسعار الذهب اللحظية — إعادة تصميم شاملة وفق design.md
+ * شريط وكروت أسعار الذهب اللحظية — إعادة تصميم شاملة وفق DESIGN.md
  * تضمن إبراز الأسعار بأعلى درجات الوضوح والشفافية للكاشير وصاحب المحل، مع تفريق قاطع بين البيع والشراء.
  */
 export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: boolean } = {}) {
@@ -40,6 +40,8 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
 
   const country = currency === 'SAR' ? 'sa' : 'eg'
   const symbol = currencySymbol(currency)
+
+  const live = livePrices && Math.abs(livePrices.gram21Sell - gold21) < 0.1 ? livePrices : null
 
   const gold21Ref = useRef(gold21)
   useEffect(() => {
@@ -156,7 +158,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
                 بيع
               </span>
               <span className="tabular-nums font-black text-[13px] sm:text-[14px] text-primary whitespace-nowrap">
-                <FormatEg value={livePrices?.gram24Sell ?? salePerGram(gold21, 24)} />
+                <FormatEg value={live?.gram24Sell ?? salePerGram(gold21, 24)} />
                 <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
               </span>
             </div>
@@ -167,7 +169,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
                 شراء
               </span>
               <span className="tabular-nums font-bold text-[12px] text-foreground whitespace-nowrap">
-                <FormatEg value={livePrices?.gram24Buy ?? buyPerGram(gold21, 24)} />
+                <FormatEg value={live?.gram24Buy ?? buyPerGram(gold21, 24)} />
                 <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
               </span>
             </div>
@@ -206,7 +208,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
                 بيع
               </span>
               <span className="tabular-nums font-black text-[13px] sm:text-[14px] text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                <FormatEg value={livePrices?.gram21Sell ?? salePerGram(gold21, 21)} />
+                <FormatEg value={live?.gram21Sell ?? salePerGram(gold21, 21)} />
                 <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
               </span>
             </div>
@@ -217,7 +219,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
                 شراء
               </span>
               <span className="tabular-nums font-bold text-[12px] text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
-                <FormatEg value={livePrices?.gram21Buy ?? buyPerGram(gold21, 21)} />
+                <FormatEg value={live?.gram21Buy ?? buyPerGram(gold21, 21)} />
                 <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
               </span>
             </div>
@@ -261,7 +263,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
                 بيع
               </span>
               <span className="tabular-nums font-black text-[13px] sm:text-[14px] text-primary whitespace-nowrap">
-                <FormatEg value={livePrices?.gram18Sell ?? salePerGram(gold21, 18)} />
+                <FormatEg value={live?.gram18Sell ?? salePerGram(gold21, 18)} />
                 <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
               </span>
             </div>
@@ -272,7 +274,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
                 شراء
               </span>
               <span className="tabular-nums font-bold text-[12px] text-foreground whitespace-nowrap">
-                <FormatEg value={livePrices?.gram18Buy ?? buyPerGram(gold21, 18)} />
+                <FormatEg value={live?.gram18Buy ?? buyPerGram(gold21, 18)} />
                 <span className="ms-0.5 text-[9px] font-normal text-muted-foreground">{symbol}</span>
               </span>
             </div>

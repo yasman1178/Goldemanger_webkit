@@ -97,7 +97,7 @@ function Brand({ collapsed = false, onToggle }: { collapsed?: boolean; onToggle?
         <div className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-primary text-white shadow-xs">
           <Gem className="size-5" />
         </div>
-        <span className="truncate text-[16px] font-bold tracking-tight text-foreground">Gold Master</span>
+        <span className="truncate text-[16px] font-bold tracking-tight text-foreground">GOLD POS</span>
       </div>
       {onToggle && (
         <Button

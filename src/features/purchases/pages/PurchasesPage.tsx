@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, Eye, Images, PackagePlus, Plus, SearchX } from 'lucide-react'
+import { CalendarDays, Eye, Images, PackagePlus, Plus, Printer, SearchX } from 'lucide-react'
 
 import {
   getPurchase,
@@ -10,6 +10,7 @@ import {
 } from '@/features/purchases/api'
 import { PurchaseReceiptDialog, type ReceiptParty } from '@/features/purchases/components/PurchaseReceiptDialog'
 import { PurchaseImagesDialog } from '@/features/purchases/components/PurchaseImagesDialog'
+import { PurchaseListReceiptPrint } from '@/features/purchases/components/PurchaseListReceiptPrint'
 import type { Purchase } from '@/features/purchases/types'
 import { getCustomers, getSuppliers } from '@/shared/lib/parties'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
@@ -68,6 +69,7 @@ export function PurchasesPage() {
     isCustomer: boolean
   } | null>(null)
   const [imagesTargetId, setImagesTargetId] = useState<number | null>(null)
+  const [listPrintOpen, setListPrintOpen] = useState(false)
 
   const { data: pageResult, isLoading, isError } = useQuery({
     queryKey: ['purchases', activeBranchId, 'page', page, query.trim()],
@@ -170,7 +172,6 @@ export function PurchasesPage() {
           <h1 className="text-[34px] font-bold leading-[1.2] text-foreground">
             المشتريات
           </h1>
-          <p className="text-muted-foreground">فواتير الشراء وتحديث الجرد</p>
         </div>
         <Button
           onClick={openCreate}
@@ -181,7 +182,7 @@ export function PurchasesPage() {
         </Button>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
         <div className="relative flex-1">
           <Input
             value={query}
@@ -190,7 +191,7 @@ export function PurchasesPage() {
               reset()
             }}
             placeholder="ابحث بالاسم أو الهاتف أو رقم الفاتورة..."
-            className="search-field h-12 touch-target pe-24"
+            className="search-field h-full min-h-12 touch-target pe-24"
           />
           {query && (
             <button
@@ -207,8 +208,8 @@ export function PurchasesPage() {
           )}
         </div>
 
-        <div className="flex flex-col gap-2 rounded-[14px] border border-black/5 bg-white p-3 sm:flex-row sm:items-end">
-          <div className="flex flex-1 flex-col gap-1">
+        <div className="flex shrink-0 items-end gap-2 rounded-[14px] border border-black/5 bg-white p-3 lg:max-w-[480px]">
+          <div className="flex w-[150px] shrink-0 flex-col gap-1">
             <label htmlFor="from-date" className="text-[12px] text-muted-foreground">
               من تاريخ
             </label>
@@ -220,7 +221,7 @@ export function PurchasesPage() {
               className="h-11 touch-target rounded-full"
             />
           </div>
-          <div className="flex flex-1 flex-col gap-1">
+          <div className="flex w-[150px] shrink-0 flex-col gap-1">
             <label htmlFor="to-date" className="text-[12px] text-muted-foreground">
               إلى تاريخ
             </label>
@@ -236,7 +237,7 @@ export function PurchasesPage() {
             type="button"
             onClick={runDateSearch}
             disabled={searchLoading || !fromDate || !toDate}
-            className="h-11 gap-2 rounded-full px-5 touch-target"
+            className="h-11 shrink-0 gap-2 rounded-full px-4 touch-target"
           >
             <CalendarDays className="size-4" />
             {searchLoading ? 'جارٍ البحث...' : 'بحث بالتاريخ'}
@@ -246,13 +247,24 @@ export function PurchasesPage() {
               type="button"
               variant="outline"
               onClick={clearDateSearch}
-              className="h-11 gap-2 rounded-full px-4 touch-target"
+              className="h-11 shrink-0 gap-2 rounded-full px-4 touch-target"
             >
               <SearchX className="size-4" />
               مسح
             </Button>
           )}
         </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setListPrintOpen(true)}
+          disabled={displayed.length === 0 || searchLoading || isLoading}
+          className="h-11 shrink-0 gap-2 rounded-full px-4 touch-target"
+        >
+          <Printer className="size-4" />
+          طباعة
+        </Button>
       </div>
 
       {searchLoading ? (
@@ -412,6 +424,19 @@ export function PurchasesPage() {
         party={printTarget?.party ?? null}
         isCustomer={printTarget?.isCustomer ?? false}
         onClose={() => setPrintTarget(null)}
+      />
+
+      <PurchaseListReceiptPrint
+        open={listPrintOpen}
+        onOpenChange={setListPrintOpen}
+        title={
+          dateSearching && (fromDate || toDate)
+            ? `${fromDate} ← ${toDate}`
+            : query.trim()
+              ? `بحث: ${query.trim()}`
+              : ''
+        }
+        purchases={displayed}
       />
 
       <PurchaseImagesDialog

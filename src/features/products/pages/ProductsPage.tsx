@@ -27,7 +27,6 @@ import { PaginationBar } from '@/shared/components/ui/pagination'
 import { getSiteUrl, resolveProductImage } from '@/shared/lib/seo'
 import { buildProductShareImage, canvasToPngBlob, SHARE_IMAGE_STYLES } from '@/shared/lib/share-image'
 import type { ShareImageStyleId } from '@/shared/lib/share-image'
-import { uploadPieceImage } from '@/features/purchases/api'
 import { getStoreSummary } from '@/features/settings/api'
 import { Button } from '@/shared/components/ui/button'
 import { Badge } from '@/shared/components/ui/badge'
@@ -60,14 +59,14 @@ function ProductCardSkeleton() {
       <div className="aspect-square w-full bg-secondary">
         <Skeleton className="h-full w-full rounded-none" />
       </div>
-      <div className="space-y-2 p-2.5">
+      <div className="flex flex-col gap-2 p-3">
         <Skeleton className="h-4 w-3/4" />
         <div className="flex gap-1">
           <Skeleton className="h-5 w-10 rounded-full" />
           <Skeleton className="h-5 w-14 rounded-full" />
         </div>
-        <Skeleton className="h-5 w-1/2" />
-        <Skeleton className="h-9 w-full rounded-full" />
+        <Skeleton className="h-10 w-full rounded-lg" />
+        <Skeleton className="h-8 w-full rounded-full" />
       </div>
     </Card>
   )
@@ -175,20 +174,11 @@ export function ProductsPage() {
       const blob = await canvasToPngBlob(canvas)
       if (blob) {
         const composed = canvas.toDataURL('image/png')
-        setShare((s) => (s ? { ...s, composed } : s))
-
-        try {
-          const uploaded = await uploadPieceImage(
-            new File([blob], `share-${p.productId}.png`, { type: 'image/png' }),
-          )
-          setShare((s) =>
-            s
-              ? { ...s, link: `${base}?img=${encodeURIComponent(uploaded.url)}` }
-              : s,
-          )
-        } catch {
-          toast.error('تعذّر رفع صورة المشاركة — سيتم استخدام صورة المنتج')
-        }
+        setShare((s) =>
+          s
+            ? { ...s, composed, link: `${base}?img=${encodeURIComponent(original)}` }
+            : s,
+        )
       }
     } catch {
       toast.error('تعذّر إنشاء صورة المشاركة')
@@ -225,28 +215,17 @@ export function ProductsPage() {
       }
       const composed = canvas.toDataURL('image/png')
       const base = `${getSiteUrl()}/products/${share.product.productId}`
-      setShare((s) => (s ? { ...s, composed, link: base } : s))
-
-      try {
-        const uploaded = await uploadPieceImage(
-          new File([blob], `share-${share.product.productId}.png`, { type: 'image/png' }),
-        )
-        setShare((s) =>
-          s
-            ? {
-                ...s,
-                link: `${base}?img=${encodeURIComponent(uploaded.url)}`,
-              }
-            : s,
-        )
-        toast.success(
-          discountValue > 0
-            ? `تم تطبيق خصم ${discountValue}% على المصنعية وإنشاء الصورة`
-            : 'تم إنشاء صورة المشاركة بالاستايل المختار',
-        )
-      } catch {
-        toast.error('تم إنشاء الصورة لكن تعذّر رفعها — يمكنك تنزيلها مباشرة')
-      }
+      const original = resolveProductImage(getProductImage(share.product))
+      setShare((s) =>
+        s
+          ? { ...s, composed, link: `${base}?img=${encodeURIComponent(original)}` }
+          : s,
+      )
+      toast.success(
+        discountValue > 0
+          ? `تم تطبيق خصم ${discountValue}% على المصنعية وإنشاء الصورة`
+          : 'تم إنشاء صورة المشاركة بالاستايل المختار',
+      )
     } catch {
       toast.error('تعذّر إعادة إنشاء صورة المشاركة')
     } finally {
@@ -405,7 +384,7 @@ export function ProductsPage() {
             {products.map((p) => (
             <Card
               key={p.productId}
-              className="overflow-hidden p-0 rounded-[14px] elevation-card transition-transform hover:-translate-y-0.5"
+              className="group/product overflow-hidden p-0 rounded-[14px] elevation-card transition-all hover:-translate-y-0.5 hover:shadow-lg"
             >
               <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-secondary">
                 {getProductImage(p) ? (
@@ -413,48 +392,52 @@ export function ProductsPage() {
                     src={getProductImage(p) ?? undefined}
                     alt={p.productName}
                     loading="lazy"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover/product:scale-105"
                   />
                 ) : (
-                  <Gem className="size-9 text-muted-foreground/30" />
+                  <Gem className="size-10 text-muted-foreground/25" />
                 )}
                 {(p.quantity ?? 0) <= 0 && (
-                  <span className="absolute top-1.5 start-1.5 inline-flex items-center rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="absolute top-2 start-2 inline-flex items-center rounded-full bg-black/60 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
                     نافد
                   </span>
                 )}
+                <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/10 to-transparent" />
               </div>
 
-              <div className="space-y-1.5 p-2.5">
-                <p className="truncate text-[13px] font-bold leading-[1.35] text-foreground">
+              <div className="flex flex-col gap-2 p-3">
+                <p className="truncate text-[14px] font-bold leading-snug text-foreground">
                   {p.productName}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-1">
                   {p.typegolde === 3 && (
-                    <Badge className="bg-warning text-white">كسر</Badge>
+                    <Badge className="bg-warning/90 text-white text-[10px] h-5 px-1.5">كسر</Badge>
                   )}
-                  <Badge>{p.karat}k</Badge>
-                  {p.size > 0 && <Badge variant="outline">مقاس {p.size}</Badge>}
-                  <Badge variant="outline">{formatNumber(p.weight)} جم</Badge>
+                  <Badge className="bg-amber-500/10 text-amber-700 border-amber-300/50 text-[10px] h-5 px-1.5">{p.karat}k</Badge>
+                  {p.size > 0 && (
+                    <Badge variant="outline" className="text-[10px] h-5 px-1.5">مقاس {p.size}</Badge>
+                  )}
+                  <Badge variant="outline" className="text-[10px] h-5 px-1.5">{formatNumber(p.weight)} جم</Badge>
                 </div>
 
-                <p className="tabular-nums text-[13px] font-bold text-primary">
-                  {effectiveGold > 0
-                    ? formatEgp(salePerGram(effectiveGold, p.karat) * p.weight)
-                    : '—'}
-                </p>
-
-                <div className="flex items-center gap-1.5 pt-1">
-                  <Button
-                    size="sm"
-                    className="flex-1 gap-1.5 rounded-full"
-                    onClick={() => openShare(p)}
-                  >
-                    <Share2 className="size-3.5" />
-                    مشاركة
-                  </Button>
+                <div className="rounded-lg bg-primary/5 px-3 py-2 border border-primary/10">
+                  <p className="tabular-nums text-[15px] font-extrabold text-primary leading-none">
+                    {effectiveGold > 0
+                      ? formatEgp(salePerGram(effectiveGold, p.karat) * p.weight)
+                      : '—'}
+                  </p>
                 </div>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full gap-1.5 rounded-full h-8 text-[11px] mt-0.5"
+                  onClick={() => openShare(p)}
+                >
+                  <Share2 className="size-3" />
+                  مشاركة
+                </Button>
               </div>
             </Card>
           ))}
@@ -476,7 +459,7 @@ export function ProductsPage() {
       >
         <DialogContent
           showCloseButton={false}
-          className="left-1/2 top-1/2 w-[min(96vw,920px)] max-w-none max-h-[92vh] overflow-hidden gap-0 rounded-[20px] bg-background p-0 text-foreground ring-1 ring-foreground/10 sm:max-w-none"
+          className="left-1/2 top-1/2 w-[min(96vw,920px)] max-w-none sm:max-w-none md:max-w-none lg:max-w-none max-h-[92vh] overflow-hidden gap-0 rounded-[20px] bg-background p-0 text-foreground ring-1 ring-foreground/10"
         >
           {share && (
             <div className="flex h-full max-h-[92vh] flex-col">
@@ -689,7 +672,11 @@ export function ProductsPage() {
 
               {/* ─── Footer ───────────────────────────────────────────── */}
               <footer className="flex flex-wrap items-center gap-2 border-t border-border bg-secondary/40 px-6 py-4">
-                <div className="min-w-0 flex-1 truncate rounded-full bg-background px-4 py-2 text-[12px] text-muted-foreground ring-1 ring-border" dir="ltr">
+                <div
+                  dir="ltr"
+                  title={share.link}
+                  className="min-w-0 basis-full whitespace-nowrap overflow-x-auto rounded-full bg-background px-4 py-2 text-[12px] text-muted-foreground ring-1 ring-border"
+                >
                   {share.link}
                 </div>
                 <Button

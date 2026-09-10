@@ -56,9 +56,10 @@ export function DebtReportPage() {
   const [selectedClient, setSelectedClient] = useState<DebtClientSummary | null>(null)
 
   const { data: summary = [], isLoading, isError } = useQuery({
-    queryKey: ['debts-summary', activeBranchId],
+    queryKey: ['debts-client-summary', activeBranchId],
     queryFn: () => getClientSummary(activeBranchId ?? 0),
     enabled: !!activeBranchId,
+    select: (data) => (Array.isArray(data) ? data : []),
   })
 
   const filtered = useMemo(() => {
@@ -284,6 +285,7 @@ function ClientDetail({
   const { data: debts = [], isLoading } = useQuery({
     queryKey: ['debts', 'client', client.clientId],
     queryFn: () => getClientDebts(client.clientId),
+    select: (data) => (Array.isArray(data) ? data : []),
   })
 
   const sorted = useMemo(
@@ -421,7 +423,12 @@ function ClientDetail({
 
 function DebtRow({ debt }: { debt: Debt }) {
   const status = getDebtStatus(debt)
-  const remaining = Math.max(0, debt.amountOwed - debt.paidAmount)
+  const remaining = Math.max(
+    0,
+    debt.balanceType === 1
+      ? Math.round((debt.amountOwed - debt.paidAmount) * 100) / 100
+      : Math.round(debt.amountOwed - debt.paidAmount),
+  )
   const isCredit = debt.debtType === 1
   return (
     <TableRow>
@@ -455,7 +462,7 @@ function DebtRow({ debt }: { debt: Debt }) {
       <TableCell
         className={cn(
           'tabular-nums font-semibold',
-          isCredit ? 'text-success' : 'text-warning',
+          remaining <= 0 ? 'text-success' : isCredit ? 'text-success' : 'text-warning',
         )}
       >
         {debt.balanceType === 1 ? `${remaining} جم` : formatEgp(remaining)}

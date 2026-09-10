@@ -50,7 +50,7 @@ export function InstallAppButton() {
 
 /**
  * مكون تحميل البرنامج المخصص للدرج والقائمة الجانبية (Slide Drawer / Sidebar)
- * وفق متطلبات design.md: متناسق تماماً مع مساحة القائمة ومريح للمس السريع.
+ * وفق متطلبات DESIGN.md: متناسق تماماً مع مساحة القائمة ومريح للمس السريع.
  */
 export function SidebarInstallButton({ collapsed = false }: { collapsed?: boolean }) {
   const { canPrompt, isIosDevice, isInstalled, install } = usePwaInstall()

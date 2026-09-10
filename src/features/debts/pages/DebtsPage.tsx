@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   Wallet,
   AlertTriangle,
@@ -79,6 +79,7 @@ const statusConfig: Record<
 }
 
 export function DebtsPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const activeBranchId = useActiveBranchId()
   const [searchQuery, setSearchQuery] = useState('')
@@ -249,69 +250,67 @@ export function DebtsPage() {
           <Button
             type="button"
             variant="outline"
-            asChild
+            onClick={() => void navigate('/app/debts/report')}
             className="h-11 gap-2 rounded-full px-4 touch-target"
           >
-            <Link to="/app/debts/report">
-              <FileText className="size-4" />
-              التقرير المفصل
-            </Link>
+            <FileText className="size-4" />
+            التقرير المفصل
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card size="sm" className="rounded-[14px] elevation-card">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Card size="sm" className="rounded-[14px] elevation-card border-sky-200/60 bg-gradient-to-br from-sky-50/80 to-card">
+          <CardHeader className="px-3 pt-2.5 pb-0">
+            <CardTitle className="flex items-center justify-between gap-1.5 text-[11px] font-semibold leading-[1.3] text-sky-600">
               <span>إجمالي الدين</span>
-              <Wallet className="size-4 text-muted-foreground/60" />
+              <Wallet className="size-3.5 text-sky-400" />
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-foreground">
+          <CardContent className="px-3 pb-2.5 pt-0.5">
+            <div className="tabular-nums text-[17px] font-bold leading-[1.1] text-sky-700">
               {formatEgp(summaryTotal)}
             </div>
           </CardContent>
         </Card>
 
-        <Card size="sm" className="rounded-[14px] elevation-card">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
+        <Card size="sm" className="rounded-[14px] elevation-card border-emerald-200/60 bg-gradient-to-br from-emerald-50/80 to-card">
+          <CardHeader className="px-3 pt-2.5 pb-0">
+            <CardTitle className="flex items-center justify-between gap-1.5 text-[11px] font-semibold leading-[1.3] text-emerald-600">
               <span>المدفوع</span>
-              <CheckCircle2 className="size-4 text-success/60" />
+              <CheckCircle2 className="size-3.5 text-emerald-400" />
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-success">
+          <CardContent className="px-3 pb-2.5 pt-0.5">
+            <div className="tabular-nums text-[17px] font-bold leading-[1.1] text-emerald-700">
               {formatEgp(summaryPaid)}
             </div>
           </CardContent>
         </Card>
 
-        <Card size="sm" className="rounded-[14px] elevation-card">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-              <span>المتبقي</span>
-              <AlertTriangle className="size-4 text-warning/60" />
+        <Card size="sm" className="rounded-[14px] elevation-card border-amber-200/60 bg-gradient-to-br from-amber-50/80 to-card">
+          <CardHeader className="px-3 pt-2.5 pb-0">
+            <CardTitle className="flex items-center justify-between gap-1.5 text-[11px] font-semibold leading-[1.3] text-amber-600">
+              <span>المديونية الحالية</span>
+              <AlertTriangle className="size-3.5 text-amber-400" />
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-warning">
+          <CardContent className="px-3 pb-2.5 pt-0.5">
+            <div className="tabular-nums text-[17px] font-bold leading-[1.1] text-amber-700">
               {formatEgp(summaryRemaining)}
             </div>
           </CardContent>
         </Card>
 
-        <Card size="sm" className="rounded-[14px] elevation-card">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
+        <Card size="sm" className="rounded-[14px] elevation-card border-rose-200/60 bg-gradient-to-br from-rose-50/80 to-card">
+          <CardHeader className="px-3 pt-2.5 pb-0">
+            <CardTitle className="flex items-center justify-between gap-1.5 text-[11px] font-semibold leading-[1.3] text-rose-600">
               <span>ديون متأخرة</span>
-              <AlertTriangle className="size-4 text-error/60" />
+              <AlertTriangle className="size-3.5 text-rose-400" />
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-error">
+          <CardContent className="px-3 pb-2.5 pt-0.5">
+            <div className="tabular-nums text-[17px] font-bold leading-[1.1] text-rose-700">
               {summaryOverdue}
             </div>
           </CardContent>
@@ -389,7 +388,7 @@ export function DebtsPage() {
             <TableBody>
               {debts.map((debt) => {
                 const status = getDebtStatus(debt)
-                const remaining = Math.max(0, debt.amountOwed - debt.paidAmount)
+                const remaining = Math.max(0, Math.round(debt.amountOwed - debt.paidAmount))
                 const cfg = statusConfig[status]
                 return (
                   <TableRow key={debt.debtId}>
@@ -418,7 +417,7 @@ export function DebtsPage() {
                     <TableCell className="tabular-nums text-success">
                       {formatEgp(debt.paidAmount)}
                     </TableCell>
-                    <TableCell className="tabular-nums font-semibold text-warning">
+                    <TableCell className={cn('tabular-nums font-semibold', remaining > 0 ? 'text-warning' : 'text-success')}>
                       {formatEgp(remaining)}
                     </TableCell>
                     <TableCell>
@@ -431,20 +430,18 @@ export function DebtsPage() {
                       {formatDate(debt.dueDate)}
                     </TableCell>
                     <TableCell className="text-end">
-                      {remaining > 0 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPaymentSheet(debt)
-                            setPaymentAmount('')
-                          }}
-                          className="rounded-full touch-target"
-                        >
-                          تسجيل دفعة
-                        </Button>
-                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setPaymentSheet(debt)
+                          setPaymentAmount('')
+                        }}
+                        className="rounded-full touch-target"
+                      >
+                        تسجيل دفعة
+                      </Button>
                     </TableCell>
                   </TableRow>
                 )
@@ -485,7 +482,7 @@ export function DebtsPage() {
                 <div className="flex justify-between text-[15px]">
                   <span className="font-bold text-warning">المتبقي</span>
                   <span className="rounded-lg bg-warning px-2 py-1 font-bold tabular-nums text-white shadow-sm">
-                    {formatEgp(paymentSheet.amountOwed - paymentSheet.paidAmount)}
+                    {formatEgp(Math.round(paymentSheet.amountOwed - paymentSheet.paidAmount))}
                   </span>
                 </div>
               </div>

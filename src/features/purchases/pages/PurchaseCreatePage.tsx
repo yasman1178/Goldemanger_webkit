@@ -52,7 +52,7 @@ import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import { Switch } from '@/shared/components/ui/switch'
+
 import {
   Dialog,
   DialogContent,
@@ -129,7 +129,7 @@ export function PurchaseCreatePage() {
 const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
   const [exchangeStorage, setExchangeStorage] = useState('')
   const [storageId, setStorageId] = useState('')
-  const [isInitialStock, setIsInitialStock] = useState(false)
+  const [isInitialStock] = useState(false)
   const [newSupplierMode, setNewSupplierMode] = useState(false)
   const [newSupplierName, setNewSupplierName] = useState('')
   const [newSupplierPhone, setNewSupplierPhone] = useState('')
@@ -394,8 +394,7 @@ const { data: products = [], isLoading: productsLoading } = useQuery({
       setSettleMode(0)
       setStampTaxRate('1')
       setExchanges([])
-      setStorageId('')
-      setIsInitialStock(false)
+setStorageId('')
       setNewSupplierMode(false)
       setNewSupplierName('')
       setNewSupplierPhone('')
@@ -732,41 +731,26 @@ if (paymentType === 'goldTradeIn') {
                   onCreateStorage={handleCreateStorage}
                   triggerClassName="w-full h-12 rounded-[14px] border border-black/10 bg-white text-[14px] font-medium text-foreground"
                 />
-              </div>
+</div>
 
-              <div className="flex items-center justify-between rounded-2xl border border-black/10 bg-white p-4">
-                <div>
-                  <Label className="text-[15px] font-semibold">
-                    رصيد أول المدة
-                  </Label>
-                  <p className="mt-0.5 text-[13px] leading-[1.5] text-muted-foreground">
-                    عند التفعيل تُحفظ القطع في المخزون دون خصم من الخزينة — لإدخال
-                    رصيدك الافتتاحي.
+              {partyMode === 'supplier' && (
+                <div className="space-y-2">
+                  <Label htmlFor="stamp-tax-rate">نسبة الدمغة والضريبة (%)</Label>
+                  <Input
+                    id="stamp-tax-rate"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={stampTaxRate}
+                    onChange={(e) => setStampTaxRate(e.target.value)}
+                    placeholder="1.00"
+                    className="h-12 touch-target rounded-[14px]"
+                  />
+                  <p className="text-[12px] leading-[1.5] text-muted-foreground">
+                    نُسبة تُطبق على سعر الذهب في كل سطر. الافتراضي 1%.
                   </p>
                 </div>
-                <Switch
-                  checked={isInitialStock}
-                  onCheckedChange={setIsInitialStock}
-                  aria-label="فاتورة رصيد أول المدة"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="stamp-tax-rate">نسبة الدمغة والضريبة (%)</Label>
-                <Input
-                  id="stamp-tax-rate"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={stampTaxRate}
-                  onChange={(e) => setStampTaxRate(e.target.value)}
-                  placeholder="1.00"
-                  className="h-12 touch-target rounded-[14px]"
-                />
-                <p className="text-[12px] leading-[1.5] text-muted-foreground">
-                  نُسبة تُطبق على سعر الذهب في كل سطر. الافتراضي 1%.
-                </p>
-              </div>
+              )}
 
               {partyMode === 'supplier' && newSupplierMode && (
                 <div className="sm:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">

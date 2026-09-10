@@ -160,21 +160,6 @@ export async function createPurchase(
   return data.data
 }
 
-export interface PieceImageUploadResult {
-  url: string
-}
-
-export async function uploadPieceImage(file: File): Promise<PieceImageUploadResult> {
-  const form = new FormData()
-  form.append('file', file)
-  const { data } = await api.post<PieceImageUploadResult>(
-    '/api/Images/upload',
-    form,
-    { headers: { 'Content-Type': undefined } },
-  )
-  return data
-}
-
 export interface PurchaseDocumentDto {
   kind: string
   kindValue: number
