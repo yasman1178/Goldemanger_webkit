@@ -1,7 +1,6 @@
-import { Readable } from 'node:stream'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-export const config = { runtime: 'nodejs' }
+export const config = { runtime: 'nodejs', bodyParser: false }
 
 const MAX_BYTES = 8 * 1024 * 1024
 
@@ -17,6 +16,15 @@ function cleanFileName(name: string): string {
   return cleaned.length > 60 ? cleaned.slice(-60) : (cleaned || 'product-image.jpg')
 }
 
+function readBody(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   try {
     const contentType = String(req.headers['content-type'] ?? '')
@@ -25,10 +33,16 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       return
     }
 
+    const raw = await readBody(req)
+    if (raw.byteLength === 0) {
+      sendJson(res, 400, { message: 'اختر صورة للمنتج أولاً.' })
+      return
+    }
+
     const webReq = new Request('http://internal', {
       method: 'POST',
       headers: { 'content-type': contentType },
-      body: Readable.toWeb(req),
+      body: new Uint8Array(raw),
     })
     const form = await webReq.formData()
     const file = form.get('file')
