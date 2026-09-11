@@ -14,6 +14,7 @@ import { InventoryReceiptPrint } from '@/features/inventory/components/Inventory
 import { getProducts } from '@/features/products/api'
 import type { Product } from '@/features/products/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { getStorages } from '@/shared/lib/parties'
 import { typeLabels } from '@/features/products/types'
 import { formatNumber } from '@/shared/lib/utils'
 import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
@@ -164,6 +165,20 @@ export function InventoryPage() {
     queryFn: () => getProducts(activeBranchId ?? undefined),
   })
 
+  const { data: branchStorages = [] } = useQuery({
+    queryKey: ['storages'],
+    queryFn: getStorages,
+  })
+
+  /** مخازن الكسر: أي مخزن اسمه يحوي «كسر» — كل قطعة فيه تُحسب ضمن رصيد الكسر مهما كان نوعها. */
+  const scrapStoreIds = useMemo(() => {
+    const set = new Set<number>()
+    for (const s of branchStorages) {
+      if (s.name && s.name.includes('كسر')) set.add(s.id)
+    }
+    return set
+  }, [branchStorages])
+
   const {
     data: unitsPage,
     isLoading: unitsLoading,
@@ -261,7 +276,9 @@ export function InventoryPage() {
     const build = (isKaser: boolean) => {
       const map = new Map<number, { pieces: number; weight: number }>()
       for (const p of availableProducts) {
-        if ((p.typegolde === 3) !== isKaser) continue
+        const inScrapStore = p.storageId != null && scrapStoreIds.has(p.storageId)
+        const isScrapPiece = p.typegolde === 3 || inScrapStore
+        if (isScrapPiece !== isKaser) continue
         const current = map.get(p.karat) ?? { pieces: 0, weight: 0 }
         map.set(p.karat, {
           pieces: current.pieces + (p.quantity ?? 0),
@@ -277,7 +294,7 @@ export function InventoryPage() {
       }
     }
     return { kaser: build(true), shop: build(false) }
-  }, [availableProducts])
+  }, [availableProducts, scrapStoreIds])
 
   return (
     <div className="space-y-6 pb-20">

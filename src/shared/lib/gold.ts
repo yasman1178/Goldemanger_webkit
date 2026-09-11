@@ -1,5 +1,7 @@
 export const SALE_MARKUP = 0
 export const TAX_AND_STAMP_RATE = 0.01
+/** عمولة الشراء من عميل (نسبة من سعر الذهب تُخصم عند الشراء من عميل) — تطابق افتراضي الباك (Branch). */
+export const BUY_FROM_CUSTOMER_COMMISSION = 0.015
 
 export function amountToNumber(value: string): number {
   return Number(value) || 0

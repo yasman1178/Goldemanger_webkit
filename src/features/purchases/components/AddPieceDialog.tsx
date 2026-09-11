@@ -28,6 +28,7 @@ export interface PieceDraft {
   factory: string
   factoryForSale: string
   quantity: string
+  size?: string
   imageLink?: string
   storageId?: string
 }
@@ -60,7 +61,7 @@ interface Props {
   commissionRate?: number
   taxRate?: number
   storages?: StorageOption[]
-  defaultStorageId?: string
+  onCreateStorage?: (name: string) => Promise<StorageOption>
   /** عند التبريد: إجمالي الذهب المستبدل مكافئ 21 (تعرض المعادلة كاملة). */
   input21?: number
   /** عند التبريد: إجمالي القطع الملتزمة مكافئ 21 قبل هذه القطعة. */
@@ -69,13 +70,13 @@ interface Props {
   onConfirm: (draft: PieceDraft) => void
 }
 
-export function AddPieceDialog({ open, onOpenChange, goldPrice, initial, includeTax = true, commissionRate = 0, taxRate = 0.01, storages = [], defaultStorageId, input21, output21, branchId, onConfirm }: Props) {
+export function AddPieceDialog({ open, onOpenChange, goldPrice, initial, includeTax = true, commissionRate = 0, taxRate = 0.01, storages = [], onCreateStorage, input21, output21, branchId, onConfirm }: Props) {
   // إعادة تهيئة النموذج عند كل فتح عبر remount (key) بدل useEffect — متوافق مع react-hooks/set-state-in-effect.
   const formKey = open ? JSON.stringify(initial ?? EMPTY_PIECE_DRAFT) : 'closed'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <PieceForm key={formKey} goldPrice={goldPrice} initial={initial} includeTax={includeTax} commissionRate={commissionRate} taxRate={taxRate} storages={storages} defaultStorageId={defaultStorageId} input21={input21} output21={output21} branchId={branchId} onConfirm={onConfirm} onCancel={() => onOpenChange(false)} />
+        <PieceForm key={formKey} goldPrice={goldPrice} initial={initial} includeTax={includeTax} commissionRate={commissionRate} taxRate={taxRate} storages={storages} onCreateStorage={onCreateStorage} input21={input21} output21={output21} branchId={branchId} onConfirm={onConfirm} onCancel={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   )
@@ -88,7 +89,7 @@ function PieceForm({
   commissionRate = 0,
   taxRate = 0.01,
   storages = [],
-  defaultStorageId,
+  onCreateStorage,
   input21,
   output21,
   branchId,
@@ -101,7 +102,7 @@ function PieceForm({
   commissionRate?: number
   taxRate?: number
   storages?: StorageOption[]
-  defaultStorageId?: string
+  onCreateStorage?: (name: string) => Promise<StorageOption>
   input21?: number
   output21?: number
   branchId?: number
@@ -110,7 +111,7 @@ function PieceForm({
 }) {
   const [draft, setDraft] = useState<PieceDraft>({
     ...(initial ?? EMPTY_PIECE_DRAFT),
-    storageId: initial?.storageId ?? defaultStorageId,
+    storageId: initial?.storageId,
   })
   const [error, setError] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -190,6 +191,10 @@ function PieceForm({
     }
     if (weight <= 0) {
       setError('أدخل وزناً صالحاً أكبر من صفر.')
+      return
+    }
+    if (storages.length > 0 && !draft.storageId) {
+      setError('اختر مخزن تخزين القطعة.')
       return
     }
     if (!photoFile) {
@@ -362,6 +367,21 @@ function PieceForm({
               />
             </div>
             <div className="space-y-1">
+              <Label className="flex items-center gap-1.5 text-[13px] font-bold text-teal-700">
+                <span className="size-1.5 rounded-full bg-teal-500" />
+                المقاس
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={draft.size ?? ''}
+                onChange={(e) => set('size', e.target.value)}
+                placeholder="مثال: 17"
+                className="h-11 touch-target rounded-[14px] border-teal-300 bg-teal-50/50 focus-visible:ring-teal-300/40"
+              />
+            </div>
+            <div className="space-y-1">
               <Label className="flex items-center gap-1.5 text-[13px] font-bold text-rose-700">
                 <span className="size-1.5 rounded-full bg-rose-500" />
                 مصنعية المحل/جم (أسعار البيع — لا تُضاف)
@@ -429,10 +449,10 @@ function PieceForm({
                 <div>
                   <Label className="flex items-center gap-1.5 text-[13px] font-bold text-violet-700">
                     <span className="size-1.5 rounded-full bg-violet-500" />
-                    المخزن
+                    المخزن *
                   </Label>
                   <p className="text-[11px] text-muted-foreground">
-                    يُخصم الذهب من هذا المخزن. فارغ = مخزن الفاتورة.
+                    مخزن تخزين القطعة — إجباري.
                   </p>
                 </div>
                 <StoragePicker
@@ -440,8 +460,9 @@ function PieceForm({
                   storages={storages}
                   onChange={(v) => set('storageId', v === 'all' ? undefined : v)}
                   allowAll={false}
-                  allowCreate={false}
-                  placeholder="المخزن"
+                  allowCreate={Boolean(onCreateStorage)}
+                  onCreateStorage={onCreateStorage}
+                  placeholder="اختر المخزن"
                   variant="violet"
                 />
               </div>

@@ -30,6 +30,7 @@ const KARATS = [24, 21, 18]
 export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: boolean } = {}) {
   const gold21 = useGoldStore((s) => s.gold21)
   const setGold21 = useGoldStore((s) => s.setGold21)
+  const setGold21Buy = useGoldStore((s) => s.setGold21Buy)
   const setLastFetchTime = useGoldStore((s) => s.setLastFetchTime)
   const lastFetchTime = useGoldStore((s) => s.lastFetchTime)
   const freezeGold = useGoldStore((s) => s.freezeGold)
@@ -52,6 +53,11 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
   useEffect(() => {
     onPriceChangeRef.current = setGold21
   }, [setGold21])
+
+  const onPriceChangeBuyRef = useRef(setGold21Buy)
+  useEffect(() => {
+    onPriceChangeBuyRef.current = setGold21Buy
+  }, [setGold21Buy])
 
   const editOpenRef = useRef(editOpen)
   useEffect(() => {
@@ -82,6 +88,9 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
     }
     if (!freezeRef.current) {
       onPriceChangeRef.current(data.gram21Sell)
+      if (data.gram21Buy && data.gram21Buy > 0) {
+        onPriceChangeBuyRef.current(data.gram21Buy)
+      }
     }
     return true
   }
@@ -108,6 +117,9 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
           }
           if (!freezeRef.current) {
             onPriceChangeRef.current(data.gram21Sell)
+            if (data.gram21Buy && data.gram21Buy > 0) {
+              onPriceChangeBuyRef.current(data.gram21Buy)
+            }
           }
         }
       } finally {

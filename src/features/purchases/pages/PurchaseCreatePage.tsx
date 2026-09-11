@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useId, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -33,19 +33,19 @@ import { getInventoryUnits } from '@/features/inventory/api'
 import type { InventoryUnitRecord } from '@/features/inventory/types'
 import { getProducts } from '@/features/products/api'
 import type { Product } from '@/features/products/types'
-import { StoragePicker } from '@/shared/components/StoragePicker'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import {
   createCustomer,
   createStorage,
   createSupplier,
+  fetchLiveGoldPrice,
   getCustomers,
   getLatestGoldPrice,
   getStorages,
   getSuppliers,
 } from '@/shared/lib/parties'
-import { amountToNumber, purchaseLineMath, purchasePerGram } from '@/shared/lib/gold'
+import { amountToNumber, BUY_FROM_CUSTOMER_COMMISSION, purchaseLineMath, purchasePerGram } from '@/shared/lib/gold'
 import { getOverview } from '@/features/settings/api'
 import { cn, formatEgp, formatNumber } from '@/shared/lib/utils'
 import { Input } from '@/shared/components/ui/input'
@@ -88,6 +88,7 @@ function toLine(draft: PieceDraft): PurchaseLineDraft {
     factory: draft.factory,
     factoryForSale: draft.factoryForSale,
     quantity: draft.quantity,
+    size: draft.size,
     imageLink: draft.imageLink,
     storageId: draft.storageId,
     committed: true,
@@ -128,7 +129,6 @@ export function PurchaseCreatePage() {
   const [stampTaxRate, setStampTaxRate] = useState('1')
 const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
   const [exchangeStorage, setExchangeStorage] = useState('')
-  const [storageId, setStorageId] = useState('')
   const [isInitialStock] = useState(false)
   const [newSupplierMode, setNewSupplierMode] = useState(false)
   const [newSupplierName, setNewSupplierName] = useState('')
@@ -169,6 +169,28 @@ const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
   })
 
   const storeGold21 = useGoldStore((s) => s.gold21)
+  const storeGold21Buy = useGoldStore((s) => s.gold21Buy)
+  const setGold21 = useGoldStore((s) => s.setGold21)
+  const setGold21Buy = useGoldStore((s) => s.setGold21Buy)
+
+  // تحديث مباشر لسعري البيع والشراء من المصدر الحي أثناء تواجد المدير في شاشة الشراء
+  // حتى لا تُحسب فاتورة شراء من عميل بسعر البيع في غياب زيارة شاشة البيع أولاً.
+  useEffect(() => {
+    let stopped = false
+    const updateLive = async () => {
+      const live = await fetchLiveGoldPrice('eg')
+      if (!stopped && live && live.gram21Sell > 0) {
+        setGold21(live.gram21Sell)
+        if (live.gram21Buy && live.gram21Buy > 0) setGold21Buy(live.gram21Buy)
+      }
+    }
+    void updateLive()
+    const id = setInterval(updateLive, 60_000)
+    return () => {
+      stopped = true
+      clearInterval(id)
+    }
+  }, [setGold21, setGold21Buy])
 
   const { data: serverPrice } = useQuery({
     queryKey: ['gold-price'],
@@ -176,7 +198,11 @@ const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
     staleTime: 5 * 60 * 1000,
   })
 
-  const goldPrice = storeGold21 > 0 ? storeGold21 : (serverPrice ?? 0)
+  // القاعدة الحاسمة: الشراء من عميل يستخدم سعر الشراء (Buy) دائماً ولا يقع على سعر البيع أبداً.
+  // عند غياب سعر الشراء يبقى goldPrice = 0 (تحميل) ويمنع الحفظ — بدل حساب بسعر البيع.
+  const goldPrice = partyMode === 'customer'
+    ? storeGold21Buy
+    : (storeGold21 > 0 ? storeGold21 : (serverPrice ?? 0))
 
   const { data: overview } = useQuery({
     queryKey: ['settings-overview'],
@@ -189,7 +215,8 @@ const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
     const found = activeBranchId
       ? list.find((b) => b.branchId === activeBranchId)
       : list[0]
-    return found?.buyFromCustomerCommission ?? 0
+    // القاعدة: الشراء من عميل بسعر الشراء (البيع − العمولة) — لا يُترك 0 أبداً وإلا ظهر سعر البيع.
+    return found?.buyFromCustomerCommission ?? BUY_FROM_CUSTOMER_COMMISSION
   }, [overview, activeBranchId])
 
 const { data: products = [], isLoading: productsLoading } = useQuery({
@@ -211,6 +238,23 @@ const { data: products = [], isLoading: productsLoading } = useQuery({
       if (sid <= 0) continue
       if (u.weight > bestWeight) {
         bestWeight = u.weight
+        best = String(sid)
+      }
+    }
+    if (best) return best
+    // fallback مقصود: مخزن الكسر قد يحوي قطعاً نوعها «جديد» (سلوك معتمد) —
+    // عند غياب أي وحدة كسر (typegolde===3) نختار المخزن صاحب أكبر إجمالي وزن متاح
+    // حتى لا يبقى «مخزن الاستبدال» فارغاً ويظن المستخدم أن المخزن خالٍ.
+    const totals = new Map<number, number>()
+    for (const u of inventoryUnits) {
+      if (u.status !== 'AVAILABLE' || !(u.weight > 0)) continue
+      const sid = u.storageId ?? 0
+      if (sid <= 0) continue
+      totals.set(sid, (totals.get(sid) ?? 0) + u.weight)
+    }
+    for (const [sid, total] of totals) {
+      if (total > bestWeight) {
+        bestWeight = total
         best = String(sid)
       }
     }
@@ -278,6 +322,19 @@ const { data: products = [], isLoading: productsLoading } = useQuery({
 
   const committedLines = lines
 
+const givenByKarat = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const e of exchanges) {
+      const weight = amountToNumber(e.weight)
+      const karat = amountToNumber(e.fromKarat)
+      if (weight <= 0 || karat <= 0) continue
+      map.set(karat, (map.get(karat) ?? 0) + weight)
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([karat, weight]) => ({ karat, weight }))
+  }, [exchanges])
+
   const given21 = useMemo(() => {
     return round3(
       exchanges.reduce((sum, e) => {
@@ -334,10 +391,11 @@ const { data: products = [], isLoading: productsLoading } = useQuery({
         resolvedSupplierId = created.id
       }
 
-      return createPurchase({
+return createPurchase({
         branchId: activeBranchId ?? 0,
         supplierId: resolvedSupplierId,
         totalAmount,
+        goldPrice21AtPurchase: goldPrice || null,
         isInitialStock,
         paymentType,
         stampTaxRate: amountToNumber(stampTaxRate) / 100,
@@ -366,7 +424,8 @@ const { data: products = [], isLoading: productsLoading } = useQuery({
             factory: amountToNumber(l.factory),
             factoryForSale: amountToNumber(l.factoryForSale),
             quantity: amountToNumber(l.quantity) || 1,
-            storageId: Number(l.storageId ?? storageId),
+            size: Math.trunc(amountToNumber(l.size ?? '')),
+            storageId: Number(l.storageId),
             imageLink: l.imageLink?.trim() || '',
           })),
       })
@@ -394,7 +453,6 @@ const { data: products = [], isLoading: productsLoading } = useQuery({
       setSettleMode(0)
       setStampTaxRate('1')
       setExchanges([])
-setStorageId('')
       setNewSupplierMode(false)
       setNewSupplierName('')
       setNewSupplierPhone('')
@@ -442,6 +500,7 @@ function addExchangeFromUnit(unit: InventoryUnitRecord) {
       factory: p.factory ? String(p.factory) : '',
       factoryForSale: p.factoryForSale ? String(p.factoryForSale) : '',
       quantity: '1',
+      size: p.size ? String(p.size) : '',
     })
     setPickerOpen(false)
     setPieceDialogOpen(true)
@@ -490,7 +549,7 @@ function addExchangeFromUnit(unit: InventoryUnitRecord) {
       toast.error('اكتب اسم المورد الجديد.')
       return
     }
-    if (!newSupplierMode && !supplierId) {
+if (!newSupplierMode && !supplierId) {
       toast.error(
         partyMode === 'customer'
           ? 'اختر العميل أو أنشئ عميلاً جديداً.'
@@ -498,8 +557,16 @@ function addExchangeFromUnit(unit: InventoryUnitRecord) {
       )
       return
     }
-    if (!storageId) {
-      toast.error('اختر المخزن/موقع التخزين.')
+    if (!invoiceImage) {
+      toast.error('أرفق صورة فاتورة الشراء — إلزامية.')
+      return
+    }
+    if (partyMode === 'customer' && !idCardImage) {
+      toast.error('أرفق صورة البطاقة الشخصية للعميل — إلزامية.')
+      return
+    }
+    if (partyMode === 'customer' && (!goldPrice || goldPrice <= 0)) {
+      toast.error('لم يصل سعر الشراء بعد — انتظر لحظة ثم أعد المحاولة.')
       return
     }
     const validLines = lines.filter(
@@ -507,6 +574,10 @@ function addExchangeFromUnit(unit: InventoryUnitRecord) {
     )
     if (validLines.length === 0) {
       toast.error('أضف قطعة واحدة على الأقل (اسم + وزن صالح).')
+      return
+    }
+    if (validLines.some((l) => !l.storageId)) {
+      toast.error('حدّد مخزن التخزين لكل قطعة.')
       return
     }
 if (paymentType === 'goldTradeIn') {
@@ -719,20 +790,6 @@ if (paymentType === 'goldTradeIn') {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label>المخزن *</Label>
-                <StoragePicker
-                  value={storageId}
-                  storages={storages}
-                  onChange={setStorageId}
-                  allowAll={false}
-                  placeholder="اختر المخزن"
-                  allowCreate
-                  onCreateStorage={handleCreateStorage}
-                  triggerClassName="w-full h-12 rounded-[14px] border border-black/10 bg-white text-[14px] font-medium text-foreground"
-                />
-</div>
-
               {partyMode === 'supplier' && (
                 <div className="space-y-2">
                   <Label htmlFor="stamp-tax-rate">نسبة الدمغة والضريبة (%)</Label>
@@ -789,14 +846,16 @@ if (paymentType === 'goldTradeIn') {
                 'grid grid-cols-1 gap-3',
                 partyMode === 'customer' && 'sm:grid-cols-2',
               )}>
-                <AttachmentInput
-                  label="صورة فاتورة الشراء (اختياري)"
+<AttachmentInput
+                  label="صورة فاتورة الشراء (مطلوب)"
+                  required
                   value={invoiceImage}
                   onChange={setInvoiceImage}
                 />
                 {partyMode === 'customer' && (
                   <AttachmentInput
-                    label="صورة البطاقة الشخصية للعميل (اختياري)"
+                    label="صورة البطاقة الشخصية للعميل (مطلوب)"
+                    required
                     value={idCardImage}
                     onChange={setIdCardImage}
                   />
@@ -824,10 +883,13 @@ if (paymentType === 'goldTradeIn') {
                   </div>
                 </div>
 
-                <TwentyOneKConversionBar
-                  branchId={activeBranchId ?? undefined}
+<TwentyOneKConversionBar
                   purchasedByKarat={byKarat}
                   purchased21={received21}
+                  givenByKarat={givenByKarat}
+                  given21={given21}
+                  goldPrice={goldPrice}
+                  settlementResidual={settlementResidual}
                 />
 
                 <div className="space-y-2 rounded-2xl border border-primary/25 bg-primary/[0.04] p-3">
@@ -1080,20 +1142,21 @@ if (paymentType === 'goldTradeIn') {
                       أدخل سطراً بعيار صحيح
                     </p>
                   ) : (
-                    byKarat.map((row) => (
-                      <div
-                        key={row.karat}
-                        className="flex items-center justify-between text-[13px]"
-                      >
-                        <span className="font-semibold tabular-nums text-foreground">
-                          {row.karat}K
-                        </span>
-                        <span className="tabular-nums text-muted-foreground">
-                          {formatNumber(row.pieces)} قطعة •{' '}
-                          {formatNumber(row.weight)} gm
-                        </span>
-                      </div>
-                    ))
+byKarat.map((row) => (
+                        <div
+                          key={row.karat}
+                          className="flex items-center justify-between text-[13px]"
+                        >
+                          <span className="font-semibold tabular-nums text-foreground">
+                            {row.karat}K
+                          </span>
+                          <span className="tabular-nums text-muted-foreground">
+                            {formatNumber(row.pieces)} قطعة •{' '}
+                            {formatNumber(row.weight)} gm • معادل{' '}
+                            {formatNumber(round3((row.weight * row.karat) / 21))} gm
+                          </span>
+                        </div>
+                      ))
                   )}
                 </div>
                 <div className="flex items-center justify-between">
@@ -1251,7 +1314,7 @@ if (paymentType === 'goldTradeIn') {
         commissionRate={partyMode === 'customer' ? customerCommissionRate : 0}
         taxRate={amountToNumber(stampTaxRate) / 100}
         storages={storages}
-        defaultStorageId={storageId || undefined}
+        onCreateStorage={handleCreateStorage}
         input21={paymentType === 'goldTradeIn' ? given21 : undefined}
         output21={paymentType === 'goldTradeIn' ? received21 : undefined}
         branchId={activeBranchId ?? undefined}
@@ -1383,6 +1446,14 @@ function CommittedLineRow({
           <span className="text-muted-foreground">النوع: </span>
           <span className="font-semibold text-foreground">{typeLabel}</span>
         </p>
+        {amountToNumber(line.size ?? '') > 0 && (
+          <p>
+            <span className="text-muted-foreground">المقاس: </span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatNumber(amountToNumber(line.size ?? ''))}
+            </span>
+          </p>
+        )}
         <p>
           <span className="text-muted-foreground">الكمية: </span>
           <span className="font-semibold tabular-nums text-foreground">
@@ -1458,10 +1529,12 @@ function CommittedLineRow({
 
 function AttachmentInput({
   label,
+  required = false,
   value,
   onChange,
 }: {
   label: string
+  required?: boolean
   value: AttachedFile | null
   onChange: (value: AttachedFile | null) => void
 }) {
@@ -1469,7 +1542,14 @@ function AttachmentInput({
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-[13px]">{label}</Label>
+      <Label className="flex items-center gap-1 text-[13px]">
+        {label}
+        {required && (
+          <span className="text-error" aria-hidden="true">
+            *
+          </span>
+        )}
+      </Label>
       {value ? (
         <div className="flex items-center gap-3 rounded-[14px] border border-black/10 bg-white p-2">
           <img

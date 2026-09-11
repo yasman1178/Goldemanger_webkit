@@ -106,6 +106,12 @@ export async function createPurchase(
   form.append('BranchId', String(payload.branchId))
   form.append('SupplierId', String(payload.supplierId))
   form.append('TotalAmount', String(payload.totalAmount))
+  form.append(
+    'GoldPrice21AtPurchase',
+    payload.goldPrice21AtPurchase != null
+      ? String(payload.goldPrice21AtPurchase)
+      : '',
+  )
   form.append('IsInitialStock', String(payload.isInitialStock))
   form.append(
     'PaymentType',
@@ -136,6 +142,7 @@ export async function createPurchase(
     form.append(`ProductsDot[${index}].Typegolde`, String(p.typegolde))
     form.append(`ProductsDot[${index}].Design`, '0')
     form.append(`ProductsDot[${index}].Quantity`, String(p.quantity))
+    form.append(`ProductsDot[${index}].Size`, String(p.size ?? 0))
     form.append(`ProductsDot[${index}].StorageId`, String(p.storageId))
     form.append(`ProductsDot[${index}].Factory`, String(p.factory))
     form.append(`ProductsDot[${index}].FactoryForSale`, String(p.factoryForSale))

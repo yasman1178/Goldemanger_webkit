@@ -49,7 +49,9 @@ api.interceptors.response.use(
       try {
         const { useAuthStore } = await import('@/shared/stores/auth-store')
         useAuthStore.getState().clearAuth()
-      } catch {}
+      } catch {
+        /* تنظيف المصادقة اختياري — تجاهل الفشل */
+      }
       if (window.location.pathname.startsWith('/app')) {
         window.location.href = '/login'
       }
@@ -87,7 +89,9 @@ api.interceptors.response.use(
       try {
         const { useAuthStore } = await import('@/shared/stores/auth-store')
         useAuthStore.getState().clearAuth()
-      } catch {}
+      } catch {
+        /* تنظيف المصادقة اختياري — تجاهل الفشل */
+      }
       if (window.location.pathname.startsWith('/app')) {
         window.location.href = '/login'
       }

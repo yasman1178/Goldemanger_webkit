@@ -12,6 +12,9 @@ function round3(value: number): number {
   return Math.round(value * 1000) / 1000
 }
 
+/** مرجع ثابت لقائمة فارغة — يمنع انهيار المقارنة عند وصول prop غير مصفوفة. */
+const EMPTY_UNITS: InventoryUnitRecord[] = []
+
 export interface ExchangePiecePickerProps {
   storages: StorageOption[]
   selectedStorage: string
@@ -39,10 +42,12 @@ export function ExchangePiecePicker({
   className,
 }: ExchangePiecePickerProps) {
   const storageNumber = amountToNumber(selectedStorage)
+  // تحصين: أي شكل غير مصفوفة (رد مغلف/نص خطأ) يُعامل كقائمة فارغة بدل الانهيار.
+  const safeUnits = Array.isArray(units) ? units : EMPTY_UNITS
 
   const availableUnits = useMemo(() => {
     if (storageNumber <= 0) return []
-    return units
+    return safeUnits
       .filter((u) => u.storageId === storageNumber && u.status === 'AVAILABLE' && u.weight > 0)
       .sort((a, b) => {
         const aScrap = a.products?.typegolde === 3 ? 1 : 0
@@ -51,7 +56,7 @@ export function ExchangePiecePicker({
         if (b.karat !== a.karat) return b.karat - a.karat
         return (a.products?.productName ?? '').localeCompare(b.products?.productName ?? '')
       })
-  }, [units, storageNumber])
+  }, [safeUnits, storageNumber])
 
   const alreadyAdded = useMemo(() => {
     const set = new Set<number>()
@@ -95,6 +100,9 @@ export function ExchangePiecePicker({
 
       <div className="space-y-1">
         <Label className="text-[13px]">مخزن الاستبدال</Label>
+        <p className="text-[11px] text-muted-foreground">
+          تُعرض هنا قطع «هذا المخزن» المحفوظة بحالة متاح — قطع الفاتورة الحالية تظهر بعد حفظها.
+        </p>
         <StoragePicker
           value={selectedStorage}
           storages={storages}
@@ -115,6 +123,9 @@ export function ExchangePiecePicker({
         ) : availableUnits.length === 0 ? (
           <p className="rounded-xl bg-black/5 px-3 py-2 text-[12px] text-muted-foreground">
             لا توجد قطع متاحة في هذا المخزن.
+            <span className="block text-[11px] opacity-80">
+              الوحدات المحمّلة للفرع: {safeUnits.length} — تحقق أن القطع محفوظة (ليست مسودة) وحالتها «متاح».
+            </span>
           </p>
         ) : !canAddMore ? (
           <p className="rounded-xl bg-success/10 px-3 py-2 text-[12px] text-success">

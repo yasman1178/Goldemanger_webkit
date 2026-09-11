@@ -82,6 +82,7 @@ export interface PurchaseLineDraft {
   factory: string
   factoryForSale: string
   quantity: string
+  size?: string
   committed?: boolean
   imageLink?: string
   storageId?: string
@@ -91,6 +92,7 @@ export interface CreatePurchasePayload {
   supplierId: number
   branchId: number
   totalAmount: number
+  goldPrice21AtPurchase?: number | null
   isInitialStock: boolean
   paymentType: PurchasePaymentType
   stampTaxRate: number
@@ -111,6 +113,7 @@ export interface CreatePurchasePayload {
     factory: number
     factoryForSale: number
     quantity: number
+    size: number
     storageId: number
     imageLink?: string
   }>

@@ -5,12 +5,26 @@ import type { InventoryUnitRecord, InventoryUnitStatus, StockRecord } from './ty
 
 const base = '/api/Stock'
 
+/**
+ * تطبيع الردود القادمة من الباك إلى مصفوفة دائماً.
+ * السبب: عقد الاستجابة drift بين النسخ — نسخة تُعيد مصفوفة مباشرة `[...]` ونسخة
+ * تُعيد غلاف `ApiResponse` بشكل `{ data: [...] }`. بدون هذا التحصين ينهار أي
+ * مكوّن يستدعي `.filter` على الرد (شاشة بيضاء: units.filter is not a function).
+ */
+export function extractArray<T>(payload: unknown, endpoint: string): T[] {
+  if (Array.isArray(payload)) return payload as T[]
+  const inner = (payload as { data?: unknown } | null | undefined)?.data
+  if (Array.isArray(inner)) return inner as T[]
+  console.warn(`[inventory] ${endpoint} أعاد شكلاً غير متوقع — أُعيدت قائمة فارغة.`, payload)
+  return []
+}
+
 export async function getStocks(branchId?: number): Promise<StockRecord[]> {
   try {
-    const { data } = await api.get<StockRecord[]>(`${base}/GetAll`, {
+    const { data } = await api.get<unknown>(`${base}/GetAll`, {
       params: branchId ? { branchId } : undefined,
     })
-    return data
+    return extractArray<StockRecord>(data, `${base}/GetAll`)
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       return []
@@ -20,10 +34,10 @@ export async function getStocks(branchId?: number): Promise<StockRecord[]> {
 }
 
 export async function getInventoryUnits(branchId?: number): Promise<InventoryUnitRecord[]> {
-  const { data } = await api.get<InventoryUnitRecord[]>('/api/InventoryUnit/GetAll', {
+  const { data } = await api.get<unknown>('/api/InventoryUnit/GetAll', {
     params: branchId ? { branchId } : undefined,
   })
-  return data
+  return extractArray<InventoryUnitRecord>(data, '/api/InventoryUnit/GetAll')
 }
 
 export async function getInventoryUnitsPage(params: {
@@ -34,7 +48,7 @@ export async function getInventoryUnitsPage(params: {
   status?: InventoryUnitStatus | 'all'
   storageId?: number
 }): Promise<PaginatedResult<InventoryUnitRecord>> {
-  const { data } = await api.get<PaginatedResult<InventoryUnitRecord>>(
+  const { data } = await api.get<unknown>(
     '/api/InventoryUnit/GetAll',
     {
       params: {
@@ -47,7 +61,24 @@ export async function getInventoryUnitsPage(params: {
       },
     },
   )
-  return data
+  return extractPage<InventoryUnitRecord>(data, '/api/InventoryUnit/GetAll?page')
+}
+
+/**
+ * تطبيع الرد المرقّم: يقبل الصفحة مباشرة `{ data: [...], totalCount }`
+ * أو مغلفة `ApiResponse` بشكل `{ data: { data: [...], totalCount } }`.
+ */
+export function extractPage<T>(payload: unknown, endpoint: string): PaginatedResult<T> {
+  const outer = payload as { data?: unknown } | null | undefined
+  const inner = outer?.data
+  if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+    return inner as PaginatedResult<T>
+  }
+  if (outer && typeof outer === 'object') {
+    return payload as PaginatedResult<T>
+  }
+  console.warn(`[inventory] ${endpoint} أعاد شكلاً غير متوقع.`, payload)
+  return { data: [], totalCount: 0, pageNumber: 1, pageSize: PAGE_SIZE } as PaginatedResult<T>
 }
 
 export interface TransferResult {

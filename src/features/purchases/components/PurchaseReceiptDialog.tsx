@@ -5,7 +5,7 @@ import { Images, Printer, X } from 'lucide-react'
 import { getCompanyInfo } from '@/features/purchases/api'
 import { PurchaseImagesDialog } from '@/features/purchases/components/PurchaseImagesDialog'
 import type { Purchase } from '@/features/purchases/types'
-import { purchasePerGram, TAX_AND_STAMP_RATE } from '@/shared/lib/gold'
+import { purchasePerGram, TAX_AND_STAMP_RATE, BUY_FROM_CUSTOMER_COMMISSION } from '@/shared/lib/gold'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
 import { getOverview } from '@/features/settings/api'
 import { Button } from '@/shared/components/ui/button'
@@ -92,7 +92,7 @@ export function PurchaseReceiptDialog({
   }, 0)
 
   const commissionRate = isCustomer
-    ? (overview?.branches?.find((b) => b.branchId === purchase.branchId)?.buyFromCustomerCommission ?? 0)
+    ? (overview?.branches?.find((b) => b.branchId === purchase.branchId)?.buyFromCustomerCommission ?? BUY_FROM_CUSTOMER_COMMISSION)
     : 0
   const commissionSubtotal = isCustomer ? goldSubtotal * commissionRate : 0
 
