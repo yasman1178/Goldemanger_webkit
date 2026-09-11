@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-export const config = { runtime: 'nodejs20.x' }
+export const config = { runtime: 'nodejs' }
 
 const MAX_BYTES = 8 * 1024 * 1024
 
