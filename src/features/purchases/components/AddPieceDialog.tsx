@@ -193,7 +193,7 @@ function PieceForm({
       setError('أدخل وزناً صالحاً أكبر من صفر.')
       return
     }
-    if (storages.length > 0 && !draft.storageId) {
+    if (!draft.storageId) {
       setError('اختر مخزن تخزين القطعة.')
       return
     }
@@ -443,7 +443,7 @@ function PieceForm({
             )}
           </div>
 
-          {storages.length > 0 && (
+          {(storages.length > 0 || Boolean(onCreateStorage)) && (
             <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div>

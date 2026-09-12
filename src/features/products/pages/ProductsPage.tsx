@@ -50,7 +50,13 @@ import {
 const BROKEN_GOLD_IMAGE = '/broken-gold.svg'
 
 function getProductImage(product: Product) {
-  return product.typegolde === 3 ? BROKEN_GOLD_IMAGE : product.primaryImageUrl
+  if (product.typegolde === 3) return BROKEN_GOLD_IMAGE
+  return (
+    product.primaryImageUrl ||
+    (Array.isArray(product.imageUrls) && product.imageUrls[0]) ||
+    product.imageLink ||
+    null
+  )
 }
 
 function ProductCardSkeleton() {

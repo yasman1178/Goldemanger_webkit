@@ -26,10 +26,23 @@ export async function getStorages(): Promise<StorageLocation[]> {
   return data
 }
 
-export async function createStorage(name: string): Promise<StorageLocation> {
-  const { data } = await api.post<StorageLocation>('/api/Storage', {
-    location: name,
-  })
+export async function createStorage(
+  nameOrInput: string | { location: string; branchId?: number; name?: string },
+  branchId?: number,
+): Promise<StorageLocation> {
+  const payload =
+    typeof nameOrInput === 'string'
+      ? {
+          location: nameOrInput,
+          name: nameOrInput,
+          ...(branchId ? { branchId } : {}),
+        }
+      : {
+          location: nameOrInput.location ?? nameOrInput.name ?? '',
+          name: nameOrInput.name ?? nameOrInput.location ?? '',
+          ...(nameOrInput.branchId ? { branchId: nameOrInput.branchId } : {}),
+        }
+  const { data } = await api.post<StorageLocation>('/api/Storage', payload)
   return data
 }
 

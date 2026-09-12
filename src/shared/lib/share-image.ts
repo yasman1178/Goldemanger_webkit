@@ -87,13 +87,48 @@ function roundedRect(
   ctx.closePath()
 }
 
-function loadImage(
-  url: string,
-  crossOrigin = 'anonymous',
-): Promise<HTMLImageElement | null> {
-  return new Promise((resolve) => {
+async function loadImage(url: string): Promise<HTMLImageElement | null> {
+  // 1. مسارات Data URLs أو Blob URLs لا تحتاج تحويلاً
+  if (url.startsWith('data:') || url.startsWith('blob:')) {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => resolve(null)
+      img.src = url
+    })
+  }
+
+  // 2. محاولة جلب الصورة كـ Blob عبر fetch أولاً لتفادي مشاكل CORS مع رسم الـ Canvas
+  try {
+    const res = await fetch(url, { mode: 'cors' })
+    if (res.ok) {
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const img = await new Promise<HTMLImageElement | null>((resolve) => {
+        const image = new Image()
+        image.onload = () => resolve(image)
+        image.onerror = () => resolve(null)
+        image.src = objectUrl
+      })
+      if (img) return img
+    }
+  } catch {
+    // الانتقال للـ fallback إذا فشل fetch
+  }
+
+  // 3. Fallback عبر crossOrigin='anonymous'
+  const crossOriginImg = await new Promise<HTMLImageElement | null>((resolve) => {
     const img = new Image()
-    img.crossOrigin = crossOrigin
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+  if (crossOriginImg) return crossOriginImg
+
+  // 4. Fallback أخير بدون crossOrigin (إن كان مسموحاً في نفس الأوريغين)
+  return new Promise<HTMLImageElement | null>((resolve) => {
+    const img = new Image()
     img.onload = () => resolve(img)
     img.onerror = () => resolve(null)
     img.src = url

@@ -536,9 +536,9 @@ function addExchangeFromUnit(unit: InventoryUnitRecord) {
   }
 
   async function handleCreateStorage(name: string) {
-    const created = await createStorage(name)
+    const created = await createStorage(name, activeBranchId ?? undefined)
     queryClient.invalidateQueries({ queryKey: ['storages'] })
-    toast.success('تم إنشاء المخزن ' + created.name)
+    toast.success('تم إنشاء المخزن ' + (created.name || created.location || name))
     return created
   }
 

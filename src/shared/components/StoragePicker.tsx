@@ -157,7 +157,7 @@ export function StoragePicker({
               </button>
             )}
 
-            {visibleStorages.length > 0 && (
+            {visibleStorages.length > 0 ? (
               <div className="grid grid-cols-2 gap-2.5">
                 {visibleStorages.map((s) => {
                   const active = value === String(s.id)
@@ -198,6 +198,10 @@ export function StoragePicker({
                   )
                 })}
               </div>
+            ) : (
+              <p className="py-2 text-center text-[13px] text-muted-foreground">
+                لا توجد مخازن حالياً، يمكنك إنشاء مخزن جديد بالأسفل.
+              </p>
             )}
 
             {allowCreate && (

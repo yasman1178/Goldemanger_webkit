@@ -12,6 +12,7 @@ export interface StorageLocation {
   id: number
   name: string
   branchId: number
+  location?: string | null
 }
 
 export interface PriceUpdateGolde {
