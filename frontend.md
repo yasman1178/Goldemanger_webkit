@@ -85,3 +85,12 @@ src/
 - **carryAmount** (خزينة فقط): رصيد آخر حركة قبل أقدم صف بالصفحة — يحسب «المبلغ المؤثر» عبر الصفحات (`delta = amount − prev`، ولأقدم صف `amount − carryAmount`).
 - **الملخصات/البطاقات الإحصائية (ديون، خزينة)**: احسبها من **مصدر كامل منفصل** (مثل `GET /api/Debts/BranchSummary/{branchId}`) — **لا** تُشتق من صفوف الصفحة الحالية (ستعطي رقماً خاطئاً عند التنقل).
 - **إضافة ترقيم لصفحة جديدة**: (1) اربط دالة `getXPage` على الـ endpoint المروّس في `api.ts`؛ (2) طبّق نمط الصفحة أعلاه؛ (3) `npm.cmd run typecheck` ثم `lint` ثم `test` ثم `build`.
+
+## 8) SEO — رابط الموقع وصورة OG وأسعار الذهب (المرحلة 0، 2026-09-12)
+
+- **مصدر حقيقة الرابط**: `vite.config.ts` → `SITE_URL = 'https://goldemanger.vercel.app'` + دالة `resolveSiteUrl()` تقبل `VITE_SITE_URL` فقط إن طابق `^https:\/\/[a-z0-9.-]+\.[a-z]{2,}$` (مهملة للقيم القمامة مع warn).
+- **`scripts/generate-seo.mjs`**: نفس التحقق — يولّد `public/robots.txt` + `public/sitemap.xml` (مهملة في git).
+- **`src/shared/lib/seo.ts`**: `getSiteUrl()` يتحقق من `VITE_SITE_URL` ثم يلجأ لـ `window.location.origin` (يواكب أي دومين مستقبلي تلقائيًا ولا يتأثر بقيمة قمامة في البناء).
+- **صورة OG**: `public/og-cover.png` **1200×630** (منتج من الـ SVG عبر Edge headless) — SVG لا تعرضها منصات المشاركة. أضف `og:image:width/height/type` مع أي استخدام.
+- **أسعار الذهب المجهولة**: `GET /api/GoldPrice/Live` أصبح `[AllowAnonymous]` + MemoryCache (3 دقائق) — فصفحة الهبوط تعرض أسعارًا حقيقية للزائر غير المسجل و`useSaghaPrices` يحدّثها كل 60 ثانية.
+- **خريطة التنفيذ الكاملة**: `SEO_IMPLEMENTATION_PLAN.md` في مستودع الـ Backend (المرحلة 1+ جاهزة للبدء).

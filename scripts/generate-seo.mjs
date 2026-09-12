@@ -20,7 +20,20 @@ function readEnv() {
   }
 }
 
-const siteUrl = (process.env.VITE_SITE_URL?.trim() || readEnv() || 'https://goldemanger.vercel.app').replace(/\/+$/, '')
+const SITE_URL = 'https://goldemanger.vercel.app'
+const SITE_URL_PATTERN = /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}$/i
+
+/** يقبل VITE_SITE_URL فقط إن كان رابط https صالحاً؛ وإلا يعود للثابت ويسجّل تحذيراً. */
+function resolveSiteUrl(raw) {
+  const candidate = (raw || '').trim().replace(/\/+$/, '')
+  if (candidate && SITE_URL_PATTERN.test(candidate)) return candidate
+  if (candidate) {
+    console.warn(`[generate-seo] تجاهل VITE_SITE_URL غير صالح: "${raw}" → استخدام ${SITE_URL}`)
+  }
+  return SITE_URL
+}
+
+const siteUrl = resolveSiteUrl(process.env.VITE_SITE_URL || readEnv())
 
 mkdirSync(publicDir, { recursive: true })
 

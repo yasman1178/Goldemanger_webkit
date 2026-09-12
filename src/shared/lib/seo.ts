@@ -17,12 +17,18 @@ export const WHATSAPP_LINK = `https://wa.me/201551702595?text=${encodeURICompone
 
 const API_BASE = getApiBaseUrl()
 
+const SITE_URL_PATTERN = /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}$/i
+
 /**
- * رابط الموقع النهائي؛ يُحدد عبر VITE_SITE_URL عند البناء، وإلا يُشتق من النطاق الحالي.
+ * رابط الصفحة الحالية كمصدر حقيقة للـ canonical/OG في المتصفح.
+ * يقبل VITE_SITE_URL فقط إن كان رابط https صالحاً؛ وإلا يشتق من النطاق الفعلي
+ * (window.location.origin) فيحمي من أية قيمة قمامة في بيئة البناء ويواكب أي دومين مستقبلي.
  */
 export function getSiteUrl(): string {
-  const env = import.meta.env.VITE_SITE_URL as string | undefined
-  return (env?.trim() ? env.trim().replace(/\/+$/, '') : window.location.origin)
+  const env = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim()
+  const candidate = env?.replace(/\/+$/, '')
+  if (candidate && SITE_URL_PATTERN.test(candidate)) return candidate
+  return window.location.origin
 }
 
 /** تحويل مسار نسبي إلى رابط مطلق كامل. */
