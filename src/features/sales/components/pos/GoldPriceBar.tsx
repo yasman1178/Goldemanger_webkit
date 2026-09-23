@@ -155,7 +155,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
               <span className="flex size-5.5 items-center justify-center rounded-[6px] bg-slate-900 text-white text-[10px] font-black">
                 24K
               </span>
-              <p className="text-[12px] font-bold text-foreground leading-none">ذهب نقي 24</p>
+              <p className="text-[12px] font-bold text-foreground leading-none">عيار 24</p>
             </div>
             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-700">
               999.9
@@ -205,7 +205,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
               <span className="flex size-5.5 items-center justify-center rounded-[6px] bg-amber-500 text-white text-[10px] font-black shadow-xs">
                 21K
               </span>
-              <p className="text-[12px] font-bold text-amber-950 leading-none">ذهب رئيسي 21</p>
+              <p className="text-[12px] font-bold text-amber-950 leading-none">عيار 21</p>
             </div>
             <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black text-amber-800">
               الأساسي
@@ -260,7 +260,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
               <span className="flex size-5.5 items-center justify-center rounded-[6px] bg-amber-700 text-white text-[10px] font-black">
                 18K
               </span>
-              <p className="text-[12px] font-bold text-foreground leading-none">ذهب مشغول 18</p>
+              <p className="text-[12px] font-bold text-foreground leading-none">عيار 18</p>
             </div>
             <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-800 border border-amber-200/50">
               750

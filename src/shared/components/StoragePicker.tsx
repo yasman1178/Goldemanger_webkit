@@ -22,7 +22,8 @@ export type StorageOption = {
 }
 
 function storageLabel(s: StorageOption): string {
-  return s.name ?? s.location ?? `مخزن #${s.id}`
+  const text = (s.name && s.name.trim()) || (s.location && s.location.trim())
+  return text || `مخزن #${s.id}`
 }
 
 interface StoragePickerProps {

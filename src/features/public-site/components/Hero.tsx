@@ -29,34 +29,38 @@ export function Hero() {
   const weight21 = ((calcWeight || 0) * calcKarat) / 21
   const estimatedValue = Math.round(weight21 * (prices.gold21Sell || 4120))
 
+  const k24 = prices.karats.find((k) => k.karat === 24)
+  const k21 = prices.karats.find((k) => k.karat === 21)
+  const k18 = prices.karats.find((k) => k.karat === 18)
+
   const tickerItems = [
     {
       karat: 'عيار 24 (سبائك)',
       price: `${prices.gold24Sell.toLocaleString('ar-EG')} ج.م`,
       buyPrice: `${prices.gold24Buy.toLocaleString('ar-EG')} ج.م`,
-      change: '+18 ج.م',
+      change: k24 ? `${k24.isUp ? '+' : ''}${k24.changeAmount} ج.م` : '+18 ج.م',
     },
     {
       karat: 'عيار 21 (الأكثر تداولاً)',
       price: `${prices.gold21Sell.toLocaleString('ar-EG')} ج.م`,
       buyPrice: `${prices.gold21Buy.toLocaleString('ar-EG')} ج.م`,
-      change: '+15 ج.م',
+      change: k21 ? `${k21.isUp ? '+' : ''}${k21.changeAmount} ج.م` : '+15 ج.م',
     },
     {
       karat: 'عيار 18',
       price: `${prices.gold18Sell.toLocaleString('ar-EG')} ج.م`,
       buyPrice: `${prices.gold18Buy.toLocaleString('ar-EG')} ج.م`,
-      change: '+12 ج.م',
+      change: k18 ? `${k18.isUp ? '+' : ''}${k18.changeAmount} ج.م` : '+12 ج.م',
     },
     {
       karat: 'الجنيه الذهب (8g)',
       price: `${prices.goldPoundSell.toLocaleString('ar-EG')} ج.م`,
       buyPrice: `${prices.goldPoundBuy.toLocaleString('ar-EG')} ج.م`,
-      change: '+120 ج.م',
+      change: k21 ? `${k21.isUp ? '+' : ''}${k21.changeAmount * 8} ج.م` : '+120 ج.م',
     },
     {
       karat: 'الأونصة عالمياً',
-      price: `$${prices.ounceUsd.toLocaleString()} USD`,
+      price: `${prices.ounceUsd.toLocaleString()} USD`,
       buyPrice: `${prices.ounceEgp.toLocaleString('ar-EG')} ج.م`,
       change: '+0.4%',
     },

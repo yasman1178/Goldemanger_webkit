@@ -127,8 +127,8 @@ export function PurchaseCreatePage() {
   const [partyMode, setPartyMode] = useState<PartyMode>('supplier')
   const [paymentType, setPaymentType] = useState<PurchasePaymentType>('cash')
   const [stampTaxRate, setStampTaxRate] = useState('1')
-const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
-  const [exchangeStorage, setExchangeStorage] = useState('')
+  const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
+  const [exchangeStorage, setExchangeStorage] = useState('all')
   const [isInitialStock] = useState(false)
   const [newSupplierMode, setNewSupplierMode] = useState(false)
   const [newSupplierName, setNewSupplierName] = useState('')
@@ -261,7 +261,7 @@ const { data: products = [], isLoading: productsLoading } = useQuery({
     return best
   }, [inventoryUnits])
 
-  const effectiveExchangeStorage = exchangeStorage || defaultScrapStorage
+  const effectiveExchangeStorage = exchangeStorage || defaultScrapStorage || 'all'
 
   const totalWeight = useMemo(() => {
     return lines.reduce(
@@ -483,8 +483,23 @@ return createPurchase({
     )
   }
 
-function addExchangeFromUnit(unit: InventoryUnitRecord) {
+  function addExchangeFromUnit(unit: InventoryUnitRecord) {
     setExchanges((prev) => [...prev, buildExchangeFromUnit(unit)])
+  }
+
+  function addAllExchangeUnits(unitsToAdd: InventoryUnitRecord[]) {
+    const existing = new Set(exchanges.map((e) => e.inventoryUnitId).filter(Boolean))
+    const toAdd = unitsToAdd.filter((u) => !existing.has(u.inventoryUnitId))
+    if (toAdd.length === 0) return
+    const newLines = toAdd.map((u) => buildExchangeFromUnit(u))
+    setExchanges((prev) => [...prev, ...newLines])
+    toast.success(`تمت إضافة ${newLines.length} قطعة للاستبدال`)
+  }
+
+  function clearAllExchanges() {
+    if (exchanges.length === 0) return
+    setExchanges([])
+    toast.info('تم تفريغ قطع الاستبدال')
   }
 
   function removeExchange(key: number) {
@@ -1030,14 +1045,16 @@ if (paymentType === 'goldTradeIn') {
                   </div>
                 </div>
 
-<ExchangePiecePicker
+                <ExchangePiecePicker
                   storages={storages}
                   selectedStorage={effectiveExchangeStorage}
                   onStorageChange={setExchangeStorage}
                   units={inventoryUnits}
                   exchanges={exchanges}
                   onAdd={addExchangeFromUnit}
+                  onAddAll={addAllExchangeUnits}
                   onRemove={removeExchange}
+                  onClearAll={clearAllExchanges}
                 />
               </div>
             )}

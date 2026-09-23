@@ -166,15 +166,20 @@ export function InventoryPage() {
   })
 
   const { data: branchStorages = [] } = useQuery({
-    queryKey: ['storages'],
+    queryKey: ['storages', activeBranchId],
     queryFn: getStorages,
+    select: (list) =>
+      activeBranchId
+        ? list.filter((s) => s.branchId === activeBranchId)
+        : list,
   })
 
   /** مخازن الكسر: أي مخزن اسمه يحوي «كسر» — كل قطعة فيه تُحسب ضمن رصيد الكسر مهما كان نوعها. */
   const scrapStoreIds = useMemo(() => {
     const set = new Set<number>()
     for (const s of branchStorages) {
-      if (s.name && s.name.includes('كسر')) set.add(s.id)
+      const name = (s.name || s.location || '')
+      if (name.includes('كسر')) set.add(s.id)
     }
     return set
   }, [branchStorages])
@@ -235,17 +240,29 @@ export function InventoryPage() {
   }, [availableProducts, query])
 
   const storages = useMemo(() => {
-    const map = new Map<number, string>()
+    // 1. نبدأ بالمخازن المحفوظة فعلياً في قاعدة البيانات للفرع الحالي بأسمائها الأصلية
+    const map = new Map<number, { id: number; name: string; location: string; branchId?: number }>()
+    for (const s of branchStorages) {
+      const label = s.name?.trim() || s.location?.trim() || `مخزن #${s.id}`
+      map.set(s.id, {
+        id: s.id,
+        name: label,
+        location: label,
+        branchId: s.branchId,
+      })
+    }
+    // 2. إذا كانت هناك منتجات تحمل storageId غير مسجل في قائمة مخازن الفرع، نضيفه كـ fallback
     for (const p of products) {
-      if (p.storageId != null) {
-        map.set(p.storageId, `مخزن #${p.storageId}`)
+      if (p.storageId != null && !map.has(p.storageId)) {
+        map.set(p.storageId, {
+          id: p.storageId,
+          name: `مخزن #${p.storageId}`,
+          location: `مخزن #${p.storageId}`,
+        })
       }
     }
-    for (const u of units ?? []) {
-      if (u.storage) map.set(u.storage.storageId, u.storage.location)
-    }
-    return Array.from(map, ([id, location]) => ({ id, location }))
-  }, [products, units])
+    return Array.from(map.values())
+  }, [branchStorages, products])
 
   const totals = useMemo(() => {
     const productIds = new Set(availableProducts.map((p) => p.productId))
@@ -262,12 +279,15 @@ export function InventoryPage() {
   const selectedStorageName =
     storageFilter === 'all'
       ? 'كل المخازن'
-      : storages.find((storage) => String(storage.id) === storageFilter)?.location ?? 'المخزن'
+      : storages.find((storage) => String(storage.id) === storageFilter)?.name ||
+        storages.find((storage) => String(storage.id) === storageFilter)?.location ||
+        'المخزن'
 
   const storageNameOf = useCallback(
     (storageId: number | null) => {
       if (storageId == null) return 'بدون مخزن'
-      return storages.find((s) => s.id === storageId)?.location ?? `مخزن #${storageId}`
+      const found = storages.find((s) => s.id === storageId)
+      return found?.name || found?.location || `مخزن #${storageId}`
     },
     [storages],
   )
@@ -607,7 +627,7 @@ export function InventoryPage() {
                   </TableCell>
                   <TableCell>
                     <span className="text-muted-foreground">
-                      {u.storage?.location ?? '—'}
+                      {storageNameOf(u.storageId) || u.storage?.location || '—'}
                     </span>
                   </TableCell>
                   <TableCell className="text-end font-semibold tabular-nums text-foreground">

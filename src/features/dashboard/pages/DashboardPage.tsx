@@ -165,7 +165,7 @@ export function DashboardPage() {
       tone: 'neutral',
     },
     {
-      label: 'الديون اليوم',
+      label: 'إجمالي المديونية',
       value: formatEgp(dashboard?.totalDebts ?? branchDetails?.totalDebts ?? 0),
       icon: Wallet,
       tone: 'warning',

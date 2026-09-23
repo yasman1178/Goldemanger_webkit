@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
+import { create } from 'zustand'
 import { fetchLiveGoldPrice } from '@/shared/lib/parties'
 import { useGoldStore } from '@/shared/stores/gold-store'
 
@@ -309,21 +310,34 @@ export function calculateSaghaPrices(
   }
 }
 
-/**
- * هوك مخصص لجلب وتحديث أسعار الصاغة المصرية لحظياً وبشكل مباشر دوماً.
- */
-export function useSaghaPrices() {
-  const storePrice21 = useGoldStore((s) => s.gold21)
-  const setStorePrice21 = useGoldStore((s) => s.setGold21)
-  const [data, setData] = useState<SaghaPriceData>(() =>
-    calculateSaghaPrices(storePrice21 > 0 ? storePrice21 : DEFAULT_21_SELL),
-  )
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+interface SaghaStoreState {
+  prices: SaghaPriceData
+  loading: boolean
+  error: string | null
+  setPrices: (prices: SaghaPriceData) => void
+  setLoading: (loading: boolean) => void
+  setError: (error: string | null) => void
+  refreshPrices: () => Promise<void>
+}
 
-  const refreshPrices = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+function getInitialSaghaPrices(): SaghaPriceData {
+  const storePrice21 = useGoldStore.getState().gold21
+  const storePrice21Buy = useGoldStore.getState().gold21Buy
+  return calculateSaghaPrices(
+    storePrice21 > 1000 ? storePrice21 : DEFAULT_21_SELL,
+    storePrice21Buy > 1000 ? storePrice21Buy : undefined,
+  )
+}
+
+export const useSaghaStore = create<SaghaStoreState>((set) => ({
+  prices: getInitialSaghaPrices(),
+  loading: false,
+  error: null,
+  setPrices: (prices) => set({ prices }),
+  setLoading: (loading) => set({ loading }),
+  setError: (error) => set({ error }),
+  refreshPrices: async () => {
+    set({ loading: true, error: null })
     try {
       const live = await fetchLiveGoldPrice('eg')
       if (live && live.gram21Sell > 1000) {
@@ -336,39 +350,78 @@ export function useSaghaPrices() {
           live.gram18Buy ?? undefined,
           live.source || 'سوق الصاغة المصري وشعبة الذهب',
         )
-        setData(calculated)
-        setStorePrice21(live.gram21Sell)
+        set({ prices: calculated, loading: false })
+        useGoldStore.getState().setGold21(live.gram21Sell)
+        if (live.gram21Buy && live.gram21Buy > 0) {
+          useGoldStore.getState().setGold21Buy(live.gram21Buy)
+        }
+        useGoldStore.getState().setLastFetchTime(
+          new Date().toLocaleString('ar-EG', { timeStyle: 'short' }),
+        )
       } else {
-        // إذا لم يرد السيرفر بقيمة، نستخدم القيمة المخزنة أو الافتراضية
-        const currentBase = storePrice21 > 1000 ? storePrice21 : DEFAULT_21_SELL
-        setData(calculateSaghaPrices(currentBase))
+        const base =
+          useGoldStore.getState().gold21 > 1000
+            ? useGoldStore.getState().gold21
+            : DEFAULT_21_SELL
+        const calculated = calculateSaghaPrices(base)
+        set({ prices: calculated, loading: false })
       }
     } catch {
-      const currentBase = storePrice21 > 1000 ? storePrice21 : DEFAULT_21_SELL
-      setData(calculateSaghaPrices(currentBase))
-      setError('جاري عرض أحدث أسعار الصاغة المسجلة')
-    } finally {
-      setLoading(false)
+      const base =
+        useGoldStore.getState().gold21 > 1000
+          ? useGoldStore.getState().gold21
+          : DEFAULT_21_SELL
+      set({
+        prices: calculateSaghaPrices(base),
+        loading: false,
+        error: 'جاري عرض أحدث أسعار الصاغة المسجلة',
+      })
     }
-  }, [storePrice21, setStorePrice21])
+  },
+}))
+
+// مزامنة فورية: عند تغير سعر الذهب في useGoldStore من أي مكان بالبرنامج يُعاد احتساب أسعار الصاغة وتحديثها تلقائياً
+useGoldStore.subscribe((state, prevState) => {
+  if (state.gold21 !== prevState.gold21 && state.gold21 > 1000) {
+    const current = useSaghaStore.getState().prices
+    if (Math.abs(current.gold21Sell - state.gold21) > 0.5) {
+      const recalculated = calculateSaghaPrices(
+        state.gold21,
+        state.gold21Buy || undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'تحديث أسعار الذهب المباشر',
+      )
+      useSaghaStore.getState().setPrices(recalculated)
+    }
+  }
+})
+
+let globalPollingTimer: ReturnType<typeof setInterval> | null = null
+
+/**
+ * هوك مخصص لجلب وتحديث أسعار الصاغة المصرية لحظياً وبشكل مباشر وموحد بين أول الصفحة وآخرها دوماً.
+ */
+export function useSaghaPrices() {
+  const prices = useSaghaStore((s) => s.prices)
+  const loading = useSaghaStore((s) => s.loading)
+  const error = useSaghaStore((s) => s.error)
+  const refreshPrices = useSaghaStore((s) => s.refreshPrices)
 
   useEffect(() => {
-    // تشغيل التحديث الأولي وتكرار الجلب كل دقيقة
-    const timer = setTimeout(() => {
-      void refreshPrices()
-    }, 0)
-    const interval = setInterval(() => {
-      void refreshPrices()
-    }, 60_000)
-
-    return () => {
-      clearTimeout(timer)
-      clearInterval(interval)
+    // تشغيل التحديث الأولي والجدولة الدورية التلقائية كل دقيقة مرة واحدة لكامل التطبيق
+    if (!globalPollingTimer) {
+      void useSaghaStore.getState().refreshPrices()
+      globalPollingTimer = setInterval(() => {
+        void useSaghaStore.getState().refreshPrices()
+      }, 60_000)
     }
-  }, [refreshPrices])
+  }, [])
 
   return {
-    prices: data,
+    prices,
     loading,
     error,
     refreshPrices,
