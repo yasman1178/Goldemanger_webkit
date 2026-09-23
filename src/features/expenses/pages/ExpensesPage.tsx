@@ -153,7 +153,7 @@ export function ExpensesPage() {
             <DialogDescription>يُخصم المبلغ من الخزينة فوراً.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="p-5 sm:p-6 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="exp-amount">المبلغ</Label>
               <Input

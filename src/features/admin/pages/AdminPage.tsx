@@ -254,7 +254,7 @@ function OwnerDialog({
             الحساب يُنشأ بدون شركة أو فرع. صاحب المحل ينشئ بياناتهما عند أول دخول.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="p-5 sm:p-6 space-y-4">
           <Label>الاسم الكامل</Label>
           <Input value={fullName} onChange={(e) => setFullName(e.target.value)} className="h-11 rounded-[14px] touch-target" />
           <Label>رقم الهاتف</Label>
@@ -887,7 +887,7 @@ function ExtendDialog({
             يمدد كل الفروع. إذا انتهى الاشتراك يُمدد من اليوم، وإلا يُضاف لأبعد تاريخ انتهاء.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="p-5 sm:p-6 space-y-4">
           <div className="space-y-1.5">
             <Label className="text-[13px] font-semibold">عدد الأيام</Label>
             <Input
@@ -991,7 +991,7 @@ function AddBranchDialog({
             الفرع الجديد يحصل تلقائيًا على اشتراك يطابق أبعد تاريخ انتهاء للشركة.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="p-5 sm:p-6 space-y-4">
           <div className="space-y-1.5">
             <Label className="text-[13px] font-semibold">اسم الفرع</Label>
             <Input
@@ -1179,7 +1179,7 @@ function EmployeeDialog({
             مدير النظام يمكنه إنشاء/تعديل أي دور: Owner / Manager / Sale / Responsible.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="p-5 sm:p-6 space-y-4">
           <div className="space-y-1.5">
             <Label className="text-[13px] font-semibold">الاسم الكامل</Label>
             <Input

@@ -73,7 +73,8 @@ export function InventoryReceiptPrint({
           <DialogTitle>برنت جرد المخزن</DialogTitle>
         </DialogHeader>
 
-        <div className="receipt-print flex justify-center py-2">
+        <div className="p-5 sm:p-6 space-y-4">
+          <div className="receipt-print flex justify-center py-2">
           <div className="receipt-paper p-2">
             <div className="text-center">
               <p className="text-[13px] font-bold">GOLD POS</p>
@@ -159,23 +160,24 @@ export function InventoryReceiptPrint({
           </div>
         </div>
 
-        <div className="flex gap-2 receipt-no-print">
-          <Button
-            type="button"
-            onClick={() => window.print()}
-            className="h-11 flex-1 gap-2 rounded-full touch-target"
-          >
-            <Printer className="size-4" />
-            طباعة
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="h-11 rounded-full touch-target"
-          >
-            إغلاق
-          </Button>
+          <div className="flex gap-2 receipt-no-print">
+            <Button
+              type="button"
+              onClick={() => window.print()}
+              className="h-11 flex-1 gap-2 rounded-full touch-target"
+            >
+              <Printer className="size-4" />
+              طباعة
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="h-11 rounded-full touch-target"
+            >
+              إغلاق
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

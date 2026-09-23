@@ -242,7 +242,7 @@ function PieceForm({
           </div>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="p-5 sm:p-6 space-y-4">
           <div className="space-y-2 rounded-[14px] border border-primary/25 bg-primary/[0.04] p-3">
             <Label className="text-[13px] font-semibold">اسم القطعة *</Label>
             <button
@@ -579,7 +579,7 @@ function PieceForm({
                 اختر الصنف من القائمة أو اكتب اسم القطعة مباشرة.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
+            <div className="p-5 sm:p-6 space-y-3">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {JEWELRY_ITEM_NAMES.map((name) => {
                   const selected = draft.productName === name

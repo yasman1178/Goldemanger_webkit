@@ -129,7 +129,7 @@ export function StoragePicker({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="p-5 sm:p-6 space-y-3">
             {allowAll && (
               <button
                 type="button"

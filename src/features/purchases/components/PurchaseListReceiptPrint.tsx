@@ -99,7 +99,8 @@ export function PurchaseListReceiptPrint({ open, onOpenChange, title, purchases 
           <DialogTitle>سجل فواتير الشراء — طباعة</DialogTitle>
         </DialogHeader>
 
-        <div className="receipt-print mx-auto w-full">
+        <div className="p-5 sm:p-6 space-y-4">
+          <div className="receipt-print mx-auto w-full">
           <div className="receipt-paper rounded-sm p-2 shadow-sm">
             <div className="text-center">
               <p className="text-[13px] font-bold">{shopName}</p>
@@ -234,23 +235,24 @@ export function PurchaseListReceiptPrint({ open, onOpenChange, title, purchases 
           </div>
         </div>
 
-        <div className="mt-3 flex gap-2 receipt-no-print">
-          <Button
-            type="button"
-            onClick={() => window.print()}
-            className="h-11 flex-1 gap-2 rounded-full touch-target"
-          >
-            <Printer className="size-4" />
-            طباعة
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="h-11 flex-1 rounded-full touch-target"
-          >
-            إغلاق
-          </Button>
+          <div className="mt-3 flex gap-2 receipt-no-print">
+            <Button
+              type="button"
+              onClick={() => window.print()}
+              className="h-11 flex-1 gap-2 rounded-full touch-target"
+            >
+              <Printer className="size-4" />
+              طباعة
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="h-11 flex-1 rounded-full touch-target"
+            >
+              إغلاق
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

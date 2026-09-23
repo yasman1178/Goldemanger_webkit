@@ -165,7 +165,7 @@ export function PaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] gap-2 overflow-y-auto p-2 sm:max-w-[26rem]">
+      <DialogContent className="max-h-[min(92vh,780px)] gap-3.5 overflow-y-auto p-5 sm:p-6 sm:max-w-[28rem]">
         <DialogHeader>
           <DialogTitle>{isCompletion ? 'إتمام البيع المعلّق' : 'إتمام البيع'}</DialogTitle>
           <DialogDescription>
@@ -416,7 +416,7 @@ function CustomerPicker({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2">
+          <div className="p-5 sm:p-6 space-y-2">
             {adding ? (
               <div className="space-y-3 rounded-2xl bg-black/5 p-4">
                 <div className="space-y-1.5">

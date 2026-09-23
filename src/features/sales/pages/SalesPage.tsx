@@ -526,26 +526,28 @@ function CancelSaleDialog({
             إلغاء الفاتورة؟
           </DialogTitle>
         </DialogHeader>
-        <p className="text-[15px] text-muted-foreground">
-          سيتم حذف كل القطع المضافة من الفاتورة الحالية.
-        </p>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="h-11 flex-1 rounded-full touch-target"
-          >
-            متابعة البيع
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onConfirm}
-            className="h-11 flex-1 rounded-full touch-target"
-          >
-            إلغاء الفاتورة
-          </Button>
+        <div className="p-5 sm:p-6 space-y-4">
+          <p className="text-[15px] text-muted-foreground">
+            سيتم حذف كل القطع المضافة من الفاتورة الحالية.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="h-11 flex-1 rounded-full touch-target"
+            >
+              متابعة البيع
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={onConfirm}
+              className="h-11 flex-1 rounded-full touch-target"
+            >
+              إلغاء الفاتورة
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -570,27 +572,29 @@ function CancelHeldDialog({
             إلغاء فاتورة معلّقة؟
           </DialogTitle>
         </DialogHeader>
-        <p className="text-[15px] leading-relaxed text-muted-foreground">
-          {sale ? `سيتم تحرير قطع فاتورة #${sale.saleId} (${formatNumber(sale.heldGrams)} جم/21)
-          والعودة للمخزون المتاح، وحذف المديونية الذهبية للعميل.` : ''}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="h-11 flex-1 rounded-full touch-target"
-          >
-            تراجع
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onConfirm}
-            className="h-11 flex-1 rounded-full touch-target"
-          >
-            إلغاء وإرجاع القطع
-          </Button>
+        <div className="p-5 sm:p-6 space-y-4">
+          <p className="text-[15px] leading-relaxed text-muted-foreground">
+            {sale ? `سيتم تحرير قطع فاتورة #${sale.saleId} (${formatNumber(sale.heldGrams)} جم/21)
+            والعودة للمخزون المتاح، وحذف المديونية الذهبية للعميل.` : ''}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="h-11 flex-1 rounded-full touch-target"
+            >
+              تراجع
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={onConfirm}
+              className="h-11 flex-1 rounded-full touch-target"
+            >
+              إلغاء وإرجاع القطع
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -616,26 +620,28 @@ function UnsavedSaleDialog({
             لديك عملية بيع غير مكتملة
           </DialogTitle>
         </DialogHeader>
-        <p className="text-[15px] text-muted-foreground">
-          لديك قطع غير محفوظة في الفاتورة. هل تريد الخروج دون حفظها؟
-        </p>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onContinue}
-            className="h-11 flex-1 rounded-full touch-target"
-          >
-            متابعة البيع
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onDiscard}
-            className="h-11 flex-1 rounded-full touch-target"
-          >
-            تجاهل الفاتورة
-          </Button>
+        <div className="p-5 sm:p-6 space-y-4">
+          <p className="text-[15px] text-muted-foreground">
+            لديك قطع غير محفوظة في الفاتورة. هل تريد الخروج دون حفظها؟
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onContinue}
+              className="h-11 flex-1 rounded-full touch-target"
+            >
+              متابعة البيع
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={onDiscard}
+              className="h-11 flex-1 rounded-full touch-target"
+            >
+              تجاهل الفاتورة
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

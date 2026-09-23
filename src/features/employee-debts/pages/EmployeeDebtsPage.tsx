@@ -287,7 +287,7 @@ export function EmployeeDebtsPage() {
             <DialogDescription>تُخصم قيمة السلفة من الخزينة فوراً.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="p-5 sm:p-6 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="ed-employee">الموظف</Label>
               <Select value={employeeId} onValueChange={setEmployeeId}>

@@ -110,7 +110,7 @@ function ProductDetail({
           <DialogTitle>{product?.productName ?? 'تفاصيل المنتج'}</DialogTitle>
           <DialogDescription>تفاصيل رصيد المنتج في الجرد.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2.5 text-[15px]">
+        <div className="p-5 sm:p-6 space-y-2.5 text-[15px]">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">العدد</span>
             <span className="font-semibold tabular-nums text-foreground">

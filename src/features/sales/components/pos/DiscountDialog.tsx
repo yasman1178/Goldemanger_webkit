@@ -47,49 +47,51 @@ export function DiscountDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {discount > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              onClear()
-              onOpenChange(false)
-            }}
-            className="flex h-12 w-full touch-target items-center justify-between rounded-[14px] border border-black/10 bg-success/10 px-4 text-[15px] text-success"
-          >
-            <span>الخصم الحالي: <FormatEg value={discount} /> {currencySymbol(currency)} — إزالته</span>
-            <span className="text-[13px] underline">إزالة</span>
-          </button>
-        )}
-
-        <div className="space-y-2 rounded-2xl border-2 border-primary/30 bg-primary/5 p-3 shadow-[0_8px_24px_rgba(37,99,235,0.12)]">
-          <Label
-            htmlFor="discount"
-            className="flex items-center gap-2 text-[15px] font-bold text-primary"
-          >
-            <span className="flex size-8 items-center justify-center rounded-full bg-primary text-white">
-              <Tag className="size-4" />
-            </span>
-            قيمة الخصم
-          </Label>
-          <input
-            id="discount"
-            type="number"
-            min="0"
-            step="any"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="0.00"
-            autoFocus
-            className={cn(
-              'h-14 w-full touch-target rounded-xl border-2 bg-white px-4 text-[22px] font-bold tabular-nums text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/25',
-              valid ? 'border-primary shadow-[0_0_0_3px_rgba(37,99,235,0.12)]' : 'border-primary/40',
-            )}
-          />
-          {!valid && entered > 0 && (
-            <p className="text-[13px] text-error">
-              الخصم لا يتجاوز إجمالي المصنعية ({formatNumber(maxMaking)} {currencySymbol(currency)})
-            </p>
+        <div className="p-5 sm:p-6 space-y-3">
+          {discount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                onClear()
+                onOpenChange(false)
+              }}
+              className="flex h-12 w-full touch-target items-center justify-between rounded-[14px] border border-black/10 bg-success/10 px-4 text-[15px] text-success"
+            >
+              <span>الخصم الحالي: <FormatEg value={discount} /> {currencySymbol(currency)} — إزالته</span>
+              <span className="text-[13px] underline">إزالة</span>
+            </button>
           )}
+
+          <div className="space-y-2 rounded-2xl border-2 border-primary/30 bg-primary/5 p-3 shadow-[0_8px_24px_rgba(37,99,235,0.12)]">
+            <Label
+              htmlFor="discount"
+              className="flex items-center gap-2 text-[15px] font-bold text-primary"
+            >
+              <span className="flex size-8 items-center justify-center rounded-full bg-primary text-white">
+                <Tag className="size-4" />
+              </span>
+              قيمة الخصم
+            </Label>
+            <input
+              id="discount"
+              type="number"
+              min="0"
+              step="any"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="0.00"
+              autoFocus
+              className={cn(
+                'h-14 w-full touch-target rounded-xl border-2 bg-white px-4 text-[22px] font-bold tabular-nums text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/25',
+                valid ? 'border-primary shadow-[0_0_0_3px_rgba(37,99,235,0.12)]' : 'border-primary/40',
+              )}
+            />
+            {!valid && entered > 0 && (
+              <p className="text-[13px] text-error">
+                الخصم لا يتجاوز إجمالي المصنعية ({formatNumber(maxMaking)} {currencySymbol(currency)})
+              </p>
+            )}
+          </div>
         </div>
 
         <DialogFooter>

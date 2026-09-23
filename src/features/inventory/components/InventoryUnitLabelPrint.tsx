@@ -28,7 +28,7 @@ export function InventoryUnitLabelPrint({ unit, onClose }: Props) {
         </DialogHeader>
 
         {unit && (
-          <>
+          <div className="p-5 sm:p-6 space-y-4">
             <div className="receipt-label-print flex justify-center py-2">
               <div
                 className="receipt-label rounded-md border border-black/30 p-1 text-center"
@@ -82,7 +82,7 @@ export function InventoryUnitLabelPrint({ unit, onClose }: Props) {
                 إغلاق
               </Button>
             </div>
-          </>
+          </div>
         )}
       </DialogContent>
     </Dialog>

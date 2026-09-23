@@ -143,7 +143,7 @@ export function InventoryUnitActions({ unit, onPrint }: Props) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="p-5 sm:p-6 space-y-3">
             <div className="flex items-center justify-between rounded-xl bg-muted px-3 py-2 text-[14px]">
               <span className="text-muted-foreground">المخزن الحالي</span>
               <span className="font-semibold text-foreground">
@@ -222,7 +222,7 @@ export function InventoryUnitActions({ unit, onPrint }: Props) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="p-5 sm:p-6 space-y-3">
             <div className="flex items-center justify-between rounded-xl bg-muted px-3 py-2 text-[14px]">
               <span className="text-muted-foreground">الموقع المتوقع</span>
               <span className="font-semibold text-foreground">

@@ -165,8 +165,25 @@ function DialogDescription({
   )
 }
 
+function DialogBody({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-body"
+      className={cn(
+        "flex-1 overflow-y-auto px-6 py-4 sm:px-7 sm:py-5",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
 export {
   Dialog,
+  DialogBody,
   DialogClose,
   DialogContent,
   DialogDescription,

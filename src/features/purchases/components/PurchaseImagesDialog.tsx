@@ -61,78 +61,80 @@ export function PurchaseImagesDialog({ purchaseId, legacyImages = [], onClose }:
           </DialogTitle>
         </DialogHeader>
 
-        {purchaseId == null ? null : isLoading ? (
-          <div className="grid grid-cols-2 gap-2">
-            <Skeleton className="h-48 rounded-xl" />
-            <Skeleton className="h-48 rounded-xl" />
-          </div>
-        ) : hasDbDocs ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {docs!.map((doc) => (
-                <figure
-                  key={doc.kindValue}
-                  className="overflow-hidden rounded-xl border border-black/10 bg-white"
-                >
-                  <img
-                    src={doc.dataUrl}
-                    alt={KIND_LABEL[doc.kindValue] ?? doc.kind}
-                    loading="lazy"
-                    className="h-64 w-full object-contain bg-black/5"
-                  />
-                  <figcaption className="flex items-center justify-between p-2 text-[12px]">
-                    <span className="font-semibold">
-                      {KIND_LABEL[doc.kindValue] ?? doc.kind}
-                    </span>
-                    <span className="text-muted-foreground tabular-nums">
-                      {(doc.sizeBytes / 1024).toFixed(0)}KB
-                    </span>
-                  </figcaption>
-                </figure>
-              ))}
+        <div className="p-5 sm:p-6 space-y-4">
+          {purchaseId == null ? null : isLoading ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Skeleton className="h-48 rounded-xl" />
+              <Skeleton className="h-48 rounded-xl" />
             </div>
-            <Button
-              type="button"
-              onClick={handlePdf}
-              disabled={pdfLoading}
-              className="w-full gap-2 rounded-full touch-target"
-            >
-              <FileDown className="size-4" />
-              {pdfLoading ? 'جارٍ تجهيز PDF...' : 'تصدير الصور PDF'}
-            </Button>
-          </div>
-        ) : legacyImages.length > 0 ? (
-          <div className="space-y-3">
-            <p className="text-[13px] text-muted-foreground">
-              صور أرشيفية (URL قديم للقراءة فقط) — الفواتير الجديدة تُخزن مضغوطة في قاعدة البيانات.
-            </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {legacyImages.map((img) => {
-                const url = img.path.startsWith('http')
-                  ? img.path
-                  : `${getApiBaseUrl()}${img.path}`
-                return (
+          ) : hasDbDocs ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {docs!.map((doc) => (
                   <figure
-                    key={img.path}
+                    key={doc.kindValue}
                     className="overflow-hidden rounded-xl border border-black/10 bg-white"
                   >
                     <img
-                      src={url}
-                      alt={img.label}
+                      src={doc.dataUrl}
+                      alt={KIND_LABEL[doc.kindValue] ?? doc.kind}
                       loading="lazy"
                       className="h-64 w-full object-contain bg-black/5"
                     />
-                    <figcaption className="p-2 text-[12px] font-semibold">{img.label}</figcaption>
+                    <figcaption className="flex items-center justify-between p-2 text-[12px]">
+                      <span className="font-semibold">
+                        {KIND_LABEL[doc.kindValue] ?? doc.kind}
+                      </span>
+                      <span className="text-muted-foreground tabular-nums">
+                        {(doc.sizeBytes / 1024).toFixed(0)}KB
+                      </span>
+                    </figcaption>
                   </figure>
-                )
-              })}
+                ))}
+              </div>
+              <Button
+                type="button"
+                onClick={handlePdf}
+                disabled={pdfLoading}
+                className="w-full gap-2 rounded-full touch-target"
+              >
+                <FileDown className="size-4" />
+                {pdfLoading ? 'جارٍ تجهيز PDF...' : 'تصدير الصور PDF'}
+              </Button>
             </div>
-          </div>
-        ) : (
-          <p className="py-8 text-center text-[14px] text-muted-foreground">
-            لا توجد صور مخزنة لهذه الفاتورة.
-          </p>
-        )}
+          ) : legacyImages.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-[13px] text-muted-foreground">
+                صور أرشيفية (URL قديم للقراءة فقط) — الفواتير الجديدة تُخزن مضغوطة في قاعدة البيانات.
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {legacyImages.map((img) => {
+                  const url = img.path.startsWith('http')
+                    ? img.path
+                    : `${getApiBaseUrl()}${img.path}`
+                  return (
+                    <figure
+                      key={img.path}
+                      className="overflow-hidden rounded-xl border border-black/10 bg-white"
+                    >
+                      <img
+                        src={url}
+                        alt={img.label}
+                        loading="lazy"
+                        className="h-64 w-full object-contain bg-black/5"
+                      />
+                      <figcaption className="p-2 text-[12px] font-semibold">{img.label}</figcaption>
+                    </figure>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <p className="py-8 text-center text-[14px] text-muted-foreground">
+              لا توجد صور مخزنة لهذه الفاتورة.
+            </p>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )

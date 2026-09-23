@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Search,
   X,
@@ -474,7 +474,7 @@ function CategoryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <div className="p-5 sm:p-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {categories.map(({ key, label, icon: Icon }) => {
             const active = value === key
             return (
@@ -551,7 +551,7 @@ function ProductQuickView({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2.5 text-[15px]">
+        <div className="p-5 sm:p-6 space-y-2.5 text-[15px]">
           {product?.primaryImageUrl ? (
             <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-2xl bg-secondary">
               <img

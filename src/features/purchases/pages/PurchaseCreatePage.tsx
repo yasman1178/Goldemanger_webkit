@@ -478,9 +478,7 @@ return createPurchase({
   }
 
   function removeLine(key: number) {
-    setLines((prev) =>
-      prev.length > 1 ? prev.filter((l) => l.key !== key) : prev,
-    )
+    setLines((prev) => prev.filter((l) => l.key !== key))
   }
 
   function addExchangeFromUnit(unit: InventoryUnitRecord) {
@@ -1236,38 +1234,40 @@ byKarat.map((row) => (
             </DialogDescription>
           </DialogHeader>
 
-          {productsLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 rounded-xl" />
-              <Skeleton className="h-12 rounded-xl" />
-              <Skeleton className="h-12 rounded-xl" />
-            </div>
-          ) : products.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">
-              لا توجد تعريفات منتجات بعد — أنشئها من صفحة المنتجات أولاً.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {products.map((p) => (
-                <button
-                  key={p.productId}
-                  type="button"
-                  onClick={() => pickProduct(p)}
-                  className="flex w-full items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white p-3 text-start transition-colors hover:border-primary/40 hover:bg-primary/5 touch-target"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-[15px] font-semibold text-foreground">
-                      {p.productName}
-                    </p>
-                    <p className="text-[13px] text-muted-foreground">
-                      عيار {p.karat}k • وزن {formatNumber(p.weight)} gm
-                    </p>
-                  </div>
-                  <Plus className="size-5 shrink-0 text-primary" />
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="p-5 sm:p-6 space-y-2">
+            {productsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 rounded-xl" />
+                <Skeleton className="h-12 rounded-xl" />
+                <Skeleton className="h-12 rounded-xl" />
+              </div>
+            ) : products.length === 0 ? (
+              <p className="py-8 text-center text-muted-foreground">
+                لا توجد تعريفات منتجات بعد — أنشئها من صفحة المنتجات أولاً.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {products.map((p) => (
+                  <button
+                    key={p.productId}
+                    type="button"
+                    onClick={() => pickProduct(p)}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white p-3 text-start transition-colors hover:border-primary/40 hover:bg-primary/5 touch-target"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] font-semibold text-foreground">
+                        {p.productName}
+                      </p>
+                      <p className="text-[13px] text-muted-foreground">
+                        عيار {p.karat}k • وزن {formatNumber(p.weight)} gm
+                      </p>
+                    </div>
+                    <Plus className="size-5 shrink-0 text-primary" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1282,7 +1282,7 @@ byKarat.map((row) => (
               أنشئ العميل في سجلات المحل ثم سيُختار تلقائياً في هذه الفاتورة.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="p-5 sm:p-6 space-y-3">
             <div className="space-y-1">
               <Label className="text-[13px]">اسم العميل *</Label>
               <Input
@@ -1357,12 +1357,14 @@ byKarat.map((row) => (
             </DialogDescription>
           </DialogHeader>
           {previewPiece?.imageLink && (
-            <div className="overflow-hidden rounded-2xl border border-black/10 bg-black/5">
-              <img
-                src={previewPiece.imageLink}
-                alt={previewPiece.productName}
-                className="max-h-[65vh] w-full object-contain"
-              />
+            <div className="p-5 sm:p-6 pt-0">
+              <div className="overflow-hidden rounded-2xl border border-black/10 bg-black/5">
+                <img
+                  src={previewPiece.imageLink}
+                  alt={previewPiece.productName}
+                  className="max-h-[65vh] w-full object-contain"
+                />
+              </div>
             </div>
           )}
         </DialogContent>

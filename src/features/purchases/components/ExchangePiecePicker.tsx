@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback } from 'react'
 import {
   ArrowLeftRight,
   Boxes,
-  Check,
   CheckCheck,
   Package,
   Plus,
@@ -25,14 +24,10 @@ function round3(value: number): number {
   return Math.round(value * 1000) / 1000
 }
 
-/** مرجع ثابت لقائمة فارغة — يمنع انهيار المقارنة عند وصول prop غير مصفوفة. */
-const EMPTY_UNITS: InventoryUnitRecord[] = []
-
 export interface ExchangePiecePickerProps {
   storages: StorageOption[]
-  selectedStorage: string
-  onStorageChange: (value: string) => void
-  /** كل وحدات الجرد في الفرع — تُفلتر حسب المخزن المختار أو تعرض من كل المخازن. */
+  selectedStorage?: string
+  onStorageChange: (storageId: string) => void
   units: InventoryUnitRecord[]
   exchanges: GoldExchangeLine[]
   onAdd: (unit: InventoryUnitRecord) => void
@@ -42,10 +37,6 @@ export interface ExchangePiecePickerProps {
   className?: string
 }
 
-/**
- * اختيار قطع للاستبدال من مخزن مختار أو من كل المخازن:
- * تدعم اختيار الكل واختيار قطع من أكثر من مخزن في نفس الوقت.
- */
 export function ExchangePiecePicker({
   storages,
   selectedStorage,
@@ -59,49 +50,28 @@ export function ExchangePiecePicker({
   className,
 }: ExchangePiecePickerProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const safeUnits = Array.isArray(units) ? units : EMPTY_UNITS
 
-  const isAllStorages = !selectedStorage || selectedStorage === 'all'
-  const targetStorageId = Number(selectedStorage)
+  const safeUnits = useMemo(() => (Array.isArray(units) ? units : []), [units])
+
+  const targetStorageId = useMemo(() => {
+    if (!selectedStorage || selectedStorage === 'all') return null
+    const n = Number(selectedStorage)
+    return Number.isFinite(n) ? n : null
+  }, [selectedStorage])
+
+  const isAllStorages = targetStorageId == null
 
   const storageName = useCallback(
-    (id: number | string | undefined | null) => {
-      if (id == null) return 'بدون مخزن'
-      const n = Number(id)
-      const found = storages.find((s) => s.id === n)
-      return found?.name || found?.location || `مخزن #${n}`
+    (storageId: number | null | undefined): string => {
+      if (storageId == null) return 'بدون مخزن'
+      const found = storages.find((s) => s.id === storageId)
+      return found?.name || found?.location || `مخزن #${storageId}`
     },
     [storages],
   )
 
-  const availableUnits = useMemo(() => {
-    return safeUnits
-      .filter((u) => {
-        if (u.status !== 'AVAILABLE' || !(u.weight > 0)) return false
-        if (!isAllStorages && u.storageId !== targetStorageId) return false
-        return true
-      })
-      .sort((a, b) => {
-        const aScrap = a.products?.typegolde === 3 ? 1 : 0
-        const bScrap = b.products?.typegolde === 3 ? 1 : 0
-        if (aScrap !== bScrap) return bScrap - aScrap
-        if (b.karat !== a.karat) return b.karat - a.karat
-        return (a.products?.productName ?? '').localeCompare(b.products?.productName ?? '')
-      })
-  }, [safeUnits, isAllStorages, targetStorageId])
-
-  const displayedUnits = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return availableUnits
-    return availableUnits.filter((u) => {
-      const name = (u.products?.productName ?? '').toLowerCase()
-      const karat = String(u.karat)
-      const stName = storageName(u.storageId).toLowerCase()
-      return name.includes(q) || karat.includes(q) || stName.includes(q)
-    })
-  }, [availableUnits, searchQuery, storages])
-
-  const alreadyAdded = useMemo(() => {
+  // مجموعة معرّفات القطع المختارة حالياً
+  const alreadyAddedUnitIds = useMemo(() => {
     const set = new Set<number>()
     for (const e of exchanges) {
       if (e.inventoryUnitId) set.add(e.inventoryUnitId)
@@ -109,14 +79,59 @@ export function ExchangePiecePicker({
     return set
   }, [exchanges])
 
-  const notAddedInView = useMemo(() => {
+  // خريطة للوصول السريع لمفتاح exchange بناءً على inventoryUnitId
+  const unitIdToExchangeKey = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const e of exchanges) {
+      if (e.inventoryUnitId) {
+        map.set(e.inventoryUnitId, e.key)
+      }
+    }
+    return map
+  }, [exchanges])
+
+  // القطع المتاحة في المخزن المختار (مع عرض القطع المختارة بأعلى القائمة)
+  const unitsInCurrentStorage = useMemo(() => {
+    return safeUnits
+      .filter((u) => {
+        if (u.status !== 'AVAILABLE' || !(u.weight > 0)) return false
+        if (!isAllStorages && u.storageId !== targetStorageId) return false
+        return true
+      })
+      .sort((a, b) => {
+        // نضع القطع المختارة أولاً لتكون بارزة
+        const aSelected = a.inventoryUnitId != null && alreadyAddedUnitIds.has(a.inventoryUnitId) ? 1 : 0
+        const bSelected = b.inventoryUnitId != null && alreadyAddedUnitIds.has(b.inventoryUnitId) ? 1 : 0
+        if (aSelected !== bSelected) return bSelected - aSelected
+
+        const aScrap = a.products?.typegolde === 3 ? 1 : 0
+        const bScrap = b.products?.typegolde === 3 ? 1 : 0
+        if (aScrap !== bScrap) return bScrap - aScrap
+        if (b.karat !== a.karat) return b.karat - a.karat
+        return (a.products?.productName ?? '').localeCompare(b.products?.productName ?? '')
+      })
+  }, [safeUnits, isAllStorages, targetStorageId, alreadyAddedUnitIds])
+
+  // تطبيق البحث على القطع
+  const displayedUnits = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return unitsInCurrentStorage
+    return unitsInCurrentStorage.filter((u) => {
+      const name = (u.products?.productName ?? '').toLowerCase()
+      const karat = String(u.karat)
+      const stName = storageName(u.storageId).toLowerCase()
+      return name.includes(q) || karat.includes(q) || stName.includes(q)
+    })
+  }, [unitsInCurrentStorage, searchQuery, storageName])
+
+  // القطع غير المختارة بعد من بين المعروضة (لتحديد الكل)
+  const unselectedDisplayedUnits = useMemo(() => {
     return displayedUnits.filter(
-      (u) => u.inventoryUnitId != null && !alreadyAdded.has(u.inventoryUnitId),
+      (u) => u.inventoryUnitId != null && !alreadyAddedUnitIds.has(u.inventoryUnitId),
     )
-  }, [displayedUnits, alreadyAdded])
+  }, [displayedUnits, alreadyAddedUnitIds])
 
-  const allInViewAdded = displayedUnits.length > 0 && notAddedInView.length === 0
-
+  // إجمالي وزن الذهب معادل 21 للقطع المختارة
   const input21 = useMemo(
     () =>
       round3(
@@ -130,111 +145,173 @@ export function ExchangePiecePicker({
     [exchanges],
   )
 
-  const distinctStoragesCount = useMemo(() => {
-    const s = new Set<string>()
+  // إجمالي الوزن الفعلي للقطع المختارة
+  const totalWeight = useMemo(
+    () =>
+      round3(
+        exchanges.reduce((sum, e) => {
+          const weight = amountToNumber(e.weight)
+          return sum + (weight > 0 ? weight : 0)
+        }, 0),
+      ),
+    [exchanges],
+  )
+
+  // عدد المخازن المختلفة التي جرى الاختيار منها
+  const distinctStorages = useMemo(() => {
+    const map = new Map<string, string>()
     for (const e of exchanges) {
-      if (e.storageId) s.add(String(e.storageId))
+      if (e.storageId) {
+        map.set(String(e.storageId), storageName(Number(e.storageId)))
+      }
     }
-    return s.size
-  }, [exchanges])
+    return Array.from(map.values())
+  }, [exchanges, storageName])
 
   function handleSelectAll() {
-    if (notAddedInView.length === 0) return
+    if (unselectedDisplayedUnits.length === 0) return
     if (onAddAll) {
-      onAddAll(notAddedInView)
+      onAddAll(unselectedDisplayedUnits)
     } else {
-      notAddedInView.forEach((u) => onAdd(u))
+      unselectedDisplayedUnits.forEach((u) => onAdd(u))
     }
   }
 
-  function handleRemoveAllInView() {
-    const viewUnitIds = new Set(displayedUnits.map((u) => u.inventoryUnitId).filter(Boolean))
-    const toRemove = exchanges.filter(
-      (e) => e.inventoryUnitId && viewUnitIds.has(e.inventoryUnitId),
-    )
-    toRemove.forEach((e) => onRemove(e.key))
+  function handleClearAll() {
+    if (onClearAll) {
+      onClearAll()
+    } else {
+      exchanges.forEach((e) => onRemove(e.key))
+    }
   }
 
+  function handleRemoveByUnit(unit: InventoryUnitRecord) {
+    if (unit.inventoryUnitId == null) return
+    const key = unitIdToExchangeKey.get(unit.inventoryUnitId)
+    if (key != null) {
+      onRemove(key)
+    }
+  }
+
+  const currentStorageLabel = isAllStorages
+    ? 'كل المخازن'
+    : storageName(targetStorageId)
+
   return (
-    <div className={cn('space-y-3 rounded-2xl border border-black/10 bg-white p-3', className)}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-[14px] font-bold text-foreground">
-          <ArrowLeftRight className="size-4 text-primary" />
-          رصيد الاستبدال (استبدال ذهب)
-        </span>
-        <span className="text-[11px] text-muted-foreground">
-          يمكنك اختيار قطع من أكثر من مخزن
-        </span>
+    <div className={cn('space-y-3.5 rounded-2xl border border-black/10 bg-white p-4 elevation-card', className)}>
+      {/* Header Bar with Summary & Clear Button */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <ArrowLeftRight className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-[15px] font-bold text-foreground">
+              القطع المختارة للاستبدال
+            </h3>
+            <p className="text-[11px] text-muted-foreground">
+              يمكنك اختيار قطع من أكثر من مخزن — تغيير المخزن لا يحذف ما تم اختياره
+            </p>
+          </div>
+        </div>
+
+        {exchanges.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleClearAll}
+              className="h-8 gap-1.5 rounded-full border-error/30 text-error hover:bg-error/10 hover:text-error touch-target font-bold"
+              title="مسح كافة القطع المضافة للاستبدال"
+            >
+              <Trash2 className="size-3.5" />
+              <span>مسح القطع المضافة ({exchanges.length})</span>
+            </Button>
+          </div>
+        )}
       </div>
 
-      <div className="space-y-1">
-        <Label className="text-[13px] font-semibold">مخزن الاستبدال</Label>
-        <p className="text-[11px] text-muted-foreground">
-          اختر «كل المخازن» لاختيار قطع من مخازن متعددة، أو حدّد مخزناً بعينه.
-        </p>
+      {/* Summary Chips */}
+      {exchanges.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/[0.04] px-3.5 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-primary px-2.5 py-0.5 text-[12px] font-bold text-white tabular-nums">
+              {exchanges.length} قطع مختارة
+            </span>
+            <span className="text-[12px] font-semibold text-foreground tabular-nums">
+              الوزن: <span className="font-bold text-primary">{formatNumber(totalWeight)} جم</span>
+            </span>
+            <span className="text-[12px] font-semibold text-foreground tabular-nums">
+              (معادل 21: <span className="font-bold text-amber-600">{formatNumber(input21)} جم</span>)
+            </span>
+          </div>
+
+          {distinctStorages.length > 1 && (
+            <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-semibold text-foreground">
+              من {distinctStorages.length} مخازن ({distinctStorages.join('، ')})
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Storage Filter Selector */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label className="text-[13px] font-semibold text-foreground">
+            تصفية بالمخزن:
+          </Label>
+          <span className="text-[11px] text-muted-foreground">
+            تغيير المخزن لا يحذف القطع المختارة
+          </span>
+        </div>
         <StoragePicker
           value={selectedStorage || 'all'}
           storages={storages}
           onChange={onStorageChange}
           allowAll={true}
-          allLabel="كل المخازن (اختيار حر من كل المخازن)"
+          allLabel="كل المخازن (عرض المتاح في جميع المخازن)"
           allowCreate={false}
           placeholder="اختر المخزن"
           triggerClassName="w-full h-11 rounded-[14px] border border-black/10 bg-white text-[14px] font-medium text-foreground"
         />
       </div>
 
-      <div className="space-y-2">
+      {/* Pieces List Section */}
+      <div className="space-y-2 pt-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Label className="text-[13px] font-bold text-foreground">
-              القطع المتاحة للاستبدال ({availableUnits.length})
+              القطع المختارة والمتاحة ({unitsInCurrentStorage.length})
             </Label>
-            {isAllStorages && (
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                من كل المخازن
-              </span>
-            )}
+            <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-semibold text-foreground">
+              {currentStorageLabel}
+            </span>
           </div>
 
-          {displayedUnits.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              {!allInViewAdded ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSelectAll}
-                  className="h-8 gap-1 rounded-full border-primary/30 bg-primary/5 px-3 text-[11px] font-bold text-primary hover:bg-primary/10 touch-target"
-                  title="إضافة كل القطع المتاحة حالياً للاستبدال"
-                >
-                  <CheckCheck className="size-3.5" />
-                  <span>تحديد الكل ({notAddedInView.length})</span>
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRemoveAllInView}
-                  className="h-8 gap-1 rounded-full px-2.5 text-[11px] font-semibold text-muted-foreground hover:text-error touch-target"
-                  title="إلغاء تحديد كل القطع المعروضة"
-                >
-                  <X className="size-3.5" />
-                  <span>إلغاء تحديد الكل</span>
-                </Button>
-              )}
-            </div>
+          {unselectedDisplayedUnits.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAll}
+              className="h-8 gap-1 rounded-full border-primary/30 bg-primary/5 px-3 text-[11px] font-bold text-primary hover:bg-primary/10 touch-target"
+              title="إضافة كل القطع غير المختارة دفعة واحدة"
+            >
+              <CheckCheck className="size-3.5" />
+              <span>تحديد الكل ({unselectedDisplayedUnits.length})</span>
+            </Button>
           )}
         </div>
 
-        {availableUnits.length > 5 && (
+        {/* Search */}
+        {unitsInCurrentStorage.length > 3 && (
           <div className="relative">
             <Search className="absolute start-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث بالاسم أو العيار أو المخزن..."
+              placeholder={`ابحث بالاسم أو العيار أو المخزن...`}
               className="h-9 rounded-xl ps-8 pe-8 text-[12px]"
             />
             {searchQuery && (
@@ -249,50 +326,56 @@ export function ExchangePiecePicker({
           </div>
         )}
 
-        {availableUnits.length === 0 ? (
-          <p className="rounded-xl bg-black/5 px-3 py-2.5 text-[12px] text-muted-foreground">
-            لا توجد قطع متاحة للاستبدال{' '}
-            {!isAllStorages ? `في ${storageName(targetStorageId)}` : 'في المخازن'}.
-            <span className="block text-[11px] opacity-80">
-              الوحدات بالفرع: {safeUnits.length} — تأكد أن حالتها «متاح» ووزنها أكبر من صفر.
-            </span>
-          </p>
+        {/* Units list */}
+        {unitsInCurrentStorage.length === 0 ? (
+          <div className="rounded-xl border border-black/5 bg-black/[0.02] p-4 text-center text-[13px] text-muted-foreground">
+            لا توجد قطع في <span className="font-semibold text-foreground">{currentStorageLabel}</span>.
+          </div>
         ) : displayedUnits.length === 0 ? (
-          <p className="rounded-xl bg-black/5 px-3 py-2 text-[12px] text-muted-foreground">
-            لا توجد نتائج تطابق بحثك.
+          <p className="rounded-xl bg-black/5 px-3 py-3 text-center text-[12px] text-muted-foreground">
+            لا توجد نتائج تطابق «{searchQuery}».
           </p>
         ) : (
-          <div className="max-h-60 space-y-1.5 overflow-y-auto pe-0.5">
+          <div className="max-h-72 space-y-2 overflow-y-auto pe-1">
             {displayedUnits.map((unit) => {
               const isScrap = unit.products?.typegolde === 3
-              const added = unit.inventoryUnitId != null && alreadyAdded.has(unit.inventoryUnitId)
+              const isSelected = unit.inventoryUnitId != null && alreadyAddedUnitIds.has(unit.inventoryUnitId)
+
               return (
-                <button
+                <div
                   key={unit.inventoryUnitId}
-                  type="button"
-                  disabled={added}
-                  onClick={() => onAdd(unit)}
                   className={cn(
-                    'flex w-full touch-target items-center justify-between gap-2 rounded-xl border p-2 text-start transition-colors',
-                    added
-                      ? 'border-success/30 bg-success/5 opacity-75'
-                      : 'border-black/10 bg-white hover:border-primary/40 hover:bg-primary/[0.03]',
+                    'flex w-full items-center justify-between gap-2.5 rounded-xl border p-2.5 transition-colors',
+                    isSelected
+                      ? 'border-primary/50 bg-primary/[0.04] shadow-sm'
+                      : 'border-black/10 bg-white hover:border-primary/30 hover:bg-black/[0.01]',
                   )}
                 >
-                  <span className="flex min-w-0 items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <span
                       className={cn(
                         'flex size-8 shrink-0 items-center justify-center rounded-lg',
-                        isScrap ? 'bg-amber-100 text-amber-800' : 'bg-primary/10 text-primary',
+                        isSelected
+                          ? 'bg-primary text-white'
+                          : isScrap
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-primary/10 text-primary',
                       )}
                     >
                       {isScrap ? <Scale className="size-4" /> : <Package className="size-4" />}
                     </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-bold text-foreground">
-                        {unit.products?.productName ?? `منتج #${unit.productId}`}
-                      </span>
-                      <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-[13px] font-bold text-foreground">
+                          {unit.products?.productName ?? `منتج #${unit.productId}`}
+                        </span>
+                        {isSelected && (
+                          <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.2 text-[10px] font-bold text-primary">
+                            تم الاختيار
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                         <span className="font-semibold text-foreground">{unit.karat}k</span>
                         <span>•</span>
                         <span>{isScrap ? 'كسر' : 'قطعة مخزن'}</span>
@@ -301,115 +384,45 @@ export function ExchangePiecePicker({
                           <Boxes className="size-3 text-primary" />
                           {storageName(unit.storageId)}
                         </span>
-                      </span>
-                    </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
                     <span className="text-[13px] font-bold tabular-nums text-foreground">
                       {formatNumber(unit.weight)} gm
                     </span>
-                    {added ? (
-                      <span className="flex size-6 items-center justify-center rounded-full bg-success/15 text-success">
-                        <Check className="size-3.5" />
-                      </span>
+
+                    {isSelected ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveByUnit(unit)}
+                        className="h-8 gap-1 rounded-full border-error/30 bg-error/5 px-2.5 text-[11px] font-bold text-error hover:bg-error hover:text-white touch-target"
+                        title="إلغاء اختيار هذه القطعة من الاستبدال"
+                      >
+                        <Trash2 className="size-3.5" />
+                        <span>إلغاء الاختيار</span>
+                      </Button>
                     ) : (
-                      <span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => onAdd(unit)}
+                        className="h-8 gap-1 rounded-full px-3 text-[11px] font-bold touch-target"
+                      >
                         <Plus className="size-3.5" />
-                      </span>
+                        <span>اختيار</span>
+                      </Button>
                     )}
-                  </span>
-                </button>
+                  </div>
+                </div>
               )
             })}
           </div>
         )}
       </div>
-
-      {exchanges.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-xl border border-dashed border-primary/30 bg-primary/[0.04] p-4 text-center">
-          <span className="text-[13px] font-semibold text-foreground">
-            لم تُضف قطع استبدال بعد
-          </span>
-          <span className="text-[12px] text-muted-foreground">
-            اختر قطعة أو اضغط «تحديد الكل» لإضافة قطع من أي مخزن.
-          </span>
-        </div>
-      ) : (
-        <div className="space-y-1.5 border-t border-black/10 pt-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <Label className="text-[13px] font-bold">
-                القطع المختارة ({exchanges.length})
-              </Label>
-              {distinctStoragesCount > 1 && (
-                <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                  من {distinctStoragesCount} مخازن
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-bold tabular-nums text-primary">
-                معادل 21: {formatNumber(input21)} gm
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={
-                  onClearAll
-                    ? onClearAll
-                    : () => exchanges.forEach((e) => onRemove(e.key))
-                }
-                className="h-7 px-2 text-[11px] text-error hover:bg-error/10 touch-target"
-              >
-                مسح الكل
-              </Button>
-            </div>
-          </div>
-
-          <div className="max-h-48 space-y-1 overflow-y-auto pe-0.5">
-            {exchanges.map((e) => {
-              const karat = amountToNumber(e.fromKarat)
-              const weight = amountToNumber(e.weight)
-              return (
-                <div
-                  key={e.key}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-black/10 bg-secondary/35 px-2.5 py-1.5"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-[12px] font-bold text-foreground">
-                      {e.productName || (e.sourceType === 'storeItem' ? 'قطعة مخزن' : 'كسر')}
-                    </span>
-                    <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <span>{e.sourceType === 'storeItem' ? 'قطعة مخزن' : 'كسر'}</span>
-                      <span>•</span>
-                      <span className="font-semibold text-foreground">{karat}k</span>
-                      <span>•</span>
-                      <span className="inline-flex items-center gap-0.5 font-medium text-foreground">
-                        <Boxes className="size-3 text-primary" />
-                        {storageName(e.storageId)}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <span className="text-[12px] font-bold tabular-nums text-foreground">
-                      {formatNumber(weight)} gm
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onRemove(e.key)}
-                      aria-label="إزالة القطعة"
-                      className="flex size-7 shrink-0 touch-target items-center justify-center rounded-full text-error hover:bg-error/10"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

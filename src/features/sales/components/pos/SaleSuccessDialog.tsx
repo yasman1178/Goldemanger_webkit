@@ -102,60 +102,62 @@ export function SaleSuccessDialog({ info, onClose, onNewSale }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        {sale.held ? (
-          <div className="space-y-2">
-            <div className="rounded-xl border-2 border-warning/25 bg-warning/5 p-3">
-              <p className="flex items-center gap-2 text-[14px] font-bold text-warning">
-                <Clock className="size-4" />
-                المديونية على العميل بالجرامات
-              </p>
-              <p className="mt-1 text-[15px] text-foreground">
-                {formatNumber(sale.grams21 ?? 0)} جم{' '}
-                <span className="text-[12px] font-semibold text-muted-foreground">(معادل عيار 21)</span>
+        <div className="p-5 sm:p-6 space-y-4">
+          {sale.held ? (
+            <div className="space-y-2">
+              <div className="rounded-xl border-2 border-warning/25 bg-warning/5 p-3">
+                <p className="flex items-center gap-2 text-[14px] font-bold text-warning">
+                  <Clock className="size-4" />
+                  المديونية على العميل بالجرامات
+                </p>
+                <p className="mt-1 text-[15px] text-foreground">
+                  {formatNumber(sale.grams21 ?? 0)} جم{' '}
+                  <span className="text-[12px] font-semibold text-muted-foreground">(معادل عيار 21)</span>
+                </p>
+              </div>
+              <p className="rounded-xl bg-black/5 p-3 text-[13px] leading-relaxed text-muted-foreground">
+                لن تُخصم القطع من المخزون المتاح حتى يُبت فيها من تبويب «المعلقات» في شاشة البيع —
+                تعديل، إتمام، أو إلغاء.
               </p>
             </div>
-            <p className="rounded-xl bg-black/5 p-3 text-[13px] leading-relaxed text-muted-foreground">
-              لن تُخصم القطع من المخزون المتاح حتى يُبت فيها من تبويب «المعلقات» في شاشة البيع —
-              تعديل، إتمام، أو إلغاء.
+          ) : data ? (
+            <SaleReceiptView data={data} shop={shop} />
+          ) : (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              جارٍ تجهيز الفاتورة...
             </p>
-          </div>
-        ) : data ? (
-          <SaleReceiptView data={data} shop={shop} />
-        ) : (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            جارٍ تجهيز الفاتورة...
-          </p>
-        )}
+          )}
 
-        {!sale.held && (
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => window.print()}
-              className="h-11 flex-1 gap-2 rounded-full touch-target"
-            >
-              <Printer className="size-4" />
-              طباعة
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={copyReceipt}
-              className="h-11 flex-1 rounded-full touch-target"
-            >
-              <Copy className="size-4" />
-              {copied ? 'تم النسخ' : 'مشاركة'}
-            </Button>
-          </div>
-        )}
-        <Button
-          type="button"
-          onClick={onNewSale}
-          className="h-12 w-full rounded-full touch-target"
-        >
-          فاتورة جديدة
-        </Button>
+          {!sale.held && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => window.print()}
+                className="h-11 flex-1 gap-2 rounded-full touch-target"
+              >
+                <Printer className="size-4" />
+                طباعة
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={copyReceipt}
+                className="h-11 flex-1 rounded-full touch-target"
+              >
+                <Copy className="size-4" />
+                {copied ? 'تم النسخ' : 'مشاركة'}
+              </Button>
+            </div>
+          )}
+          <Button
+            type="button"
+            onClick={onNewSale}
+            className="h-12 w-full rounded-full touch-target"
+          >
+            فاتورة جديدة
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
