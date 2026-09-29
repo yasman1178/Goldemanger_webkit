@@ -62,11 +62,18 @@ export function DashboardPage() {
   } | null>(null)
   const [closeDaySummary, setCloseDaySummary] = useState<DayCloseSummary | null>(null)
   const queryClient = useQueryClient()
+  const branchId = useAuthStore((s) => s.branchId)
   const isOwner = useAuthStore((s) => s.user?.roles ?? []).includes('Owner')
   const isResponsible = useAuthStore((s) => s.user?.roles ?? []).includes('Responsible')
   const isManager = useAuthStore((s) => s.user?.roles ?? []).includes('Manager')
   const isSale = useAuthStore((s) => s.user?.roles ?? []).includes('Sale')
   const canCloseDay = isOwner || isResponsible || isManager || isSale
+  const hasValidBranch = Boolean(activeBranchId && activeBranchId > 0)
+
+  // إذا كان صاحب محل جديد وليس لديه فرع أو شركة بعد، يتم توجيهه مباشرة لإعداد الشركة
+  if (typeof window !== 'undefined' && isOwner && (!branchId || branchId <= 0)) {
+    navigate('/app/settings', { replace: true })
+  }
 
   const closeDayMutation = useMutation({
     mutationFn: closeDay,
@@ -87,16 +94,22 @@ export function DashboardPage() {
   } = useQuery({
     queryKey: ['dashboard-stats', activeBranchId],
     queryFn: () => getDashboardStats(activeBranchId ?? undefined),
+    enabled: hasValidBranch,
+    retry: false,
   })
 
   const { data: sales = [], isLoading: salesLoading } = useQuery({
     queryKey: ['sales', activeBranchId],
     queryFn: () => getSales(activeBranchId ?? undefined),
+    enabled: hasValidBranch,
+    retry: false,
   })
 
   const { data: purchases = [], isLoading: purchasesLoading } = useQuery({
     queryKey: ['purchases', activeBranchId],
     queryFn: () => getPurchases(activeBranchId ?? undefined),
+    enabled: hasValidBranch,
+    retry: false,
   })
 
   const { data: customers = [] } = useQuery({

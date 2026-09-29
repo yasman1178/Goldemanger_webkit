@@ -302,14 +302,17 @@ export function AppLayout() {
   const branchName = useAuthStore((s) => s.branchDetails?.branchName)
   const branchDetails = useAuthStore((s) => s.branchDetails)
   const roles = useAuthStore((s) => s.user?.roles ?? [])
+  const branchId = useAuthStore((s) => s.branchId)
   const selectedBranchId = useAuthStore((s) => s.selectedBranchId)
   const setCurrency = useCurrencyStore((s) => s.setCurrency)
   const isOwner = roles.includes('Owner')
+  const hasBranch = Boolean(branchId && branchId > 0)
 
   const { data: overview } = useQuery({
     queryKey: ['overview'],
     queryFn: getOverview,
-    enabled: isOwner,
+    enabled: isOwner && hasBranch,
+    retry: false,
   })
 
   useEffect(() => {

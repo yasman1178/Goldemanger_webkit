@@ -108,22 +108,22 @@ export function AdminPage() {
   const expired = companiesList.filter((c) => isExpired(c.latestExpiry)).length
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] space-y-5 pb-20 lg:space-y-6">
-      <div className="flex items-center justify-between gap-3 rounded-[18px] border border-black/5 bg-white p-4 elevation-card sm:p-5">
+    <div className="mx-auto w-full max-w-[1440px] space-y-4 pb-20 sm:space-y-5 lg:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-[18px] border border-black/5 bg-white p-4 elevation-card sm:p-5">
         <div className="flex items-center gap-3">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <ShieldCheck className="size-6" />
+          <div className="flex size-11 sm:size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <ShieldCheck className="size-5 sm:size-6" />
+          </div>
+          <div>
+            <h1 className="text-[22px] sm:text-[28px] md:text-[34px] font-bold leading-[1.2] text-foreground">
+              إدارة النظام
+            </h1>
+            <p className="text-[12px] sm:text-[13px] md:text-[15px] text-muted-foreground">
+              الشركات والاشتراكات والفروع والمستخدمون على مستوى المنصة
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-[28px] font-bold leading-[1.2] text-foreground sm:text-[34px]">
-            إدارة النظام
-          </h1>
-          <p className="text-[13px] text-muted-foreground sm:text-[15px]">
-            الشركات والاشتراكات والفروع والمستخدمون على مستوى المنصة
-          </p>
-        </div>
-        </div>
-        <Button type="button" className="h-11 gap-2 rounded-full touch-target" onClick={() => setOwnerOpen(true)}>
+        <Button type="button" className="h-11 w-full sm:w-auto gap-2 rounded-full touch-target" onClick={() => setOwnerOpen(true)}>
           <Plus className="size-4" />
           إنشاء حساب صاحب محل
         </Button>
@@ -131,7 +131,7 @@ export function AdminPage() {
 
       <OwnerDialog open={ownerOpen} onOpenChange={setOwnerOpen} />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 lg:grid-cols-4 sm:gap-3">
         <StatCard
           icon={<StoreIcon className="size-4" />}
           tone="primary"
@@ -164,7 +164,7 @@ export function AdminPage() {
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 lg:grid-cols-4 sm:gap-3">
         <StatCard
           icon={<Database className="size-4" />}
           tone="primary"
@@ -189,33 +189,35 @@ export function AdminPage() {
         <DatabaseSizeCard />
       </div>
 
-      <Tabs defaultValue="companies" dir="rtl" className="items-start md:flex-row">
-        <TabsList className="flex h-12 min-h-12 w-full max-w-full shrink-0 justify-start gap-1 overflow-x-auto rounded-2xl bg-white p-1 elevation-card md:h-fit md:w-56 md:flex-col md:items-stretch md:overflow-visible md:rounded-[18px] md:p-2">
-          <TabsTrigger value="companies" className="h-11 min-w-max justify-start gap-2 rounded-xl px-4 md:w-full md:flex-none">
+      <Tabs defaultValue="companies" dir="rtl" className="w-full flex-col md:flex-row items-stretch md:items-start gap-4">
+        <TabsList className="flex h-auto w-full md:w-56 shrink-0 justify-start gap-1 overflow-x-auto rounded-2xl bg-white p-1.5 elevation-card md:flex-col md:items-stretch md:overflow-visible md:rounded-[18px] md:p-2">
+          <TabsTrigger value="companies" className="h-10 md:h-11 min-w-max flex-1 md:flex-none justify-center md:justify-start gap-2 rounded-xl px-3 md:px-4">
             <StoreIcon className="size-4" />
             الشركات
           </TabsTrigger>
-          <TabsTrigger value="users" className="h-11 min-w-max justify-start gap-2 rounded-xl px-4 md:w-full md:flex-none">
+          <TabsTrigger value="users" className="h-10 md:h-11 min-w-max flex-1 md:flex-none justify-center md:justify-start gap-2 rounded-xl px-3 md:px-4">
             <Users className="size-4" />
             المستخدمون
           </TabsTrigger>
-          <TabsTrigger value="logs" className="h-11 min-w-max justify-start gap-2 rounded-xl px-4 md:w-full md:flex-none">
+          <TabsTrigger value="logs" className="h-10 md:h-11 min-w-max flex-1 md:flex-none justify-center md:justify-start gap-2 rounded-xl px-3 md:px-4">
             <ScrollText className="size-4" />
             سجل النظام
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="companies" className="mt-5">
-          <CompaniesTab companies={companiesList} loading={companiesLoading} />
-        </TabsContent>
+        <div className="flex-1 min-w-0">
+          <TabsContent value="companies" className="m-0">
+            <CompaniesTab companies={companiesList} loading={companiesLoading} />
+          </TabsContent>
 
-        <TabsContent value="users" className="mt-5">
-          <UsersTab companies={companiesList} />
-        </TabsContent>
+          <TabsContent value="users" className="m-0">
+            <UsersTab companies={companiesList} />
+          </TabsContent>
 
-        <TabsContent value="logs" className="mt-5">
-          <LogsTab />
-        </TabsContent>
+          <TabsContent value="logs" className="m-0">
+            <LogsTab />
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   )
@@ -544,70 +546,128 @@ function UsersTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="text-start text-[12px] text-muted-foreground">
-            <th className="px-2 py-2 text-start font-semibold">الاسم</th>
-            <th className="px-2 py-2 text-start font-semibold">الهاتف</th>
-            <th className="px-2 py-2 text-start font-semibold">الدور</th>
-            <th className="px-2 py-2 text-end font-semibold">إجراءات</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-black/5">
-          {employees.map((emp) => (
-            <tr key={emp.id}>
-              <td className="px-2 py-2 text-[14px] font-semibold text-foreground">{emp.fullName}</td>
-              <td className="px-2 py-2 text-[13px] text-muted-foreground">{emp.phone || '—'}</td>
-              <td className="px-2 py-2">
-                <div className="flex flex-wrap gap-1">
-                  {emp.roles.length === 0 ? (
-                    <Badge variant="outline">بدون دور</Badge>
-                  ) : (
-                    emp.roles.map((r) => (
-                      <Badge key={r} variant="outline">
-                        {ROLE_LABELS[r] ?? r}
-                      </Badge>
-                    ))
-                  )}
-                </div>
-              </td>
-              <td className="px-2 py-2 text-end">
-                <div className="flex justify-end gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-9 rounded-full touch-target"
-                    onClick={() => onEdit(emp)}
-                  >
-                    تعديل
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-9 rounded-full text-error hover:text-error touch-target"
-                    onClick={() => {
-                      if (!window.confirm(`هل تريد تعطيل الموظف "${emp.fullName ?? ''}"؟`)) return
-                      void disableCompanyEmployee(companyId, emp.id)
-                        .then(() => {
-                          toast.success('تم تعطيل الموظف')
-                          onInvalidate()
-                        })
-                        .catch((error: unknown) =>
-                          toast.error(extractServerMessage(error, 'تعذّر تعطيل الموظف')),
-                        )
-                    }}
-                  >
-                    تعطيل
-                  </Button>
-                </div>
-              </td>
+    <div>
+      {/* Mobile Card View */}
+      <div className="space-y-2.5 sm:hidden">
+        {employees.map((emp) => (
+          <div key={emp.id} className="rounded-xl border border-black/5 bg-white p-3 space-y-2.5 shadow-xs">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[14px] font-bold text-foreground">{emp.fullName}</p>
+                <p className="text-[12px] text-muted-foreground" dir="ltr">{emp.phone || '—'}</p>
+              </div>
+              <div className="flex flex-wrap gap-1 justify-end">
+                {emp.roles.length === 0 ? (
+                  <Badge variant="outline" className="text-[11px]">بدون دور</Badge>
+                ) : (
+                  emp.roles.map((r) => (
+                    <Badge key={r} variant="outline" className="text-[11px]">
+                      {ROLE_LABELS[r] ?? r}
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-black/5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 flex-1 rounded-full text-xs touch-target"
+                onClick={() => onEdit(emp)}
+              >
+                تعديل
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 flex-1 rounded-full text-xs text-error hover:text-error touch-target"
+                onClick={() => {
+                  if (!window.confirm(`هل تريد تعطيل الموظف "${emp.fullName ?? ''}"؟`)) return
+                  void disableCompanyEmployee(companyId, emp.id)
+                    .then(() => {
+                      toast.success('تم تعطيل الموظف')
+                      onInvalidate()
+                    })
+                    .catch((error: unknown) =>
+                      toast.error(extractServerMessage(error, 'تعذّر تعطيل الموظف')),
+                    )
+                }}
+              >
+                تعطيل
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop/Tablet Table View */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="text-start text-[12px] text-muted-foreground">
+              <th className="px-2 py-2 text-start font-semibold">الاسم</th>
+              <th className="px-2 py-2 text-start font-semibold">الهاتف</th>
+              <th className="px-2 py-2 text-start font-semibold">الدور</th>
+              <th className="px-2 py-2 text-end font-semibold">إجراءات</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-black/5">
+            {employees.map((emp) => (
+              <tr key={emp.id}>
+                <td className="px-2 py-2 text-[14px] font-semibold text-foreground">{emp.fullName}</td>
+                <td className="px-2 py-2 text-[13px] text-muted-foreground">{emp.phone || '—'}</td>
+                <td className="px-2 py-2">
+                  <div className="flex flex-wrap gap-1">
+                    {emp.roles.length === 0 ? (
+                      <Badge variant="outline">بدون دور</Badge>
+                    ) : (
+                      emp.roles.map((r) => (
+                        <Badge key={r} variant="outline">
+                          {ROLE_LABELS[r] ?? r}
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                </td>
+                <td className="px-2 py-2 text-end">
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-full touch-target"
+                      onClick={() => onEdit(emp)}
+                    >
+                      تعديل
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-full text-error hover:text-error touch-target"
+                      onClick={() => {
+                        if (!window.confirm(`هل تريد تعطيل الموظف "${emp.fullName ?? ''}"؟`)) return
+                        void disableCompanyEmployee(companyId, emp.id)
+                          .then(() => {
+                            toast.success('تم تعطيل الموظف')
+                            onInvalidate()
+                          })
+                          .catch((error: unknown) =>
+                            toast.error(extractServerMessage(error, 'تعذّر تعطيل الموظف')),
+                          )
+                      }}
+                    >
+                      تعطيل
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -780,12 +840,12 @@ function CompanyCard({ company }: { company: AdminCompany }) {
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Button
           type="button"
           size="sm"
           variant={company.isActive ? 'outline' : 'default'}
-          className="h-11 gap-2 rounded-full touch-target"
+          className="h-10 sm:h-11 w-full gap-2 rounded-full touch-target text-xs sm:text-sm"
           disabled={statusMutation.isPending}
           onClick={() => statusMutation.mutate()}
         >
@@ -800,7 +860,7 @@ function CompanyCard({ company }: { company: AdminCompany }) {
           type="button"
           size="sm"
           variant="outline"
-          className="h-11 gap-2 rounded-full touch-target"
+          className="h-10 sm:h-11 w-full gap-2 rounded-full touch-target text-xs sm:text-sm"
           onClick={() => setExtendOpen(true)}
         >
           <TimerReset className="size-4" />
@@ -809,7 +869,8 @@ function CompanyCard({ company }: { company: AdminCompany }) {
         <Button
           type="button"
           size="sm"
-          className="h-11 gap-2 rounded-full touch-target"
+          variant="outline"
+          className="h-10 sm:h-11 w-full gap-2 rounded-full touch-target text-xs sm:text-sm"
           onClick={() => setAddBranchOpen(true)}
         >
           <Plus className="size-4" />

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
@@ -388,7 +388,14 @@ export function DebtsPage() {
             <TableBody>
               {debts.map((debt) => {
                 const status = getDebtStatus(debt)
-                const remaining = Math.max(0, Math.round(debt.amountOwed - debt.paidAmount))
+                const isGold = debt.balanceType === 1
+                const isHeld = isGold || Boolean(debt.description && debt.description.includes('معلق'))
+                const remaining = Math.max(
+                  0,
+                  isGold
+                    ? Math.round((debt.amountOwed - debt.paidAmount) * 100) / 100
+                    : Math.round(debt.amountOwed - debt.paidAmount),
+                )
                 const cfg = statusConfig[status]
                 return (
                   <TableRow key={debt.debtId}>
@@ -399,8 +406,8 @@ export function DebtsPage() {
                           دائن
                         </span>
                       )}
-                      {debt.balanceType === 1 && (
-                        <span className="ms-1.5 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                      {isGold && (
+                        <span className="ms-1.5 inline-flex items-center gap-1 rounded-full bg-warning/15 text-warning px-2 py-0.5 text-[11px] font-bold">
                           <Scale className="size-3" />
                           ذهب
                         </span>
@@ -412,13 +419,13 @@ export function DebtsPage() {
                       )}
                     </TableCell>
                     <TableCell className="tabular-nums">
-                      {formatEgp(debt.amountOwed)}
+                      {isGold ? `${debt.amountOwed} جم` : formatEgp(debt.amountOwed)}
                     </TableCell>
                     <TableCell className="tabular-nums text-success">
-                      {formatEgp(debt.paidAmount)}
+                      {isGold ? `${debt.paidAmount} جم` : formatEgp(debt.paidAmount)}
                     </TableCell>
                     <TableCell className={cn('tabular-nums font-semibold', remaining > 0 ? 'text-warning' : 'text-success')}>
-                      {formatEgp(remaining)}
+                      {isGold ? `${remaining} جم` : formatEgp(remaining)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={cfg.variant}>
@@ -430,18 +437,32 @@ export function DebtsPage() {
                       {formatDate(debt.dueDate)}
                     </TableCell>
                     <TableCell className="text-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setPaymentSheet(debt)
-                          setPaymentAmount('')
-                        }}
-                        className="rounded-full touch-target"
-                      >
-                        تسجيل دفعة
-                      </Button>
+                      {isGold || isHeld ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled
+                          className="rounded-full opacity-70 cursor-not-allowed touch-target text-amber-700 bg-amber-500/10 border-amber-500/30"
+                          title="فاتورة معلّقة بالذهب — تُسوّى بالذهب من شاشة المعلقات بالمبيعات"
+                        >
+                          <Scale className="me-1 size-3 text-amber-600" />
+                          معلّقة بالذهب
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPaymentSheet(debt)
+                            setPaymentAmount('')
+                          }}
+                          className="rounded-full touch-target"
+                        >
+                          تسجيل دفعة
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 )

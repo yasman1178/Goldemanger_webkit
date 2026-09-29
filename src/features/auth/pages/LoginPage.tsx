@@ -71,14 +71,21 @@ export function LoginPage() {
         email: '',
         roles: [data.role],
       }
+      const rawBranchId = Number(data.employeeDetails.branchId)
+      const validBranchId = !isNaN(rawBranchId) && rawBranchId > 0 ? rawBranchId : null
+
       setAuth(
         user,
         data.token,
         data.refreshToken,
         data.branchDetails,
-        Number(data.employeeDetails.branchId),
+        validBranchId ?? 0,
       )
-      navigate('/app')
+      if (data.role === 'Owner' && !validBranchId) {
+        navigate('/app/settings')
+      } else {
+        navigate('/app')
+      }
     },
     onError: (err: unknown) => {
       const status = (err as { response?: { status?: number } })?.response?.status

@@ -106,11 +106,13 @@ export function SettingsPage() {
   const roles = useAuthStore((s) => s.user?.roles ?? [])
   const branchId = useAuthStore((s) => s.branchId)
   const isOwner = roles.includes('Owner')
+  const hasBranch = Boolean(branchId && branchId > 0)
 
   const { data: overview } = useQuery({
     queryKey: ['settings-overview'],
     queryFn: getOverview,
-    enabled: isOwner,
+    enabled: isOwner && hasBranch,
+    retry: false,
   })
 
   if (!isOwner) {

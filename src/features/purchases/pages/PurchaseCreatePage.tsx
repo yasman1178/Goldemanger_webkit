@@ -19,7 +19,9 @@ import {
   Trash2,
   UserPlus,
   Users,
+  Sparkles,
 } from 'lucide-react'
+import { Switch } from '@/shared/components/ui/switch'
 
 import { createPurchase } from '@/features/purchases/api'
 import { invalidateAfterPurchase } from '@/shared/lib/invalidateShop'
@@ -129,7 +131,7 @@ export function PurchaseCreatePage() {
   const [stampTaxRate, setStampTaxRate] = useState('1')
   const [exchanges, setExchanges] = useState<GoldExchangeLine[]>([])
   const [exchangeStorage, setExchangeStorage] = useState('all')
-  const [isInitialStock] = useState(false)
+  const [isInitialStock, setIsInitialStock] = useState(false)
   const [newSupplierMode, setNewSupplierMode] = useState(false)
   const [newSupplierName, setNewSupplierName] = useState('')
   const [newSupplierPhone, setNewSupplierPhone] = useState('')
@@ -699,6 +701,24 @@ if (paymentType === 'goldTradeIn') {
                     مع تحويل العيار وجني الفارق نقداً أو كمديونية للطرف الآخر.
                   </p>
                 )}
+
+                <div className="mt-3 flex items-center justify-between rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
+                  <div className="space-y-0.5 pe-3">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="size-4 text-amber-600" />
+                      <span className="text-[13.5px] font-bold text-foreground">
+                        رصيد أول المدة (بضاعة افتتاحية)
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+                      عند التفعيل، تُضاف القطع كبضاعة افتتاحية إلى المخزن دون خصم نقدية من الخزينة.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={isInitialStock}
+                    onCheckedChange={setIsInitialStock}
+                  />
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <Label>نوع الشراء</Label>
