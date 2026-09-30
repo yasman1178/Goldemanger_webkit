@@ -14,18 +14,21 @@ import {
   Scale,
 } from 'lucide-react'
 
-import { getBranchDebtsPage, getBranchDebtsSummary, updateDebt } from '@/features/debts/api'
+import { getBranchDebtsPage, getBranchDebtsSummary, returnGold, updateDebt } from '@/features/debts/api'
 import { createCustomerDebt } from '@/features/debts/api'
 import {
+  getBalanceType,
   getDebtStatus,
+  getRemainingGrams,
   debtStatusLabels,
   type Debt,
   type DebtStatus,
   type DebtType,
   type BalanceValue,
 } from '@/features/debts/types'
+import { invalidateShopData } from '@/shared/lib/invalidateShop'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
-import { formatEgp, cn } from '@/shared/lib/utils'
+import { formatEgp, formatGrams, cn } from '@/shared/lib/utils'
 import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
 import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
@@ -86,6 +89,8 @@ export function DebtsPage() {
   const [filterStatus, setFilterStatus] = useState<DebtStatus | 'all'>('all')
   const [paymentSheet, setPaymentSheet] = useState<Debt | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
+  const [returnGramsInput, setReturnGramsInput] = useState('')
+  const [returnGoldNote, setReturnGoldNote] = useState('')
   const [page, setPage] = useState(1)
   const [newDebtOpen, setNewDebtOpen] = useState(false)
   const [newDebtForm, setNewDebtForm] = useState({
@@ -171,6 +176,39 @@ export function DebtsPage() {
     },
     onError: () => {
       toast.error('فشل تسجيل الدفعة. تأكد من المبلغ.')
+    },
+  })
+
+  const returnGoldMutation = useMutation({
+    mutationFn: async () => {
+      if (!paymentSheet) return
+      const remainingGrams = getRemainingGrams(paymentSheet)
+      const grams = returnGramsInput === '' ? remainingGrams : Number(returnGramsInput)
+      if (!(grams > 0) || grams > remainingGrams + 0.0005) {
+        throw new Error('invalid-grams')
+      }
+      return returnGold(paymentSheet.debtId, {
+        grams,
+        description: returnGoldNote.trim() || null,
+      })
+    },
+    onSuccess: (result) => {
+      if (!result) return
+      toast.success(
+        `تم رد الذهب — دخلت الخزينة ${formatEgp(Math.round(result.cashIn))} وسُدِّدت ${formatEgp(Math.round(result.releasedValue))}` +
+          (result.margin > 0 ? ` بهامش ${formatEgp(Math.round(result.margin))}` : ''),
+      )
+      invalidateShopData(queryClient)
+      setPaymentSheet(null)
+      setReturnGramsInput('')
+      setReturnGoldNote('')
+    },
+    onError: (error: { message?: string }) => {
+      if (error?.message === 'invalid-grams') {
+        toast.error('أدخل وزناً صحيحاً أكبر من صفر وأقل من أو يساوي المتبقي.')
+        return
+      }
+      toast.error('فشل رد الذهب. تأكد من البيانات.')
     },
   })
 
@@ -263,7 +301,7 @@ export function DebtsPage() {
         <Card size="sm" className="rounded-[14px] elevation-card border-sky-200/60 bg-gradient-to-br from-sky-50/80 to-card">
           <CardHeader className="px-3 pt-2.5 pb-0">
             <CardTitle className="flex items-center justify-between gap-1.5 text-[11px] font-semibold leading-[1.3] text-sky-600">
-              <span>إجمالي الدين</span>
+              <span>إجمالي الدين النقدي</span>
               <Wallet className="size-3.5 text-sky-400" />
             </CardTitle>
           </CardHeader>
@@ -291,7 +329,7 @@ export function DebtsPage() {
         <Card size="sm" className="rounded-[14px] elevation-card border-amber-200/60 bg-gradient-to-br from-amber-50/80 to-card">
           <CardHeader className="px-3 pt-2.5 pb-0">
             <CardTitle className="flex items-center justify-between gap-1.5 text-[11px] font-semibold leading-[1.3] text-amber-600">
-              <span>المديونية الحالية</span>
+              <span>المديونية النقدية</span>
               <AlertTriangle className="size-3.5 text-amber-400" />
             </CardTitle>
           </CardHeader>
@@ -316,6 +354,46 @@ export function DebtsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* شريط الذهب: الاتجاهان منفصلان — الكروت أعلاه نقدية صرفة */}
+      <Card
+        size="sm"
+        className="rounded-[14px] elevation-card border-amber-300/60 bg-gradient-to-br from-amber-50/90 to-card"
+      >
+        <CardContent className="px-3 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700">
+              <Scale className="size-3.5 text-amber-500" />
+              ذهب على العملاء
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="text-[12px] text-muted-foreground">
+                ذهب للعميل (له)
+                <span className="ms-1.5 font-bold tabular-nums text-success">
+                  {formatGrams(summary?.goldCreditGrams ?? 0)} جم
+                </span>
+              </span>
+              <span className="text-[12px] text-muted-foreground">
+                ذهب من العميل (عليه)
+                <span className="ms-1.5 font-bold tabular-nums text-warning">
+                  {formatGrams(summary?.goldDebitGrams ?? 0)} جم
+                </span>
+              </span>
+              {(summary?.entrustmentGrams ?? 0) > 0 && (
+                <span className="text-[12px] text-muted-foreground">
+                  أمانة
+                  <span className="ms-1.5 font-bold tabular-nums text-foreground">
+                    {formatGrams(summary?.entrustmentGrams ?? 0)} جم
+                  </span>
+                </span>
+              )}
+              <span className="text-[11px] text-muted-foreground">
+                بيع {formatEgp(summary?.sellPrice ?? 0)} · شراء {formatEgp(summary?.buyPrice ?? 0)}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
@@ -388,14 +466,14 @@ export function DebtsPage() {
             <TableBody>
               {debts.map((debt) => {
                 const status = getDebtStatus(debt)
-                const isGold = debt.balanceType === 1
-                const isHeld = isGold || Boolean(debt.description && debt.description.includes('معلق'))
-                const remaining = Math.max(
-                  0,
-                  isGold
-                    ? Math.round((debt.amountOwed - debt.paidAmount) * 100) / 100
-                    : Math.round(debt.amountOwed - debt.paidAmount),
-                )
+                const isGold = getBalanceType(debt) === 'gold'
+                const isEntrustment = Boolean(debt.isEntrustment)
+                const goldGrams = debt.grams ?? 0
+                const goldRemaining = getRemainingGrams(debt)
+                const isSettled = status === 'paid'
+                const remaining = isGold
+                  ? goldRemaining
+                  : Math.max(0, debt.amountOwed - debt.paidAmount)
                 const cfg = statusConfig[status]
                 return (
                   <TableRow key={debt.debtId}>
@@ -412,20 +490,30 @@ export function DebtsPage() {
                           ذهب
                         </span>
                       )}
+                      {isEntrustment && (
+                        <span className="ms-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+                          أمانة
+                        </span>
+                      )}
                       {debt.description && (
                         <span className="block text-[11px] font-normal text-muted-foreground">
                           {debt.description}
                         </span>
                       )}
+                      {isGold && debt.pricePerGram ? (
+                        <span className="block text-[11px] font-normal text-muted-foreground">
+                          {formatGrams(goldGrams)} جم × {formatEgp(debt.pricePerGram)} = {formatEgp(debt.amountOwed)}
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell className="tabular-nums">
-                      {isGold ? `${debt.amountOwed} جم` : formatEgp(debt.amountOwed)}
+                      {isGold ? `${formatGrams(goldGrams)} جم` : formatEgp(debt.amountOwed)}
                     </TableCell>
-                    <TableCell className="tabular-nums text-success">
-                      {isGold ? `${debt.paidAmount} جم` : formatEgp(debt.paidAmount)}
+                    <TableCell className={isGold ? 'tabular-nums text-muted-foreground' : 'tabular-nums text-success'}>
+                      {isGold ? 'ردّ ذهب' : formatEgp(debt.paidAmount)}
                     </TableCell>
                     <TableCell className={cn('tabular-nums font-semibold', remaining > 0 ? 'text-warning' : 'text-success')}>
-                      {isGold ? `${remaining} جم` : formatEgp(remaining)}
+                      {isGold ? `${formatGrams(remaining)} جم` : formatEgp(remaining)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={cfg.variant}>
@@ -436,18 +524,28 @@ export function DebtsPage() {
                     <TableCell className="tabular-nums text-muted-foreground">
                       {formatDate(debt.dueDate)}
                     </TableCell>
-                    <TableCell className="text-end">
-                      {isGold || isHeld ? (
+<TableCell className="text-end">
+                      {isGold ? (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled
-                          className="rounded-full opacity-70 cursor-not-allowed touch-target text-amber-700 bg-amber-500/10 border-amber-500/30"
-                          title="فاتورة معلّقة بالذهب — تُسوّى بالذهب من شاشة المعلقات بالمبيعات"
+                          disabled={isSettled}
+                          onClick={() => {
+                            setPaymentSheet(debt)
+                            setPaymentAmount('')
+                            setReturnGramsInput('')
+                            setReturnGoldNote('')
+                          }}
+                          className="rounded-full touch-target text-amber-700 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20"
+                          title={
+                            isSettled
+                              ? 'المديونية مسدَّدة بالكامل'
+                              : 'العميل يشتري ذهب المحل نقداً — التسوية بسعر بيع اليوم'
+                          }
                         >
                           <Scale className="me-1 size-3 text-amber-600" />
-                          معلّقة بالذهب
+                          رد ذهب
                         </Button>
                       ) : (
                         <Button
@@ -480,16 +578,86 @@ export function DebtsPage() {
         </>
       )}
 
-      <Sheet open={!!paymentSheet} onOpenChange={(o) => { if (!o) { setPaymentSheet(null); setPaymentAmount('') } }}>
-        <SheetContent side="bottom" className="rounded-t-3xl">
+      <Sheet open={!!paymentSheet} onOpenChange={(o) => { if (!o) { setPaymentSheet(null); setPaymentAmount(''); setReturnGramsInput(''); setReturnGoldNote('') } }}>
+        <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-3xl">
           <SheetHeader className="text-end">
-            <SheetTitle>تسجيل دفعة</SheetTitle>
+            <SheetTitle>
+              {paymentSheet && getBalanceType(paymentSheet) === 'gold' ? 'رد ذهب' : 'تسجيل دفعة'}
+            </SheetTitle>
             <SheetDescription>
-              تسجيل دفعة جزئية أو كاملة للعميل {paymentSheet?.clientName ?? ''}
+              {paymentSheet && getBalanceType(paymentSheet) === 'gold'
+                ? `${paymentSheet.clientName ?? ''} يشتري ذهب المحل نقداً — التسوية بسعر بيع اليوم`
+                : `تسجيل دفعة جزئية أو كاملة للعميل ${paymentSheet?.clientName ?? ''}`}
             </SheetDescription>
           </SheetHeader>
           {paymentSheet && (
             <div className="space-y-4 px-4 pb-6 pt-2">
+              {getBalanceType(paymentSheet) === 'gold' ? (
+                <>
+                  <div className="space-y-2 rounded-2xl border border-warning/25 bg-warning/5 p-3">
+                    <div className="flex justify-between text-[14px]">
+                      <span className="text-muted-foreground">الوزن المسجَّل</span>
+                      <span className="font-semibold tabular-nums text-foreground">
+                        {formatGrams(paymentSheet.grams ?? 0)} جم
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[14px]">
+                      <span className="text-muted-foreground">المتبقي</span>
+                      <span className="rounded-lg bg-warning px-2 py-1 font-bold tabular-nums text-white shadow-sm">
+                        {formatGrams(getRemainingGrams(paymentSheet))} جم
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[14px]">
+                      <span className="text-muted-foreground">سعر بيع اليوم</span>
+                      <span className="font-semibold tabular-nums text-foreground">
+                        {formatEgp(summary?.sellPrice ?? 0)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] leading-[1.5] text-muted-foreground">
+                      الخزينة تستلم نقداً بسعر اليوم، وتُسدَّد المديونية لقتها المسجَّلة (
+                      {formatGrams(paymentSheet.grams ?? 0)} جم × {formatEgp(paymentSheet.pricePerGram ?? 0)})،
+                      والفرق يُسجَّل كهامش للمحل.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[15px] font-bold text-primary">وزن الرد (جم)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={returnGramsInput}
+                      onChange={(e) => setReturnGramsInput(e.target.value)}
+                      placeholder={String(getRemainingGrams(paymentSheet))}
+                      className="no-number-spin h-12 touch-target rounded-xl border-primary/40 bg-white text-[17px] font-bold tabular-nums focus-visible:ring-primary/30"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      اتركه فارغاً لردّ كامل المتبقي.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[13px]">ملاحظة</Label>
+                    <Input
+                      value={returnGoldNote}
+                      onChange={(e) => setReturnGoldNote(e.target.value)}
+                      placeholder="سبب الرد"
+                      className="h-11 touch-target"
+                    />
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={() => returnGoldMutation.mutate()}
+                    disabled={returnGoldMutation.isPending}
+                    className="h-12 w-full gap-2 rounded-full touch-target"
+                  >
+                    <Scale className="size-4" />
+                    {returnGoldMutation.isPending ? 'جارٍ الحفظ...' : 'تأكيد رد الذهب'}
+                  </Button>
+                </>
+              ) : (
+                <>
               <div className="space-y-2 rounded-2xl border border-warning/25 bg-warning/5 p-3">
                 <div className="flex justify-between text-[14px]">
                   <span className="text-muted-foreground">المستحق</span>
@@ -529,6 +697,8 @@ export function DebtsPage() {
                   >
                     {paymentMutation.isPending ? 'جارٍ الحفظ...' : 'تأكيد الدفعة'}
                   </Button>
+                </>
+              )}
             </div>
           )}
         </SheetContent>

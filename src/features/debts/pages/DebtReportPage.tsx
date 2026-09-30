@@ -12,13 +12,15 @@ import {
 
 import { getClientDebts, getClientSummary } from '@/features/debts/api'
 import {
+  getBalanceType,
   getDebtStatus,
+  getRemainingGrams,
   debtStatusLabels,
   type Debt,
   type DebtClientSummary,
 } from '@/features/debts/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
-import { formatEgp, cn } from '@/shared/lib/utils'
+import { formatEgp, formatGrams, cn } from '@/shared/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
@@ -84,6 +86,9 @@ export function DebtReportPage() {
     [summary],
   )
 
+  const goldDebitGrams = summary.reduce((acc, s) => acc + (s.goldDebitGrams ?? 0), 0)
+  const goldCreditGrams = summary.reduce((acc, s) => acc + (s.goldCreditGrams ?? 0), 0)
+
   if (selectedClient) {
     return (
       <ClientDetail client={selectedClient} onBack={() => setSelectedClient(null)} />
@@ -129,7 +134,7 @@ export function DebtReportPage() {
         <Card size="sm" className="rounded-[14px] elevation-card">
           <CardHeader>
             <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-              <span>إجمالي متبقي عليهم (مدين)</span>
+              <span>إجمالي متبقي عليهم نقدي (مدين)</span>
               <Wallet className="size-4 text-warning/60" />
             </CardTitle>
           </CardHeader>
@@ -142,7 +147,7 @@ export function DebtReportPage() {
         <Card size="sm" className="rounded-[14px] elevation-card">
           <CardHeader>
             <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-              <span>إجمالي متبقي لهم (دائن)</span>
+              <span>إجمالي متبقي لهم نقدي (دائن)</span>
               <FileText className="size-4 text-success/60" />
             </CardTitle>
           </CardHeader>
@@ -207,8 +212,9 @@ export function DebtReportPage() {
                 <TableHead>العميل</TableHead>
                 <TableHead>الهاتف</TableHead>
                 <TableHead>الفواتير</TableHead>
-                <TableHead>متبقّي مدين (عليه)</TableHead>
-                <TableHead>متبقّي دائن (له)</TableHead>
+                <TableHead>متبقّي مدين نقدي (عليه)</TableHead>
+                <TableHead>متبقّي دائن نقدي (له)</TableHead>
+                <TableHead>ذهب (عليه / له)</TableHead>
                 <TableHead>الصافي</TableHead>
                 <TableHead className="text-end">التقرير التفصيلي</TableHead>
               </TableRow>
@@ -230,6 +236,21 @@ export function DebtReportPage() {
                   </TableCell>
                   <TableCell className="tabular-nums text-success">
                     {formatEgp(s.creditRemaining)}
+                  </TableCell>
+                  <TableCell className="tabular-nums">
+                    <span className="flex flex-col text-[12px] leading-[1.4]">
+                      <span className="font-bold text-warning">
+                        {formatGrams(s.goldDebitGrams)} جم
+                      </span>
+                      <span className="font-bold text-success">
+                        {formatGrams(s.goldCreditGrams)} جم
+                      </span>
+                    </span>
+                    {s.entrustmentGrams > 0 && (
+                      <span className="text-[11px] text-muted-foreground">
+                        أمانة {formatGrams(s.entrustmentGrams)} جم
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell
                     className={cn(
@@ -257,12 +278,18 @@ export function DebtReportPage() {
           </Table>
           <div className="grid grid-cols-2 gap-3 border-t border-black/5 bg-muted/40 px-4 py-3 lg:grid-cols-4">
             <div className="flex justify-between text-[13px]">
-              <span className="text-muted-foreground">إجمالي متبقي مدين</span>
+              <span className="text-muted-foreground">إجمالي متبقي مدين نقدي</span>
               <span className="font-bold tabular-nums text-warning">{formatEgp(totals.debit)}</span>
             </div>
             <div className="flex justify-between text-[13px]">
-              <span className="text-muted-foreground">إجمالي متبقي دائن</span>
+              <span className="text-muted-foreground">إجمالي متبقي دائن نقدي</span>
               <span className="font-bold tabular-nums text-success">{formatEgp(totals.credit)}</span>
+            </div>
+            <div className="flex justify-between text-[13px]">
+              <span className="text-muted-foreground">ذهب (عليه / له)</span>
+              <span className="font-bold tabular-nums text-amber-600">
+                {formatGrams(goldDebitGrams)} / {formatGrams(goldCreditGrams)} جم
+              </span>
             </div>
             <div className="flex justify-between text-[13px]">
               <span className="text-muted-foreground">الصافي (مدين − دائن)</span>
@@ -297,6 +324,14 @@ function ClientDetail({
     () => ({
       owed: sorted.reduce((acc, d) => acc + d.amountOwed, 0),
       paid: sorted.reduce((acc, d) => acc + d.paidAmount, 0),
+      goldDebitGrams: sorted.reduce(
+        (acc, d) => acc + (d.debtType === 0 && getBalanceType(d) === 'gold' ? getRemainingGrams(d) : 0),
+        0,
+      ),
+      goldCreditGrams: sorted.reduce(
+        (acc, d) => acc + (d.debtType === 1 && getBalanceType(d) === 'gold' ? getRemainingGrams(d) : 0),
+        0,
+      ),
       debit: sorted.reduce(
         (acc, d) =>
           acc + ((d.debtType === 0 ? d.amountOwed - d.paidAmount : 0) as number),
@@ -334,11 +369,17 @@ function ClientDetail({
                 <Phone className="size-3.5" />
                 {client.clientPhone || '—'}
               </p>
+              {(client.goldTotalGrams ?? 0) > 0 && (
+                <p className="mt-1 text-[12px] font-semibold text-amber-600">
+                  ذهب: {formatGrams(client.goldDebitGrams ?? 0)} جم عليه ·{' '}
+                  {formatGrams(client.goldCreditGrams ?? 0)} جم له
+                </p>
+              )}
             </div>
           </div>
           <div className="text-end">
             <div className="text-[12px] font-semibold text-muted-foreground">
-              الصافي (مدين − دائن)
+              الصافي النقدي (مدين − دائن)
             </div>
             <div
               className={cn(
@@ -413,6 +454,21 @@ function ClientDetail({
                 </TableCell>
                 <TableCell />
               </TableRow>
+              {(detailTotals.goldDebitGrams > 0 || detailTotals.goldCreditGrams > 0) && (
+                <TableRow className="bg-amber-50/60 font-bold">
+                  <TableCell colSpan={3} className="text-amber-700">
+                    إجمالي الذهب بالجرام
+                  </TableCell>
+                  <TableCell className="tabular-nums text-amber-700">
+                    {formatGrams(detailTotals.goldDebitGrams)} جم عليه
+                  </TableCell>
+                  <TableCell className="tabular-nums text-success">
+                    {formatGrams(detailTotals.goldCreditGrams)} جم له
+                  </TableCell>
+                  <TableCell />
+                  <TableCell />
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </Card>
@@ -423,26 +479,25 @@ function ClientDetail({
 
 function DebtRow({ debt }: { debt: Debt }) {
   const status = getDebtStatus(debt)
-  const remaining = Math.max(
-    0,
-    debt.balanceType === 1
-      ? Math.round((debt.amountOwed - debt.paidAmount) * 100) / 100
-      : Math.round(debt.amountOwed - debt.paidAmount),
-  )
+  const isGold = getBalanceType(debt) === 'gold'
+  const remaining = isGold
+    ? getRemainingGrams(debt)
+    : Math.max(0, debt.amountOwed - debt.paidAmount)
   const isCredit = debt.debtType === 1
   return (
     <TableRow>
       <TableCell className="tabular-nums font-semibold text-primary" dir="ltr">
-        #{debt.saleId ?? debt.debtId}
+        #{debt.saleId ?? debt.purchaseId ?? debt.debtId}
       </TableCell>
       <TableCell>
         <span className="flex flex-wrap items-center gap-1">
           <Badge variant={isCredit ? 'default' : 'secondary'}>
             {isCredit ? 'دائن' : 'مدين'}
           </Badge>
-          {debt.balanceType === 1 && (
-            <Badge variant="outline">ذهب {debt.amountOwed} جم</Badge>
+          {isGold && (
+            <Badge variant="outline">ذهب {formatGrams(debt.grams ?? 0)} جم</Badge>
           )}
+          {debt.isEntrustment && <Badge variant="secondary">أمانة</Badge>}
           {debt.description && (
             <span className="block w-full text-[11px] font-normal text-muted-foreground">
               {debt.description}
@@ -454,10 +509,10 @@ function DebtRow({ debt }: { debt: Debt }) {
         {formatDate(debt.dueDate)}
       </TableCell>
       <TableCell className="tabular-nums">
-        {debt.balanceType === 1 ? `${debt.amountOwed} جم` : formatEgp(debt.amountOwed)}
+        {isGold ? `${formatGrams(debt.grams ?? 0)} جم` : formatEgp(debt.amountOwed)}
       </TableCell>
-      <TableCell className="tabular-nums text-success">
-        {debt.balanceType === 1 ? `${debt.paidAmount} جم` : formatEgp(debt.paidAmount)}
+      <TableCell className={isGold ? 'tabular-nums text-muted-foreground' : 'tabular-nums text-success'}>
+        {isGold ? 'ردّ ذهب' : formatEgp(debt.paidAmount)}
       </TableCell>
       <TableCell
         className={cn(
@@ -465,7 +520,7 @@ function DebtRow({ debt }: { debt: Debt }) {
           remaining <= 0 ? 'text-success' : isCredit ? 'text-success' : 'text-warning',
         )}
       >
-        {debt.balanceType === 1 ? `${remaining} جم` : formatEgp(remaining)}
+        {isGold ? `${formatGrams(remaining)} جم` : formatEgp(remaining)}
       </TableCell>
       <TableCell className="text-end">
         <Badge variant={statusVariant[status]}>

@@ -5,6 +5,8 @@ import type {
   Debt,
   DebtClientSummary,
   DebtStatus,
+  ReturnGoldPayload,
+  ReturnGoldResult,
   UpdateDebtPayload,
 } from './types'
 
@@ -35,10 +37,24 @@ export async function getBranchDebtsPage(params: {
 }
 
 export interface DebtBranchSummary {
+  /** إجماليات نقدية بالجنيه فقط — لا يتسرّب إليها جرام. */
   total: number
   paid: number
   remaining: number
   overdue: number
+  cashDebitRemaining: number
+  cashCreditRemaining: number
+  /** أرصدة الذهب بالجرام وبالجنيه. */
+  goldDebitGrams: number
+  goldCreditGrams: number
+  goldDebitEgp: number
+  goldCreditEgp: number
+  goldTotalGrams: number
+  /** أمانة لدي المحل. */
+  entrustmentGrams: number
+  entrustmentEgp: number
+  sellPrice: number
+  buyPrice: number
 }
 
 export async function getBranchDebtsSummary(branchId: number): Promise<DebtBranchSummary> {
@@ -70,10 +86,13 @@ export async function createCustomerDebt(payload: CreateDebtPayload): Promise<De
   const { data } = await api.post('/api/Debts/CustomerDebt', {
     branchId: payload.branchId ?? null,
     saleId: payload.saleId ?? null,
+    purchaseId: payload.purchaseId ?? null,
     clientId: payload.clientId ?? null,
     companyId: payload.companyId ?? null,
     amountOwed: payload.amountOwed,
     paidAmount: payload.paidAmount,
+    grams: payload.grams ?? null,
+    pricePerGram: payload.pricePerGram ?? null,
     dueDate: payload.dueDate,
     paymentDate: payload.paymentDate ?? null,
     debtType: payload.debtType === 'credit' ? 1 : 0,
@@ -85,6 +104,18 @@ export async function createCustomerDebt(payload: CreateDebtPayload): Promise<De
 
 export async function updateDebt(id: number, payload: UpdateDebtPayload): Promise<void> {
   await api.put(`/api/Debts/Update${id}`, payload)
+}
+
+/**
+ * «رد ذهب»: العميل يشتري ذهب المحل نقداً. التسوية بسعر بيع اليوم
+ * في الخلفية — لا نرسل سعراً لأن الخادم هو المرجع.
+ */
+export async function returnGold(id: number, payload: ReturnGoldPayload): Promise<ReturnGoldResult> {
+  const { data } = await api.post<ReturnGoldResult>(`/api/Debts/ReturnGold/${id}`, {
+    grams: payload.grams ?? null,
+    description: payload.description ?? null,
+  })
+  return data
 }
 
 export async function deleteDebt(id: number): Promise<void> {

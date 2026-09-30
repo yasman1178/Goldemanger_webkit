@@ -38,3 +38,12 @@ export function formatCurrency(
 export function formatEgp(value: number): string {
   return formatCurrency(value)
 }
+
+/**
+ * الجرام بمنزلتين، بلا تجميع: 1.23 جم — لا تقريب يبتلع الكسور المتبقية.
+ * لا تُستخدم formatNumber هنا لأنها تجمع بلا كسور ولا فاصلة عشرية.
+ */
+export function formatGrams(value: number): string {
+  const rounded = Math.round(value * 100) / 100
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)
+}
