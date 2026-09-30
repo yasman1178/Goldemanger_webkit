@@ -22,6 +22,8 @@ import {
   Settings,
   ShieldCheck,
   KeyRound,
+  TrendingUp,
+  BadgeDollarSign,
 } from 'lucide-react'
 
 import { useAuthStore } from '@/shared/stores/auth-store'
@@ -32,6 +34,7 @@ import { SidebarInstallButton } from '@/features/public-site/components/InstallA
 import { GoldPriceBar } from '@/features/sales/components/pos/GoldPriceBar'
 import { OnboardingBanner } from '@/features/settings/components/OnboardingBanner'
 import { ChangePasswordDialog } from '@/features/auth/components/ChangePasswordDialog'
+import { logoutRequest } from '@/features/auth/api'
 import { Button } from '@/shared/components/ui/button'
 import { cn, currencyFromCountry } from '@/shared/lib/utils'
 import {
@@ -63,6 +66,8 @@ const navItems: NavItem[] = [
   { to: '/app/cash', label: 'الخزينة', icon: Banknote },
   { to: '/app/debts', label: 'المديونيات', icon: Wallet },
   { to: '/app/expenses', label: 'المصروفات', icon: TrendingDown },
+  { to: '/app/salaries', label: 'الأجور', icon: BadgeDollarSign },
+  { to: '/app/profits', label: 'أرباح المصنعية', icon: TrendingUp },
   { to: '/app/employee-debts', label: 'سلف الموظفين', icon: HandCoins },
   { to: '/app/settings', label: 'إدارة الشركة', icon: Settings, roles: ['Owner'] },
   { to: '/app/admin', label: 'إدارة النظام', icon: ShieldCheck, roles: ['Responsible'] },
@@ -176,7 +181,23 @@ function UserFooter({ collapsed = false }: { collapsed?: boolean }) {
   const user = useAuthStore((s) => s.user)
   const clearAuth = useAuthStore((s) => s.clearAuth)
   const [passwordOpen, setPasswordOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
   const initial = user?.userName?.trim().charAt(0) ?? '؟'
+
+  // مسح الحالة في الواجهة لا يكفي بعد الانتقال للكوكيز HttpOnly: لولا نداء
+  // الخادم لبقي كوكي الجلسة صالحاً وكل طلب API معتمداً عليه. نُنظّف من
+  // الخادم أولاً، ثم نمسح الحالة محلياً دائماً حتى لو فشل النداء.
+  async function handleLogout() {
+    setLoggingOut(true)
+    try {
+      await logoutRequest()
+    } catch {
+      // الخروج محلي يبقى مطلوباً حتى لو تعذّر إبلاغ الخادم
+    } finally {
+      clearAuth()
+      setLoggingOut(false)
+    }
+  }
 
   if (collapsed) {
     return (
@@ -204,7 +225,8 @@ function UserFooter({ collapsed = false }: { collapsed?: boolean }) {
             aria-label="تسجيل الخروج"
             title="تسجيل الخروج"
             className="size-8 rounded-lg text-muted-foreground hover:text-destructive touch-target"
-            onClick={clearAuth}
+            onClick={handleLogout}
+            disabled={loggingOut}
           >
             <LogOut className="size-4" />
           </Button>
@@ -242,7 +264,8 @@ function UserFooter({ collapsed = false }: { collapsed?: boolean }) {
           aria-label="تسجيل الخروج"
           title="تسجيل الخروج"
           className="size-8 shrink-0 rounded-lg text-muted-foreground hover:text-destructive touch-target"
-          onClick={clearAuth}
+          onClick={handleLogout}
+            disabled={loggingOut}
         >
           <LogOut className="size-4" />
         </Button>

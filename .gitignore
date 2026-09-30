@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# worktrees وخزائن أدوات أخرى — تحوي نسخاً كاملة من التطبيق وتفسد جذر tsconfig
+.kilo
+
 # الاتصال بالـ API لا يُرفَع — يُضبط في Vercel Dashboard
 .env
 .env.*

@@ -27,8 +27,14 @@ export interface StockRecord {
   purchase: StockPurchaseRef | null
 }
 
+/**
+ * يعكس InventoryUnitStatus في الخادم (InventoryUnit.cs). `HELD` كانت ناقصة
+ * هنا رغم توليدها في SaleController عند تعليق الفاتورة، فكانت القطع المحجوزة
+ * تظهر كنص خام `Held` تعجز الواجهة عن تسميتها أو تصفيتها.
+ */
 export type InventoryUnitStatus =
   | 'AVAILABLE'
+  | 'HELD'
   | 'SOLD'
   | 'RETURNED'
   | 'DAMAGED'
@@ -36,6 +42,7 @@ export type InventoryUnitStatus =
 
 export const inventoryUnitStatusLabels: Record<InventoryUnitStatus, string> = {
   AVAILABLE: 'متاح',
+  HELD: 'محجوز',
   SOLD: 'مباع',
   RETURNED: 'مرتجع',
   DAMAGED: 'تالف',

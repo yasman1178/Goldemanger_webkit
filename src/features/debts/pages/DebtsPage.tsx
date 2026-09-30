@@ -392,6 +392,13 @@ export function DebtsPage() {
               </span>
             </div>
           </div>
+          {(summary?.goldPendingCount ?? 0) > 0 && (
+            <p className="mt-1.5 flex items-center gap-1.5 border-t border-amber-300/50 pt-1.5 text-[11px] font-semibold text-amber-700">
+              <AlertTriangle className="size-3" />
+              {summary?.goldPendingCount} مديونية ذهب بانتظار التسعير — وزنها معروف لكن قيمتها
+              بالجنيه غير محسوبة، فلا تُحتسب في الإجماليات. تُسعَّر يدوياً.
+            </p>
+          )}
         </CardContent>
       </Card>
 

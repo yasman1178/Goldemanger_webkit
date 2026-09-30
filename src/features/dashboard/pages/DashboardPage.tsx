@@ -11,6 +11,7 @@ import {
   ReceiptText,
   ChevronLeft,
   Clock3,
+  Gem,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -33,12 +34,15 @@ import { getDashboardStats, closeDay } from '@/features/dashboard/api'
 import type { DayCloseSummary } from '@/features/dashboard/types'
 import { SaleReceiptDialog } from '@/features/sales/components/pos/SaleReceiptDialog'
 import { CloseDayDialog } from '@/features/dashboard/components/CloseDayDialog'
+import { getFactoryProfit } from '@/features/profits/api'
+import { factoryProfitQueryKey } from '@/features/profits/types'
+import { resolvePeriod } from '@/shared/lib/period'
 
 interface Metric {
   label: string
   value: string
   icon: typeof ShoppingCart
-  tone: 'neutral' | 'success' | 'warning' | 'error'
+  tone: 'neutral' | 'success' | 'warning' | 'error' | 'profit'
 }
 
 const quickActions = [
@@ -94,6 +98,25 @@ export function DashboardPage() {
   } = useQuery({
     queryKey: ['dashboard-stats', activeBranchId],
     queryFn: () => getDashboardStats(activeBranchId ?? undefined),
+    enabled: hasValidBranch,
+    retry: false,
+  })
+
+  // ربح مصنعية اليوم فقط (بدون تكلفة الذهب) — نفس الفترة التي يحسبها card المبيعات اليوم.
+  const today = useMemo(() => resolvePeriod('today'), [])
+  const { data: todayProfit } = useQuery({
+    queryKey: [
+      factoryProfitQueryKey,
+      activeBranchId,
+      today.startDate,
+      today.endDate,
+    ],
+    queryFn: () =>
+      getFactoryProfit({
+        startDate: today.startDate,
+        endDate: today.endDate,
+        branchId: activeBranchId ?? undefined,
+      }),
     enabled: hasValidBranch,
     retry: false,
   })
@@ -189,6 +212,12 @@ export function DashboardPage() {
       icon: TrendingUp,
       tone: 'error',
     },
+    {
+      label: 'ربح المصنعية اليوم',
+      value: formatEgp(todayProfit?.totalMakingProfit ?? 0),
+      icon: Gem,
+      tone: 'profit',
+    },
   ]
 
   return (
@@ -197,8 +226,8 @@ export function DashboardPage() {
         className={cn(
           'grid grid-cols-2 gap-2.5 sm:gap-3',
           canCloseDay
-            ? 'sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5'
-            : 'sm:grid-cols-2 md:grid-cols-4',
+            ? 'sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6'
+            : 'sm:grid-cols-3 md:grid-cols-5',
         )}
       >
         {stats.map((s) => {
@@ -234,6 +263,14 @@ export function DashboardPage() {
               valueColor: 'text-rose-700 dark:text-rose-400',
               badge: 'منصرفات',
               badgeColor: 'bg-rose-500/10 text-rose-700',
+            },
+            profit: {
+              border: 'border-violet-500/25 hover:border-violet-500/45',
+              bg: 'bg-gradient-to-br from-white via-white to-violet-50/60',
+              iconBg: 'bg-violet-500/15 text-violet-600',
+              valueColor: 'text-violet-700 dark:text-violet-400',
+              badge: 'بدون تكلفة الذهب',
+              badgeColor: 'bg-violet-500/10 text-violet-700',
             },
           }[s.tone]
 

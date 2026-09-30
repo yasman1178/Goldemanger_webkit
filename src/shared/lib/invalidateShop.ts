@@ -15,6 +15,9 @@ export const shopQueryPrefixes = [
   ['cash-today'],
   ['cash-current'],
   ['cash-opening'],
+  ['expenses'],
+  ['salaries'],
+  ['factory-profit'],
   ['debts'],
   ['overview'],
 ] as const

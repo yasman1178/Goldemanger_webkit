@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2, Plus, ReceiptText } from 'lucide-react'
+import { Loader2, Plus, ReceiptText, Wallet } from 'lucide-react'
 
+import { createExpense, getExpenses } from '@/features/expenses/api'
 import {
-  createExpense,
-  getExpenses,
-} from '@/features/expenses/api'
+  EXPENSE_CATEGORY_OTHER,
+  EXPENSE_CATEGORY_SALARY,
+  canSubmitExpense,
+  expenseCategories,
+  expenseCategoryLabel,
+} from '@/features/expenses/types'
+import { getEmployees } from '@/features/employee-debts/api'
 import { formatEgp } from '@/shared/lib/utils'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { Button } from '@/shared/components/ui/button'
@@ -16,6 +21,13 @@ import { Skeleton } from '@/shared/components/ui/skeleton'
 import { Fab } from '@/shared/components/ui/fab'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog'
 
 function formatDate(value: string): string {
@@ -33,10 +45,22 @@ export function ExpensesPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [amount, setAmount] = useState('')
   const [descraption, setDescraption] = useState('')
+  const [category, setCategory] = useState<string>(String(EXPENSE_CATEGORY_OTHER))
+  const [employeeId, setEmployeeId] = useState('')
 
   const { data: expenses = [], isLoading, isError } = useQuery({
     queryKey: ['expenses', activeBranchId],
     queryFn: () => getExpenses(activeBranchId ?? undefined),
+  })
+
+  const isSalary = Number(category) === EXPENSE_CATEGORY_SALARY
+
+  // قائمة الموظفين تُجلب فقط عند الحاجة إليها (تصنيف راتب) فلا تُثقل نموذج المصروف العادي
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+    queryKey: ['employee-options', activeBranchId],
+    queryFn: () => getEmployees(activeBranchId ?? undefined),
+    enabled: isSalary && activeBranchId != null,
+    staleTime: 5 * 60 * 1000,
   })
 
   const totalToday = expenses
@@ -51,26 +75,52 @@ export function ExpensesPage() {
     })
     .reduce((sum, e) => sum + e.amount, 0)
 
+  const totalSalariesToday = expenses
+    .filter(
+      (e) =>
+        e.category === EXPENSE_CATEGORY_SALARY &&
+        (() => {
+          const s = new Date(e.expenseDate)
+          const now = new Date()
+          return (
+            s.getFullYear() === now.getFullYear() &&
+            s.getMonth() === now.getMonth() &&
+            s.getDate() === now.getDate()
+          )
+        })(),
+    )
+    .reduce((sum, e) => sum + e.amount, 0)
+
   const addMutation = useMutation({
     mutationFn: () =>
       createExpense({
         amount: Number(amount) || 0,
         descraption: descraption.trim(),
+        category: Number(category),
+        employeeId: isSalary ? employeeId : null,
         branchId: activeBranchId ?? undefined,
       }),
     onSuccess: () => {
       toast.success('تم تسجيل المصروف')
       queryClient.invalidateQueries({ queryKey: ['expenses'] })
+      queryClient.invalidateQueries({ queryKey: ['salaries'] })
       setAddOpen(false)
       setAmount('')
       setDescraption('')
+      setCategory(String(EXPENSE_CATEGORY_OTHER))
+      setEmployeeId('')
     },
     onError: (error: { response?: { data?: { message?: string } } }) => {
       toast.error(error.response?.data?.message ?? 'تعذّر تسجيل المصروف.')
     },
   })
 
-  const canAdd = Number(amount) > 0 && descraption.trim().length > 0
+  const canAdd = canSubmitExpense({
+    amount: Number(amount) || 0,
+    descraption,
+    category: Number(category),
+    employeeId,
+  })
 
   return (
     <div className="space-y-6 pb-20">
@@ -90,19 +140,35 @@ export function ExpensesPage() {
         </Button>
       </div>
 
-      <Card size="sm" className="rounded-[14px] elevation-card">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
-            <span>مصروفات اليوم</span>
-            <ReceiptText className="size-4 text-muted-foreground/60" />
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-error">
-            {formatEgp(totalToday)}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-2 gap-3">
+        <Card size="sm" className="rounded-[14px] elevation-card">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
+              <span>مصروفات اليوم</span>
+              <ReceiptText className="size-4 text-muted-foreground/60" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-error">
+              {formatEgp(totalToday)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card size="sm" className="rounded-[14px] elevation-card">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
+              <span>أجور اليوم</span>
+              <Wallet className="size-4 text-muted-foreground/60" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="tabular-nums text-[24px] font-bold leading-[1.1] text-error">
+              {formatEgp(totalSalariesToday)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {isLoading ? (
         <div className="space-y-3">
@@ -134,8 +200,14 @@ export function ExpensesPage() {
                     <p className="truncate text-[15px] font-semibold text-foreground">
                       {e.descraption}
                     </p>
-                    <p className="mt-0.5 flex items-center gap-2 text-[12px] text-muted-foreground">
-                      {formatDate(e.expenseDate)}
+                    <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+                      <span>{formatDate(e.expenseDate)}</span>
+                      <Badge variant="secondary">
+                        {expenseCategoryLabel(e.category)}
+                      </Badge>
+                      {e.employeeName && (
+                        <span className="truncate">{e.employeeName}</span>
+                      )}
                       <Badge variant="destructive">{formatEgp(e.amount)}</Badge>
                     </p>
                   </div>
@@ -168,12 +240,60 @@ export function ExpensesPage() {
               />
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="exp-category">التصنيف</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger id="exp-category" className="h-12 w-full rounded-[14px]">
+                  <SelectValue placeholder="اختر التصنيف" />
+                </SelectTrigger>
+                <SelectContent>
+                  {expenseCategories.map((c) => (
+                    <SelectItem key={c.value} value={String(c.value)}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {isSalary && (
+              <div className="space-y-1.5">
+                <Label htmlFor="exp-employee">الموظف</Label>
+                <Select
+                  value={employeeId}
+                  onValueChange={setEmployeeId}
+                  disabled={employeesLoading || employees.length === 0}
+                >
+                  <SelectTrigger id="exp-employee" className="h-12 w-full rounded-[14px]">
+                    <SelectValue
+                      placeholder={
+                        employeesLoading
+                          ? 'جارٍ تحميل الموظفين…'
+                          : employees.length === 0
+                            ? 'لا يوجد موظفون في هذا الفرع'
+                            : 'اختر الموظف'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
               <Label htmlFor="exp-desc">البيان</Label>
               <Input
                 id="exp-desc"
                 value={descraption}
                 onChange={(e) => setDescraption(e.target.value)}
-                placeholder="مثال: كهرباء، إيجار..."
+                placeholder={
+                  isSalary ? 'مثال: راتب شهر سبتمبر' : 'مثال: كهرباء، إيجار...'
+                }
                 className="h-12 touch-target rounded-[14px]"
               />
             </div>

@@ -16,7 +16,9 @@ import { DebtsPage } from '@/features/debts/pages/DebtsPage'
 import { DebtReportPage } from '@/features/debts/pages/DebtReportPage'
 import { SalesHistoryPage } from '@/features/sales/pages/SalesHistoryPage'
 import { ExpensesPage } from '@/features/expenses/pages/ExpensesPage'
+import { SalariesPage } from '@/features/expenses/pages/SalariesPage'
 import { EmployeeDebtsPage } from '@/features/employee-debts/pages/EmployeeDebtsPage'
+import { ProfitsPage } from '@/features/profits/pages/ProfitsPage'
 import { SettingsPage } from '@/features/settings/pages/SettingsPage'
 import { AdminPage } from '@/features/admin/pages/AdminPage'
 
@@ -51,6 +53,8 @@ const router = createBrowserRouter([
           { path: 'debts', element: <DebtsPage /> },
           { path: 'debts/report', element: <DebtReportPage /> },
           { path: 'expenses', element: <ExpensesPage /> },
+      { path: 'salaries', element: <SalariesPage /> },
+      { path: 'profits', element: <ProfitsPage /> },
           { path: 'employee-debts', element: <EmployeeDebtsPage /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'admin', element: <AdminPage /> },

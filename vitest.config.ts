@@ -17,5 +17,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
     css: true,
+    // worktrees الأدوات تحوي نسخاً كاملة من التطبيق — بدون هذا exclusion
+    // يجمع vitest اختبارات منها ويستنزف عمّال التشغيل فينفد المهلة.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.kilo/**'],
   },
 })

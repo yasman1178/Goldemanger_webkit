@@ -76,8 +76,6 @@ export function LoginPage() {
 
       setAuth(
         user,
-        data.token,
-        data.refreshToken,
         data.branchDetails,
         validBranchId ?? 0,
       )

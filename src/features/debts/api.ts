@@ -53,6 +53,8 @@ export interface DebtBranchSummary {
   /** أمانة لدي المحل. */
   entrustmentGrams: number
   entrustmentEgp: number
+  /** مديونيات ذهب بلا لقطة سعر — وزنها معروف لكن قيمتها غير محسوبة. */
+  goldPendingCount: number
   sellPrice: number
   buyPrice: number
 }

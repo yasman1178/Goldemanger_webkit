@@ -1,17 +1,21 @@
 import axios from 'axios'
 import { getApiBaseUrl } from '@/shared/lib/api-url'
+import { useAuthStore } from '@/shared/stores/auth-store'
 
+/**
+ * المصادقة قائمة على كوكيز HttpOnly فقط.
+ * التوكنات لا تُقرأ ولا تُكتب في localStorage إطلاقاً: الخادم يضعها في
+ * `access_token`/`refresh_token` مع HttpOnly فلا تصلها جافاسكربت، والمتصفح
+ * يُعيدها مع كل طلب لأن `withCredentials` مفعّل.
+ *
+ * بنية requests إطلاقاً ترويسة Authorization: فأي قيمة محلية (حتى النص الحرفي
+ * "undefined") كانت تُرسَل كـ `Bearer undefined` فيرفضها الخادم رغم أن الكوكي
+ * السليم موجود — وهو ما كان يطرد المستخدم بعد أول 401.
+ */
 const api = axios.create({
   baseURL: getApiBaseUrl(),
   headers: { 'Content-Type': 'application/json' },
-})
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
+  withCredentials: true,
 })
 
 let isRefreshing = false
@@ -31,6 +35,14 @@ function processQueue(error: unknown) {
   failedQueue = []
 }
 
+/** هدم الجلسة محلياً وإخراج المستخدم — يُستدعى عند فشل تجديد الكوكي. */
+function endSession() {
+  useAuthStore.getState().clearAuth()
+  if (window.location.pathname.startsWith('/app')) {
+    window.location.href = '/login'
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -38,23 +50,13 @@ api.interceptors.response.use(
       _retry?: boolean
     }
 
-    if (error.response?.status !== 401 || originalRequest._retry) {
-      return Promise.reject(error)
-    }
+    // مسارات المصادقة نفسها لا تُجدَّد: 401 عليها يعني أن الجلسة انتهت فعلاً،
+    // ولو حاولنا التجديد لأعدنا إرسال طلب دخول فاشل إلى ما لا نهاية.
+    const isAuthEndpoint =
+      typeof originalRequest?.url === 'string' &&
+      /\/api\/Auth\/(login|refresh|verifyToken)/i.test(originalRequest.url)
 
-    const refreshToken = localStorage.getItem('refresh_token')
-    if (!refreshToken) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      try {
-        const { useAuthStore } = await import('@/shared/stores/auth-store')
-        useAuthStore.getState().clearAuth()
-      } catch {
-        /* تنظيف المصادقة اختياري — تجاهل الفشل */
-      }
-      if (window.location.pathname.startsWith('/app')) {
-        window.location.href = '/login'
-      }
+    if (error.response?.status !== 401 || originalRequest._retry || isAuthEndpoint) {
       return Promise.reject(error)
     }
 
@@ -70,31 +72,23 @@ api.interceptors.response.use(
     isRefreshing = true
 
     try {
-      const { data } = await axios.post(
+      // بلا جسم: الخادم يقرأ رمز التحديث من الكوكي (EmptyBodyBehavior.Allow)
+      // — إرسال أي نص هنا يجعله يتجاهل الكوكي ويبحث عن قيمة وهمية في القاعدة.
+      await axios.post(
         `${api.defaults.baseURL}/api/Auth/refresh`,
-        JSON.stringify(refreshToken),
-        { headers: { 'Content-Type': 'application/json' } },
+        null,
+        {
+          withCredentials: true,
+          headers: { 'Content-Type': 'application/json' },
+        },
       )
-
-      localStorage.setItem('access_token', data.token)
-      localStorage.setItem('refresh_token', data.refreshToken)
 
       processQueue(null)
 
       return api(originalRequest)
     } catch (refreshError) {
       processQueue(refreshError)
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      try {
-        const { useAuthStore } = await import('@/shared/stores/auth-store')
-        useAuthStore.getState().clearAuth()
-      } catch {
-        /* تنظيف المصادقة اختياري — تجاهل الفشل */
-      }
-      if (window.location.pathname.startsWith('/app')) {
-        window.location.href = '/login'
-      }
+      endSession()
       return Promise.reject(refreshError)
     } finally {
       isRefreshing = false

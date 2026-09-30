@@ -73,7 +73,7 @@ export function InventoryReceiptPrint({
           <DialogTitle>برنت جرد المخزن</DialogTitle>
         </DialogHeader>
 
-        <div className="p-5 sm:p-6 space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
           <div className="receipt-print flex justify-center py-2">
           <div className="receipt-paper p-2">
             <div className="text-center">
@@ -158,26 +158,26 @@ export function InventoryReceiptPrint({
             <div className="my-2 border-t border-dashed border-black" />
             <p className="text-center text-[10px]">الرصيد الفعلي المتاح وقت الطباعة</p>
           </div>
+          </div>
         </div>
 
-          <div className="flex gap-2 receipt-no-print">
-            <Button
-              type="button"
-              onClick={() => window.print()}
-              className="h-11 flex-1 gap-2 rounded-full touch-target"
-            >
-              <Printer className="size-4" />
-              طباعة
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="h-11 rounded-full touch-target"
-            >
-              إغلاق
-            </Button>
-          </div>
+        <div className="flex shrink-0 gap-2 border-t border-black/[0.05] px-5 pt-3 pb-5 sm:px-6 sm:pb-6 receipt-no-print">
+          <Button
+            type="button"
+            onClick={() => window.print()}
+            className="h-11 flex-1 gap-2 rounded-full touch-target"
+          >
+            <Printer className="size-4" />
+            طباعة
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="h-11 rounded-full touch-target"
+          >
+            إغلاق
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

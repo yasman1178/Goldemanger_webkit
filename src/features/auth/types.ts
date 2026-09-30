@@ -19,9 +19,11 @@ export interface BranchDetails {
   totalSales: number
 }
 
+/**
+ * لا `token`/`refreshToken` — الخادم يضعهما في كوكيز HttpOnly
+ * (AppendAuthCookies) فلا يعودان في جسم الاستجابة أصلاً.
+ */
 export interface LoginResponse {
-  token: string
-  refreshToken: string
   role: string
   message: string
   employeeDetails: EmployeeDetails

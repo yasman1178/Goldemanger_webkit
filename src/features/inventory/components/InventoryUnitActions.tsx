@@ -74,11 +74,11 @@ export function InventoryUnitActions({ unit, onPrint }: Props) {
     onSuccess: (result) => {
       setMessage({
         type: 'success',
-        text: result.locationChanged
-          ? `تم تسجيل الجرد: القطعة في ${result.actualLocation ?? 'موقع جديد'}.`
-          : `تم تسجيل الجرد: القطعة موجودة${
-              result.found ? '' : ' (غير موجودة)'
-            }.`,
+        text: !result.found
+          ? `سُجّلت القطعة ${unit.inventoryNumber} كمفقودة (LOST).`
+          : result.locationChanged
+            ? `تم تسجيل الجرد: القطعة في ${result.actualLocation ?? 'موقع جديد'}.`
+            : 'تم تسجيل الجرد: القطعة موجودة في موقعها المتوقع.',
       })
       setCountStorageId('')
       invalidateShopData(queryClient)
@@ -262,7 +262,7 @@ export function InventoryUnitActions({ unit, onPrint }: Props) {
               </div>
             </div>
 
-            {countFound && (
+            {countFound ? (
               <div className="space-y-1.5">
                 <label className="text-[14px] font-medium text-foreground">
                   الموقع الفعلي (إن اختلف)
@@ -277,6 +277,11 @@ export function InventoryUnitActions({ unit, onPrint }: Props) {
                   triggerClassName="w-full h-11 rounded-full border border-black/10 bg-white text-[14px] font-medium text-foreground"
                 />
               </div>
+            ) : (
+              <p className="rounded-xl bg-error/10 px-3 py-2 text-[13px] font-medium leading-relaxed text-error">
+                سيتم وسم القطعة كمفقودة (LOST) واستبعادها من القطع المتاحة،
+                ولن تبقى قابلة للنقل أو الجرد مجدداً.
+              </p>
             )}
 
             {message && (
