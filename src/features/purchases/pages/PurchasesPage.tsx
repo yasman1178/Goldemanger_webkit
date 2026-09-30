@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, Eye, Images, PackagePlus, Plus, Printer, SearchX } from 'lucide-react'
+import { CalendarDays, Eye, Images, PackagePlus, Plus, Printer, SearchX, Sparkles } from 'lucide-react'
 
 import {
   getPurchase,
@@ -11,6 +11,7 @@ import {
 import { PurchaseReceiptDialog, type ReceiptParty } from '@/features/purchases/components/PurchaseReceiptDialog'
 import { PurchaseImagesDialog } from '@/features/purchases/components/PurchaseImagesDialog'
 import { PurchaseListReceiptPrint } from '@/features/purchases/components/PurchaseListReceiptPrint'
+import { InitialStockDialog } from '@/features/purchases/components/InitialStockDialog'
 import type { Purchase } from '@/features/purchases/types'
 import { getCustomers, getSuppliers } from '@/shared/lib/parties'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
@@ -70,6 +71,7 @@ export function PurchasesPage() {
   } | null>(null)
   const [imagesTargetId, setImagesTargetId] = useState<number | null>(null)
   const [listPrintOpen, setListPrintOpen] = useState(false)
+  const [initialStockOpen, setInitialStockOpen] = useState(false)
 
   const { data: pageResult, isLoading, isError } = useQuery({
     queryKey: ['purchases', activeBranchId, 'page', page, query.trim()],
@@ -167,19 +169,30 @@ export function PurchasesPage() {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[34px] font-bold leading-[1.2] text-foreground">
             المشتريات
           </h1>
         </div>
-        <Button
-          onClick={openCreate}
-          className="h-12 gap-2 rounded-full px-6 touch-target"
-        >
-          <Plus className="size-5" />
-          <span className="hidden sm:inline">فاتورة شراء جديدة</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setInitialStockOpen(true)}
+            className="h-12 gap-2 rounded-full border-amber-500/30 bg-amber-500/10 px-5 font-bold text-amber-800 hover:bg-amber-500/20 touch-target"
+          >
+            <Sparkles className="size-5 text-amber-600" />
+            <span>رصيد أول المدة</span>
+          </Button>
+          <Button
+            onClick={openCreate}
+            className="h-12 gap-2 rounded-full px-6 touch-target"
+          >
+            <Plus className="size-5" />
+            <span className="hidden sm:inline">فاتورة شراء جديدة</span>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
@@ -450,6 +463,11 @@ export function PurchasesPage() {
           return arr
         })()}
         onClose={() => setImagesTargetId(null)}
+      />
+
+      <InitialStockDialog
+        open={initialStockOpen}
+        onOpenChange={setInitialStockOpen}
       />
 
       <Fab

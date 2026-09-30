@@ -19,6 +19,7 @@ import { cn } from '@/shared/lib/utils'
 import { loginRequest } from '@/features/auth/api'
 import type { User } from '@/shared/stores/auth-store'
 import { useAuthStore } from '@/shared/stores/auth-store'
+import { getOverview } from '@/features/settings/api'
 import { extractServerMessage } from '@/shared/lib/serverError'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
@@ -79,8 +80,29 @@ export function LoginPage() {
         data.branchDetails,
         validBranchId ?? 0,
       )
-      if (data.role === 'Owner' && !validBranchId) {
-        navigate('/app/settings')
+
+      if (data.role === 'Owner') {
+        if (validBranchId) {
+          navigate('/app')
+        } else {
+          // فحص هل توجد شركة وفروع مسجلة بالفعل للمالك
+          getOverview()
+            .then((overview) => {
+              if (overview?.branches && overview.branches.length > 0) {
+                const firstBranch = overview.branches[0]
+                const bId = firstBranch.branchId
+                useAuthStore.getState().setBranchId(bId)
+                useAuthStore.getState().setSelectedBranchId(bId)
+                navigate('/app')
+              } else {
+                navigate('/app/settings')
+              }
+            })
+            .catch(() => {
+              // في حال تعذر الاستعلام، يوجه للإعدادات كإجراء احتياطي
+              navigate('/app/settings')
+            })
+        }
       } else {
         navigate('/app')
       }

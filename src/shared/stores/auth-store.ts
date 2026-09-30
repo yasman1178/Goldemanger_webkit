@@ -26,6 +26,7 @@ interface AuthState {
     branchId: number,
   ) => void
   setSelectedBranchId: (branchId: number | null) => void
+  setBranchId: (branchId: number | null) => void
   clearAuth: () => void
 }
 
@@ -63,6 +64,11 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
         }),
       setSelectedBranchId: (branchId) => set({ selectedBranchId: branchId }),
+      setBranchId: (branchId) =>
+        set((s) => ({
+          branchId,
+          selectedBranchId: s.selectedBranchId ?? branchId,
+        })),
       clearAuth: () =>
         set({
           user: null,

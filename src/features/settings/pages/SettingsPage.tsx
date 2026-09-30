@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -106,14 +106,27 @@ export function SettingsPage() {
   const roles = useAuthStore((s) => s.user?.roles ?? [])
   const branchId = useAuthStore((s) => s.branchId)
   const isOwner = roles.includes('Owner')
-  const hasBranch = Boolean(branchId && branchId > 0)
+  const setBranchId = useAuthStore((s) => s.setBranchId)
+  const setSelectedBranchId = useAuthStore((s) => s.setSelectedBranchId)
 
-  const { data: overview } = useQuery({
+  const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: ['settings-overview'],
     queryFn: getOverview,
-    enabled: isOwner && hasBranch,
+    enabled: isOwner,
     retry: false,
   })
+
+  // إذا كان المالك ليس لديه branchId مسجل ولكن الفروع موجودة بالفعل في السيرفر،
+  // يتم ضبط أول فرع كفرع فاعل تلقائياً بدلاً من إظهار شاشة إعداد الشركة لأول مرة
+  useEffect(() => {
+    if (overview?.branches && overview.branches.length > 0) {
+      const firstBranch = overview.branches[0]
+      if (!branchId || branchId <= 0) {
+        setBranchId(firstBranch.branchId)
+        setSelectedBranchId(firstBranch.branchId)
+      }
+    }
+  }, [overview, branchId, setBranchId, setSelectedBranchId])
 
   if (!isOwner) {
     return (
@@ -126,7 +139,13 @@ export function SettingsPage() {
     )
   }
 
-  if (!branchId) return <InitialCompanySetup />
+  if (overviewLoading) {
+    return <LoadingCard />
+  }
+
+  // لا تظهر شاشة إعداد الشركة لأول مرة إلا إذا كان السيرفر لا يحتوي على فروع نهائياً
+  const hasExistingBranches = (overview?.branches?.length ?? 0) > 0
+  if (!branchId && !hasExistingBranches) return <InitialCompanySetup />
 
   const totalBranchesCash = overview?.branches.reduce((acc, b) => acc + (b.cash ?? 0), 0) ?? 0
   const totalBranchesSales = overview?.branches.reduce((acc, b) => acc + (b.totalSales ?? 0), 0) ?? 0

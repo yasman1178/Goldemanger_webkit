@@ -30,7 +30,13 @@ export function ProtectedRoute({ roles }: ProtectedRouteProps) {
     restoreSession()
       .then((data) => {
         const rawBranchId = Number(data.employeeDetails.branchId)
-        const validBranchId = !isNaN(rawBranchId) && rawBranchId > 0 ? rawBranchId : 0
+        const currentSavedBranchId = useAuthStore.getState().branchId
+        const validBranchId =
+          !isNaN(rawBranchId) && rawBranchId > 0
+            ? rawBranchId
+            : currentSavedBranchId && currentSavedBranchId > 0
+              ? currentSavedBranchId
+              : 0
         const restored: AuthUser = {
           id: data.employeeDetails.employeeId,
           userName: data.employeeDetails.employeeName,

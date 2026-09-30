@@ -393,15 +393,15 @@ const givenByKarat = useMemo(() => {
         resolvedSupplierId = created.id
       }
 
-return createPurchase({
+      return createPurchase({
         branchId: activeBranchId ?? 0,
         supplierId: resolvedSupplierId,
-        totalAmount,
+        totalAmount: isInitialStock ? 0 : totalAmount,
         goldPrice21AtPurchase: goldPrice || null,
         isInitialStock,
-        paymentType,
-        stampTaxRate: amountToNumber(stampTaxRate) / 100,
-        tradeInSettleMode: paymentType === 'goldTradeIn' ? settleMode : 0,
+        paymentType: isInitialStock ? 'goldTradeIn' : paymentType,
+        stampTaxRate: isInitialStock ? 0 : amountToNumber(stampTaxRate) / 100,
+        tradeInSettleMode: isInitialStock ? 0 : paymentType === 'goldTradeIn' ? settleMode : 0,
         goldExchanges:
           paymentType === 'goldTradeIn'
             ? exchanges.map((e) => ({
@@ -572,7 +572,7 @@ if (!newSupplierMode && !supplierId) {
       )
       return
     }
-    if (!invoiceImage) {
+    if (!invoiceImage && !isInitialStock) {
       toast.error('أرفق صورة فاتورة الشراء — إلزامية.')
       return
     }
