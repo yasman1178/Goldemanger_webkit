@@ -32,6 +32,7 @@ import {
 } from '@/shared/components/ui/select'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { createPurchase } from '@/features/purchases/api'
+import { verifySensitivePassword } from '@/features/auth/api'
 import { depositCash } from '@/features/cash/api'
 import { invalidateAfterPurchase } from '@/shared/lib/invalidateShop'
 import { getStorages, getSuppliers } from '@/shared/lib/parties'
@@ -99,7 +100,24 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
     enabled: open && isUnlocked,
   })
 
-  // التحقق من كلمة المرور محلياً أو تجربة تسجيل/طلب
+  // الفحص الحقيقي على الخادم بكلمة مرور صاحب الجلسة. الفحص المحلي كان مظهراً:
+// يكفي أربعة أحرف لفتح شاشة تزرع أرقاماً في المخزون والخزينة.
+  const unlockMutation = useMutation({
+    mutationFn: async (pwd: string) => verifySensitivePassword(pwd, 'initial-stock'),
+    onSuccess: (result) => {
+      if (result.verified) {
+        setIsUnlocked(true)
+        setPassword('')
+        setUnlockError('')
+        return
+      }
+      setUnlockError('كلمة المرور غير صحيحة.')
+    },
+    onError: (err: unknown) => {
+      setUnlockError(extractServerMessage(err, 'تعذّر التحقق من كلمة المرور.'))
+    },
+  })
+
   function handleUnlock(e: React.FormEvent) {
     e.preventDefault()
     setUnlockError('')
@@ -107,16 +125,7 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
       setUnlockError('يرجى إدخال كلمة المرور للمتابعة.')
       return
     }
-
-    // السماح لصاحب المحل بالمرور بعد إدخال كلمة مروره
-    // يتم التأكيد أن من يقوم بهذه العملية الحساسة هو صاحب الصلاحية
-    if (password.length < 4) {
-      setUnlockError('كلمة المرور غير صحيحة أو قصيرة جداً.')
-      return
-    }
-
-    setIsUnlocked(true)
-    setPassword('')
+    unlockMutation.mutate(password)
   }
 
   function addItem() {
@@ -311,9 +320,10 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
               </Button>
               <Button
                 type="submit"
+                disabled={unlockMutation.isPending}
                 className="h-11 rounded-full px-6 bg-amber-600 hover:bg-amber-700 text-white font-bold touch-target"
               >
-                فتح وإدخال الأرصدة
+                {unlockMutation.isPending ? 'جارٍ التحقق...' : 'فتح وإدخال الأرصدة'}
               </Button>
             </DialogFooter>
           </form>

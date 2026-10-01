@@ -46,7 +46,7 @@ function StatCard({
   return (
     <Card
       className={cn(
-        'rounded-[20px] shadow-none',
+        'rounded-[14px] elevation-card',
         tone === 'accent' && 'border-primary/20 bg-primary/[0.04]',
       )}
     >
@@ -67,7 +67,7 @@ function StatCard({
 }
 
 /** كشف أجور الفترة — يعتمد على Expense بتصنيف "راتب" مربوطاً بموظف. */
-export function SalariesPage() {
+export function SalariesReport() {
   const activeBranchId = useActiveBranchId()
   const hasValidBranch = activeBranchId != null
 
@@ -99,16 +99,14 @@ export function SalariesPage() {
   const employees = data?.employees ?? []
 
   return (
-    <div className="space-y-4 p-4 sm:p-5">
+    <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <div>
-          <h1 className="text-[20px] font-bold text-foreground">الأجور</h1>
-          <p className="text-[13px] text-muted-foreground">
-            مصروفات رواتب الفرع النشط خلال الفترة المحددة
-          </p>
-        </div>
+        <p className="text-[13px] text-muted-foreground">
+          مصروفات رواتب الفرع النشط خلال الفترة المحددة
+        </p>
         <Button
           type="button"
+          variant="outline"
           onClick={() => window.print()}
           className="receipt-no-print h-11 shrink-0 gap-2 rounded-full touch-target"
         >
@@ -117,7 +115,7 @@ export function SalariesPage() {
         </Button>
       </div>
 
-      <Card className="receipt-no-print rounded-[20px] shadow-none">
+      <Card className="receipt-no-print rounded-[14px] elevation-card">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-wrap gap-1.5">
@@ -200,8 +198,8 @@ export function SalariesPage() {
         </p>
       ) : isLoading ? (
         <div className="space-y-3">
-          <Skeleton className="h-24 rounded-[20px]" />
-          <Skeleton className="h-64 rounded-[20px]" />
+          <Skeleton className="h-24 rounded-[14px]" />
+          <Skeleton className="h-64 rounded-[14px]" />
         </div>
       ) : isError ? (
         <p className="text-[14px] font-medium text-error">تعذّر تحميل كشف الأجور.</p>
@@ -226,7 +224,7 @@ export function SalariesPage() {
             />
           </div>
 
-          <Card className="rounded-[20px] shadow-none">
+          <Card className="rounded-[14px] elevation-card">
             <CardContent className="p-4 sm:p-5">
               <p className="mb-3 text-[15px] font-semibold text-foreground">
                 توزيع الأجور على الموظفين
@@ -276,7 +274,7 @@ export function SalariesPage() {
                     لا توجد رواتب في هذه الفترة
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    سجّل مصروفاً تصنيفه «راتب» من صفحة المصروفات ليظهر هنا.
+                    سجّل مصروفاً تصنيفه «راتب» من تبويب المصروفات ليظهر هنا.
                   </p>
                 </div>
               )}

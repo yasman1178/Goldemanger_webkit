@@ -5,7 +5,10 @@ import {
   ChevronUp,
   Printer,
   AlertCircle,
+  ShieldCheck,
 } from 'lucide-react'
+
+import { useAuthStore } from '@/shared/stores/auth-store'
 
 import { getFactoryProfit } from '@/features/profits/api'
 import {
@@ -54,14 +57,15 @@ function StatCard({
   label: string
   value: string
   hint?: string
-  tone?: 'default' | 'accent'
+  tone?: 'default' | 'accent' | 'success'
   noPrint?: boolean
 }) {
   return (
     <Card
       className={cn(
-        'rounded-[20px] shadow-none',
+        'rounded-[14px] elevation-card',
         tone === 'accent' && 'border-primary/20 bg-primary/[0.04]',
+        tone === 'success' && 'border-success/25 bg-success/[0.06]',
         noPrint && 'receipt-no-print',
       )}
     >
@@ -70,7 +74,9 @@ function StatCard({
         <p
           className={cn(
             'mt-1.5 text-[20px] font-bold tabular-nums',
-            tone === 'accent' ? 'text-primary' : 'text-foreground',
+            tone === 'accent' && 'text-primary',
+            tone === 'success' && 'text-success',
+            tone === 'default' && 'text-foreground',
           )}
         >
           {value}
@@ -141,6 +147,8 @@ function SaleRow({ line }: { line: FactoryProfitSaleLine }) {
 export function ProfitsPage() {
   const activeBranchId = useActiveBranchId()
   const hasValidBranch = activeBranchId != null
+  const roles = useAuthStore((s) => s.user?.roles ?? [])
+  const isOwner = roles.includes('Owner')
 
   const [preset, setPreset] = useState<PeriodPreset>('thisMonth')
   const [customRange, setCustomRange] = useState(() => {
@@ -171,9 +179,23 @@ export function ProfitsPage() {
         endDate: range.endDate,
         branchId: activeBranchId ?? undefined,
       }),
-    enabled: hasValidBranch && rangeIsValid,
+    enabled: hasValidBranch && rangeIsValid && isOwner,
     retry: false,
   })
+
+  if (!isOwner) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+        <ShieldCheck className="size-12 text-muted-foreground" />
+        <p className="text-[17px] font-semibold text-foreground">
+          هذه الصفحة مخصصة لصاحب المحل فقط
+        </p>
+        <p className="text-sm text-muted-foreground">
+          أرباح المصنعية بيانات حساسة ولا تظهر لغير صاحب المحل.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4 p-4 sm:p-5">
@@ -195,7 +217,7 @@ export function ProfitsPage() {
         </Button>
       </div>
 
-      <Card className="receipt-no-print rounded-[20px] shadow-none">
+      <Card className="receipt-no-print rounded-[14px] elevation-card">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-wrap gap-1.5">
@@ -272,8 +294,8 @@ export function ProfitsPage() {
         </p>
       ) : isLoading ? (
         <div className="space-y-3">
-          <Skeleton className="h-24 rounded-[20px]" />
-          <Skeleton className="h-64 rounded-[20px]" />
+          <Skeleton className="h-24 rounded-[14px]" />
+          <Skeleton className="h-64 rounded-[14px]" />
         </div>
       ) : isError ? (
         <p className="text-[14px] font-medium text-error">
@@ -285,7 +307,7 @@ export function ProfitsPage() {
             <StatCard
               label="ربح المصنعية (بدون تكلفة الذهب)"
               value={formatEgp(data?.totalMakingProfit ?? 0)}
-              tone="accent"
+              tone="success"
               hint="مجموع الفروقات × الأوزان × الكميات"
             />
             <StatCard
@@ -306,7 +328,7 @@ export function ProfitsPage() {
           </div>
 
           {data?.days && data.days.length > 0 && (
-            <Card className="rounded-[20px] shadow-none">
+            <Card className="rounded-[14px] elevation-card">
               <CardContent className="p-4 sm:p-5">
                 <p className="mb-3 text-[15px] font-semibold text-foreground">
                   ملخص الأيام
@@ -353,7 +375,7 @@ export function ProfitsPage() {
             </Card>
           )}
 
-          <Card className="rounded-[20px] shadow-none">
+          <Card className="rounded-[14px] elevation-card">
             <CardContent className="p-4 sm:p-5">
               <p className="mb-3 text-[15px] font-semibold text-foreground">
                 تفصيل الفواتير

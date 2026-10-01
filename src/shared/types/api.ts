@@ -19,6 +19,10 @@ export interface PriceUpdateGolde {
   priceUpdateGoldeId: number
   goldPriceId?: number | null
   newPrice: number
+  /** سعر شراء جرام عيار 21 في نفس اللقطة — كان يُقرأ من جدول الشركة فحسب. */
+  buyPrice?: number | null
+  /** سعر أدخله مستخدم يدوياً (تعذّر جلب السعر) لا من البورصة. */
+  isManual?: boolean
   employeeId?: string | null
   branchId: number
   updateDate: string

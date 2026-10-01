@@ -43,6 +43,9 @@ export interface CreateSalePayload {
   branchId?: number | null
   saleId?: number
   isHold?: boolean
+  // لا لقطة سعر هنا عن قصد: الخادم يربط الفاتورة باللقطة التي حُسبت عليها
+  // فعلاً، وأي رقم ترسله الواجهة يُتجاهل — وإلا صار السجل يشير لسعر لم
+  // تُحسب عليه الفاتورة.
 }
 
 export interface HeldSaleItem extends SaleItem {

@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { getApiBaseUrl } from '@/shared/lib/api-url'
 import { useAuthStore } from '@/shared/stores/auth-store'
+import { connection } from '@/shared/stores/connection-store'
 
 /**
  * المصادقة قائمة على كوكيز HttpOnly فقط.
@@ -44,11 +45,25 @@ function endSession() {
 }
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // أي رد من السيرفر — حتى 404 أو 422 — دليل أن الاتصال قائم. التمييز
+    // المهم هو وجود `response` أصلاً: غيابه يعني أن الطلب لم يصل.
+    connection.markOnline()
+    return response
+  },
   async (error) => {
     const originalRequest = error.config as import('axios').AxiosRequestConfig & {
       _retry?: boolean
     }
+
+    // لا رد ولا استثناء مُجمَّل = الشبكة أو السيرفر نفسه. هذا ما يميّز
+    // «منقطع» عن «السعر قديم» في بوابة الفاتورة.
+    if (!error.response) {
+      connection.markOffline()
+      return Promise.reject(error)
+    }
+
+    connection.markOnline()
 
     // مسارات المصادقة نفسها لا تُجدَّد: 401 عليها يعني أن الجلسة انتهت فعلاً،
     // ولو حاولنا التجديد لأعدنا إرسال طلب دخول فاشل إلى ما لا نهاية.

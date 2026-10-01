@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, Plus, ReceiptText, Wallet } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 
 import { createExpense, getExpenses } from '@/features/expenses/api'
 import {
@@ -12,6 +13,7 @@ import {
   expenseCategoryLabel,
 } from '@/features/expenses/types'
 import { getEmployees } from '@/features/employee-debts/api'
+import { SalariesReport } from '@/features/expenses/components/SalariesReport'
 import { formatEgp } from '@/shared/lib/utils'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { Button } from '@/shared/components/ui/button'
@@ -28,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog'
 
 function formatDate(value: string): string {
@@ -42,11 +45,19 @@ function formatDate(value: string): string {
 export function ExpensesPage() {
   const queryClient = useQueryClient()
   const activeBranchId = useActiveBranchId()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [addOpen, setAddOpen] = useState(false)
   const [amount, setAmount] = useState('')
   const [descraption, setDescraption] = useState('')
   const [category, setCategory] = useState<string>(String(EXPENSE_CATEGORY_OTHER))
   const [employeeId, setEmployeeId] = useState('')
+
+  // دمج الأجور هنا: تبويب واحد داخل المصروفات بدل صفحة منفصلة.
+  // يدعم رابط قديم /app/salaries عبر ?tab=salaries.
+  const activeTab = searchParams.get('tab') === 'salaries' ? 'salaries' : 'expenses'
+  function setActiveTab(value: string) {
+    setSearchParams(value === 'salaries' ? { tab: 'salaries' } : {}, { replace: true })
+  }
 
   const { data: expenses = [], isLoading, isError } = useQuery({
     queryKey: ['expenses', activeBranchId],
@@ -127,20 +138,33 @@ export function ExpensesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[34px] font-bold leading-[1.2] text-foreground">
-            المصروفات
+            المصروفات والأجور
           </h1>
-          <p className="text-muted-foreground">إدارة مصروفات الفرع اليومية</p>
+          <p className="text-muted-foreground">إدارة مصروفات الفرع ورواتب الموظفين</p>
         </div>
-        <Button
-          onClick={() => setAddOpen(true)}
-          className="h-12 gap-2 rounded-full px-6 touch-target"
-        >
-          <Plus className="size-5" />
-          <span className="hidden sm:inline">تسجيل مصروف</span>
-        </Button>
+        {activeTab === 'expenses' && (
+          <Button
+            onClick={() => setAddOpen(true)}
+            className="h-12 gap-2 rounded-full px-6 touch-target"
+          >
+            <Plus className="size-5" />
+            <span className="hidden sm:inline">تسجيل مصروف</span>
+          </Button>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
+        <TabsList className="grid h-12 w-full grid-cols-2 rounded-[14px] p-1">
+          <TabsTrigger value="expenses" className="h-10 rounded-[10px] touch-target">
+            المصروفات
+          </TabsTrigger>
+          <TabsTrigger value="salaries" className="h-10 rounded-[10px] touch-target">
+            كشف الأجور
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="expenses" className="space-y-6">
+          <div className="grid grid-cols-2 gap-3">
         <Card size="sm" className="rounded-[14px] elevation-card">
           <CardHeader>
             <CardTitle className="flex items-center justify-between gap-2 text-[13px] font-semibold leading-[1.35] text-muted-foreground">
@@ -217,6 +241,12 @@ export function ExpensesPage() {
           </ul>
         </Card>
       )}
+        </TabsContent>
+
+        <TabsContent value="salaries" className="space-y-4">
+          <SalariesReport />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-sm">
@@ -324,13 +354,15 @@ export function ExpensesPage() {
         </DialogContent>
       </Dialog>
 
-      <Fab
-        aria-label="تسجيل مصروف"
-        className="fixed bottom-6 end-6 z-40"
-        onClick={() => setAddOpen(true)}
-      >
-        <Plus />
-      </Fab>
+      {activeTab === 'expenses' && (
+        <Fab
+          aria-label="تسجيل مصروف"
+          className="fixed bottom-6 end-6 z-40"
+          onClick={() => setAddOpen(true)}
+        >
+          <Plus />
+        </Fab>
+      )}
     </div>
   )
 }

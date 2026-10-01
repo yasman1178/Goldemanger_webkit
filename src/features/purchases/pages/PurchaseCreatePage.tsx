@@ -1,4 +1,4 @@
-import { useId, useEffect, useMemo, useState } from 'react'
+import { useId, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -36,6 +36,11 @@ import type { InventoryUnitRecord } from '@/features/inventory/types'
 import { getProducts } from '@/features/products/api'
 import type { Product } from '@/features/products/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { useGoldPriceGate, type PriceBasis } from '@/shared/hooks/useGoldPriceGate'
+import {
+  PriceMismatchDialog,
+  type PriceGateMode,
+} from '@/shared/components/PriceMismatchDialog'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import {
   createCustomer,
@@ -46,6 +51,7 @@ import {
   getLatestGoldPrice,
   getStorages,
   getSuppliers,
+  saveGoldPrice,
 } from '@/shared/lib/parties'
 import { amountToNumber, BUY_FROM_CUSTOMER_COMMISSION, purchaseLineMath, purchasePerGram } from '@/shared/lib/gold'
 import { getOverview } from '@/features/settings/api'
@@ -205,6 +211,16 @@ export function PurchaseCreatePage() {
   const goldPrice = partyMode === 'customer'
     ? storeGold21Buy
     : (storeGold21 > 0 ? storeGold21 : (serverPrice ?? 0))
+
+  // الشراء من عميل يُسعَّر بسعر الشراء، فالمقارنة مع سعر البيع تُظهر انحرافاً
+  // وهمياً بحجم عمولة الشراء. البوابة تأخذ المرجع نفسه الذي سيستعمله الخادم.
+  const gateBasis: PriceBasis = partyMode === 'customer' ? 'buy' : 'sell'
+  const gate = useGoldPriceGate(activeBranchId, goldPrice, gateBasis)
+  const [gateOpen, setGateOpen] = useState(false)
+  const [gateMode, setGateMode] = useState<PriceGateMode>('missing')
+  // الحفظ معلَّق خلف نافذة الحسم: بعد حلّها نُعيد التحقق ونحفظ، لا نحفظ مباشرة
+  // خوفاً أن تمر الفاتورة بنفس الشروط التي رفضناها للتو.
+  const submitAfterGateRef = useRef(false)
 
   const { data: overview } = useQuery({
     queryKey: ['settings-overview'],
@@ -560,6 +576,70 @@ const givenByKarat = useMemo(() => {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
+    // نفس قاعدة البيع: لا حفظ قبل معرفة سعر الخادم، لا بعده بالتمنّي.
+    if (gate.status === 'loading') {
+      toast.info('جارٍ التحقق من سعر الذهب على السيرفر — لحظة واحدة.')
+      return
+    }
+
+    // بوابة السعر قبل كل شيء: فاتورة تُحفظ بسعر لا يعرفه الخادم تُفسد المخزون
+    // والخزينة معاً، ولا يظهر أثرها إلا عند الجرد.
+    if (gate.status === 'offline') {
+      toast.error(
+        gate.blockReason ?? 'لا يمكن تسجيل عملية شراء بدون الاتصال بالسيرفر.',
+      )
+      return
+    }
+
+    if (gate.status === 'needs-price' || gate.driftNeedsDecision) {
+      submitAfterGateRef.current = true
+      setGateMode(gate.status === 'needs-price' ? 'missing' : 'mismatch')
+      setGateOpen(true)
+      return
+    }
+
+    submitAfterGateRef.current = false
+    runSubmit()
+  }
+
+  /**
+   * سعر مُدخل يدوياً: يُحفظ على السيرفر، ثم تُعاد كل الحسابات على سعره الجديد.
+   * الحفظ لا يسبقه شيء — لو رُفضت الفاتورة بعد تسجيل السعر، يبقى السعر المسجَّل
+   * صحيحاً لأن ما رآه الكاشير هو ما صار يُحفظ.
+   */
+  async function resolveGatePrice(price: { sell: number; buy: number | null }) {
+    await saveGoldPrice({
+      sell: price.sell,
+      buy: price.buy,
+      isManual: true,
+      branchId: activeBranchId,
+    })
+
+    setGold21(price.sell)
+    if (price.buy != null && price.buy > 0) setGold21Buy(price.buy)
+    gate.refetch()
+    setGateOpen(false)
+    toast.success(
+      `تم تسجيل سعر الذهب ${price.sell} على السيرفر — العملية ستُحسب عليه.`,
+    )
+
+    if (submitAfterGateRef.current) runSubmit()
+  }
+
+  /** اعتماد سعر الخادم بلا حفظ جديد: تحديث الشاشة على الرقم المسجَّل. */
+  function useServerPriceForPurchase() {
+    const sell = gate.serverSell
+    if (sell == null) return
+
+    setGold21(sell)
+    if (gate.serverBuy != null && gate.serverBuy > 0) setGold21Buy(gate.serverBuy)
+    setGateOpen(false)
+    toast.success(`تم اعتماد سعر الخادم ${sell} على شاشة الشراء.`)
+
+    if (submitAfterGateRef.current) runSubmit()
+  }
+
+  function runSubmit() {
     if (newSupplierMode && !newSupplierName.trim()) {
       toast.error('اكتب اسم المورد الجديد.')
       return
@@ -581,7 +661,10 @@ if (!newSupplierMode && !supplierId) {
       return
     }
     if (partyMode === 'customer' && (!goldPrice || goldPrice <= 0)) {
-      toast.error('لم يصل سعر الشراء بعد — انتظر لحظة ثم أعد المحاولة.')
+      // السعر يدخل من نافذة الحسم لا من رسالة خطأ: لا شراء من عميل بسعر بيع.
+      submitAfterGateRef.current = true
+      setGateMode('missing')
+      setGateOpen(true)
       return
     }
     const validLines = lines.filter(
@@ -1389,6 +1472,18 @@ byKarat.map((row) => (
           )}
         </DialogContent>
       </Dialog>
+
+      <PriceMismatchDialog
+        open={gateOpen}
+        mode={gateMode}
+        serverSell={gate.serverSell}
+        serverBuy={gate.serverBuy}
+        screenPrice={goldPrice}
+        drift={gate.drift}
+        onOpenChange={setGateOpen}
+        onResolved={resolveGatePrice}
+        onUseServerPrice={useServerPriceForPurchase}
+      />
 
       <PurchaseReceiptDialog
         open={savedResult != null}

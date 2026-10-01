@@ -8,9 +8,14 @@ import { getProducts } from '@/features/products/api'
 import { invalidateAfterSale } from '@/shared/lib/invalidateShop'
 import type { Product } from '@/features/products/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
-import { getLatestGoldPrice, getStorages } from '@/shared/lib/parties'
+import { getLatestGoldPrice, getStorages, saveGoldPrice } from '@/shared/lib/parties'
 import type { StorageLocation } from '@/shared/types/api'
 import { useGoldStore } from '@/shared/stores/gold-store'
+import { useGoldPriceGate } from '@/shared/hooks/useGoldPriceGate'
+import {
+  PriceMismatchDialog,
+  type PriceGateMode,
+} from '@/shared/components/PriceMismatchDialog'
 import { cartLineMath } from '@/shared/lib/gold'
 import { formatEgp, formatNumber, cn } from '@/shared/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog'
@@ -48,6 +53,8 @@ export function SalesPage() {
   const [success, setSuccess] = useState<SaleSuccessInfo | null>(null)
 
   const [view, setView] = useState<'pos' | 'held'>('pos')
+  const [gateOpen, setGateOpen] = useState(false)
+  const [gateMode, setGateMode] = useState<PriceGateMode>('missing')
   const [payingHeld, setPayingHeld] = useState<HeldSale | null>(null)
   const [editingHeld, setEditingHeld] = useState<HeldSale | null>(null)
   const [cancellingHeld, setCancellingHeld] = useState<HeldSale | null>(null)
@@ -68,6 +75,8 @@ export function SalesPage() {
   }
 
   const gold21 = useGoldStore((s) => s.gold21)
+  const setGold21 = useGoldStore((s) => s.setGold21)
+  const setGold21Buy = useGoldStore((s) => s.setGold21Buy)
   const freezeGold = useGoldStore((s) => s.freezeGold)
   const setFreezeGold = useGoldStore((s) => s.setFreezeGold)
 
@@ -98,6 +107,10 @@ export function SalesPage() {
   })
 
   const effectiveGold = gold21 > 0 ? gold21 : serverPrice ?? 0
+
+  // البوابة تحسب على السعر الذي ستُحسب عليه الفاتورة فعلاً، لا على ما يظنه
+  // المتصفح: إنها التي تقرر إن كانت الفاتورة ستمرّ أم تُحسم أولاً.
+  const gate = useGoldPriceGate(activeBranchId, effectiveGold)
 
   function addToCart(product: Product) {
     setCart((prev) => {
@@ -148,7 +161,11 @@ export function SalesPage() {
       acc.margin += m.margin
       acc.making += m.making
       acc.taxAndStamp += m.taxAndStamp
-      acc.gross += m.total
+      // نجمع القيم غير المقرَّبة ثم نقرّب الإجمالي مرة واحدة عند الأسفل.
+      // جمع m.total (المقرَّب لكل سطر) ثم التقريب مرة ثانية يجعل الإجمالي ينحرف
+      // عن حساب الخادم حتى 0.5 ج.م عن كل سطر — أي 2 ج.م عند 4 أسطر و4 عند 8 —
+      // وهو ما كان سيُسجَّل كـ«انحراف سعر» حقيقي لو دُقِّق الإجمالي على السيرفر.
+      acc.gross += m.metal + m.margin + m.making + m.taxAndStamp
     }
     const discountCap = Math.min(discount, acc.making)
     return {
@@ -271,6 +288,82 @@ export function SalesPage() {
     })()
   }
 
+  /**
+   * كل طريق يؤدي إلى الدفع يمرّ من هنا. الفاتورة تُرسل إلى الخادم الذي يحسبها
+   * من سعر الفرع المسجَّل، فإن اختلف ما على الشاشة عنه فوق عتبة التدقيق، فالسجل
+   * سيحمل رقماً لا يطابق ما رآه الكاشير ولا العميل، ولا يعرف أحد لماذا لاحقاً.
+   */
+  function requestCheckout() {
+    // أثناء التحميل لا نعرف سعر الخادم بعد: السماح بالمرور هنا يعني فاتورة
+    // قد تُحسب بسعر لم يُتحقق منه، فيُسجَّل انحراف كان يمكن منعه بزر معلّق.
+    if (gate.status === 'loading') {
+      toast.info('جارٍ التحقق من سعر الذهب على السيرفر — لحظة واحدة.')
+      return
+    }
+
+    if (gate.status === 'offline') {
+      toast.error(
+        gate.blockReason ?? 'لا يمكن تسجيل فاتورة بدون الاتصال بالسيرفر.',
+      )
+      return
+    }
+
+    if (gate.status === 'needs-price') {
+      setGateMode('missing')
+      setGateOpen(true)
+      return
+    }
+
+    if (gate.driftNeedsDecision) {
+      setGateMode('mismatch')
+      setGateOpen(true)
+      return
+    }
+
+    proceedToPayment()
+  }
+
+  function proceedToPayment() {
+    if (editingHeld) {
+      checkoutHeldEdit()
+      return
+    }
+    setCartOpen(false)
+    setPaymentOpen(true)
+  }
+
+  /**
+   * سعر مُدخل يدوياً: يُحفظ على السيرفر أولاً ثم يُعاد حساب السلة عليه. الترتيب
+   * مقصود — التحديثان في نفس الحزمة، فيُفتح نافذة الدفع بالرقم الجديد لا بالقديم.
+   */
+  async function resolveGatePrice(price: { sell: number; buy: number | null }) {
+    await saveGoldPrice({
+      sell: price.sell,
+      buy: price.buy,
+      isManual: true,
+      branchId: activeBranchId,
+    })
+
+    setGold21(price.sell)
+    if (price.buy != null && price.buy > 0) setGold21Buy(price.buy)
+    gate.refetch()
+    toast.success(`تم تسجيل سعر الذهب ${price.sell} على السيرفر — الفاتورة ستُحسب عليه.`)
+
+    proceedToPayment()
+  }
+
+  /** اعتماد سعر الخادم: تحديث الشاشة على الرقم المسجَّل، بلا حفظ جديد. */
+  function useServerPriceForCart() {
+    const sell = gate.serverSell
+    if (sell == null) return
+
+    setGold21(sell)
+    const buy = gate.serverBuy
+    if (buy != null && buy > 0) setGold21Buy(buy)
+    toast.success(`تم اعتماد سعر الخادم ${sell} على شاشة البيع.`)
+    proceedToPayment()
+  }
+
   async function handleCancelHeld(sale: HeldSale) {
     try {
       await cancelHeldSale(sale.saleId)
@@ -382,7 +475,7 @@ export function SalesPage() {
             <div className="flex min-h-0 flex-1 flex-col">
               <CurrentCart
                 {...cartProps}
-                onCheckout={editingHeld ? checkoutHeldEdit : () => setPaymentOpen(true)}
+                onCheckout={requestCheckout}
               />
             </div>
           </div>
@@ -435,13 +528,8 @@ export function SalesPage() {
                 <CurrentCart
                   {...cartProps}
                   onCheckout={() => {
-                    if (editingHeld) {
-                      checkoutHeldEdit()
-                      setCartOpen(false)
-                    } else {
-                      setCartOpen(false)
-                      setPaymentOpen(true)
-                    }
+                    setCartOpen(false)
+                    requestCheckout()
                   }}
                 />
               </div>
@@ -457,6 +545,18 @@ export function SalesPage() {
         discount={totals.discount}
         onApply={(amount) => setDiscount(amount)}
         onClear={() => setDiscount(0)}
+      />
+
+      <PriceMismatchDialog
+        open={gateOpen}
+        mode={gateMode}
+        serverSell={gate.serverSell}
+        serverBuy={gate.serverBuy}
+        screenPrice={effectiveGold}
+        drift={gate.drift}
+        onOpenChange={setGateOpen}
+        onResolved={resolveGatePrice}
+        onUseServerPrice={useServerPriceForCart}
       />
 
       <PaymentDialog

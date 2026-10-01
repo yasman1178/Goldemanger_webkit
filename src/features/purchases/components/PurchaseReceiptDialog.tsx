@@ -62,6 +62,10 @@ export function PurchaseReceiptDialog({
     staleTime: 5 * 60 * 1000,
   })
   const [imagesOpen, setImagesOpen] = useState(false)
+  // تفاصيل التكلفة الداخلية (مصنعية المورد، الدمغة، عمولة الشراء، قيمة البيع
+  // المتوقعة) أرقام تخصّ المحل لا الطرف الآخر. الإيصال يُطبع بلاها افتراضياً،
+  // ومن يحتاج المراجعة يفتحها يدوياً.
+  const [showDetails, setShowDetails] = useState(false)
 
   if (!open || !purchase) return null
 
@@ -162,16 +166,27 @@ export function PurchaseReceiptDialog({
           <h2 className="text-[16px] font-bold text-foreground">
             معاينة فاتورة الكاشير
           </h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label="إغلاق"
-            className="size-9 rounded-full touch-target"
-          >
-            <X className="size-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDetails((v) => !v)}
+              className="rounded-full text-[12px] font-semibold text-muted-foreground touch-target"
+            >
+              {showDetails ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="إغلاق"
+              className="size-9 rounded-full touch-target"
+            >
+              <X className="size-5" />
+            </Button>
+          </div>
         </div>
 
         <div className="mx-auto receipt-paper receipt-print rounded-sm p-2 shadow-sm">
@@ -406,29 +421,34 @@ export function PurchaseReceiptDialog({
                         {formatNumber(lineTotal)}
                       </span>
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[10px]">
-                      <span>ذهب: {formatNumber(goldUnit)}/جم</span>
-                      {factory > 0 && (
-                        <span className="rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">
-                          مصنعية المورد: {formatNumber(factory)}/جم
+                    {/* تفاصيل تكلفة القطعة للمراجعة الداخلية فقط؛ لا تُطبع للطرف */}
+                    {showDetails && (
+                      <div className="mt-0.5 flex items-center gap-2 text-[10px]">
+                        <span>ذهب: {formatNumber(goldUnit)}/جم</span>
+                        {factory > 0 && (
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">
+                            مصنعية المورد: {formatNumber(factory)}/جم
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {showDetails && (
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px]">
+                        {!isCustomer && (
+                          <span className="rounded bg-black/5 px-1.5 py-0.5 font-semibold">
+                            دمغة وضريبة: +{(goldUnit * stampTaxRate).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}/جم
+                          </span>
+                        )}
+                        {isCustomer && commissionRate > 0 && (
+                          <span className="rounded bg-error/10 px-1.5 py-0.5 font-semibold text-error">
+                            عمولة شراء من عميل: −{(goldUnit * commissionRate).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}/جم ({(commissionRate * 100).toFixed(2)}%)
+                          </span>
+                        )}
+                        <span className="rounded bg-success/10 px-1.5 py-0.5 font-semibold text-success">
+                          مصنعية المحل: {formatNumber(p.factoryForSale ?? 0)}/جم
                         </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px]">
-                      {!isCustomer && (
-                        <span className="rounded bg-black/5 px-1.5 py-0.5 font-semibold">
-                          دمغة وضريبة: +{(goldUnit * stampTaxRate).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}/جم
-                        </span>
-                      )}
-                      {isCustomer && commissionRate > 0 && (
-                        <span className="rounded bg-error/10 px-1.5 py-0.5 font-semibold text-error">
-                          عمولة شراء من عميل: −{(goldUnit * commissionRate).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}/جم ({(commissionRate * 100).toFixed(2)}%)
-                        </span>
-                      )}
-                      <span className="rounded bg-success/10 px-1.5 py-0.5 font-semibold text-success">
-                        مصنعية المحل: {formatNumber(p.factoryForSale ?? 0)}/جم
-                      </span>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )
               })
@@ -444,39 +464,44 @@ export function PurchaseReceiptDialog({
               <span>الوزن الكلي</span>
               <span>{formatNumber(totalWeight)} gm</span>
             </div>
-            {goldSubtotal > 0 && (
-              <div className="flex justify-between">
-                <span>قيمة الذهب</span>
-                <span>{formatEgp(goldSubtotal)}</span>
-              </div>
-            )}
-            {factorySubtotal > 0 && (
-              <div className="flex justify-between text-primary font-semibold">
-                <span>مصنعية المورد</span>
-                <span>{formatEgp(factorySubtotal)}</span>
-              </div>
-            )}
-            {!isCustomer && stampAndTaxSubtotal > 0 && (
-              <div className="flex justify-between">
-                <span>دمغة وضريبة (1%)</span>
-                <span>{formatEgp(Math.round(stampAndTaxSubtotal))}</span>
-              </div>
-            )}
-            {isCustomer && commissionSubtotal > 0 && (
-              <div className="flex justify-between">
-                <span>
-                  عمولة الشراء من عميل ({(commissionRate * 100).toFixed(2)}%)
-                </span>
-                <span>−{formatEgp(Math.round(commissionSubtotal))}</span>
-              </div>
-            )}
-            {saleValueSubtotal > 0 && (
-              <div className="flex justify-between border-t border-dashed border-black/40 pt-1">
-                <span>قيمة البيع المتوقعة (شامل الدمغة والضريبة والمصنعية)</span>
-                <span className="font-semibold tabular-nums">
-                  {formatEgp(Math.round(saleValueSubtotal))}
-                </span>
-              </div>
+            {/* ملخص التكلفة الداخلية للمراجعة فقط؛ الإيصال للطرف يكتفي بالعدد والوزن والإجمالي */}
+            {showDetails && (
+              <>
+                {goldSubtotal > 0 && (
+                  <div className="flex justify-between">
+                    <span>قيمة الذهب</span>
+                    <span>{formatEgp(goldSubtotal)}</span>
+                  </div>
+                )}
+                {factorySubtotal > 0 && (
+                  <div className="flex justify-between text-primary font-semibold">
+                    <span>مصنعية المورد</span>
+                    <span>{formatEgp(factorySubtotal)}</span>
+                  </div>
+                )}
+                {!isCustomer && stampAndTaxSubtotal > 0 && (
+                  <div className="flex justify-between">
+                    <span>دمغة وضريبة (1%)</span>
+                    <span>{formatEgp(Math.round(stampAndTaxSubtotal))}</span>
+                  </div>
+                )}
+                {isCustomer && commissionSubtotal > 0 && (
+                  <div className="flex justify-between">
+                    <span>
+                      عمولة الشراء من عميل ({(commissionRate * 100).toFixed(2)}%)
+                    </span>
+                    <span>−{formatEgp(Math.round(commissionSubtotal))}</span>
+                  </div>
+                )}
+                {saleValueSubtotal > 0 && (
+                  <div className="flex justify-between border-t border-dashed border-black/40 pt-1">
+                    <span>قيمة البيع المتوقعة (شامل الدمغة والضريبة والمصنعية)</span>
+                    <span className="font-semibold tabular-nums">
+                      {formatEgp(Math.round(saleValueSubtotal))}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
             <div className="mt-1 flex justify-between border-t border-black/20 pt-1 text-[12px] font-bold">
               <span>الإجمالي</span>

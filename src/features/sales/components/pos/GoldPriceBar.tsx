@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw, Pencil, Loader2, Gem, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -8,6 +8,7 @@ import { purchasePerGram, salePerGram, buyPerGram } from '@/shared/lib/gold'
 import { FormatEg } from './Money'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import { useCurrencyStore } from '@/shared/stores/currency-store'
+import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { currencySymbol, cn } from '@/shared/lib/utils'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
@@ -38,6 +39,34 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
   const [editOpen, setEditOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [livePrices, setLivePrices] = useState<LiveGoldPrice | null>(null)
+  const activeBranchId = useActiveBranchId()
+
+  // حفظ السعر يفشل بصمت كان يعني أن الكاشير يرى سعراً غير محفوظ على الخادم،
+  // ثم يُحسب عليه تدقيق الفاتورة ويختلف عن ما رآه. نُبلّغه ونُبقي القيمة
+  // المحلية كما هي ليكمل العمل مع تنبيه واضح.
+  const persistSnapshot = useCallback(
+    async (
+      sell: number,
+      buy: number | null | undefined,
+      isManual: boolean,
+    ): Promise<boolean> => {
+      try {
+        await saveGoldPrice({ sell, buy, isManual, branchId: activeBranchId })
+        return true
+      } catch {
+        toast.error('تعذّر حفظ سعر الذهب على السيرفر — الرقم على الشاشة غير محفوظ بعد.')
+        return false
+      }
+    },
+    [activeBranchId],
+  )
+
+  // نمرّر الدالة عبر ref مثل بقية القيم هنا: تحتاج مزامنة مع الفرع النشط،
+  // ولو دخلت مصفوفة الاعتماديات لأعادت تشغيل المؤقّت في كل تصيير.
+  const persistRef = useRef(persistSnapshot)
+  useEffect(() => {
+    persistRef.current = persistSnapshot
+  }, [persistSnapshot])
 
   const country = currency === 'SAR' ? 'sa' : 'eg'
   const symbol = currencySymbol(currency)
@@ -84,7 +113,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
       !editOpenRef.current &&
       Math.abs(data.gram21Sell - gold21Ref.current) > 0.1
     ) {
-      await saveGoldPrice(data.gram21Sell, 'update')
+      await persistSnapshot(data.gram21Sell, data.gram21Buy, false)
     }
     if (!freezeRef.current) {
       onPriceChangeRef.current(data.gram21Sell)
@@ -113,7 +142,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
             !editOpenRef.current &&
             Math.abs(data.gram21Sell - gold21Ref.current) > 0.1
           ) {
-            await saveGoldPrice(data.gram21Sell, 'update')
+            await persistRef.current(data.gram21Sell, data.gram21Buy, false)
           }
           if (!freezeRef.current) {
             onPriceChangeRef.current(data.gram21Sell)
@@ -135,7 +164,7 @@ export function GoldPriceBar({ hidePriceRefresh = false }: { hidePriceRefresh?: 
       stopped = true
       clearInterval(id)
     }
-  }, [setLastFetchTime, hidePriceRefresh, country])
+  }, [setLastFetchTime, hidePriceRefresh, country, activeBranchId])
 
   async function refresh() {
     setRefreshing(true)
@@ -352,6 +381,7 @@ function GoldPriceEditDialog({
   const [saving, setSaving] = useState(false)
   const [prevOpen, setPrevOpen] = useState(open)
   const currency = useCurrencyStore((s) => s.currency)
+  const activeBranchId = useActiveBranchId()
 
   if (open !== prevOpen) {
     setPrevOpen(open)
@@ -369,12 +399,17 @@ function GoldPriceEditDialog({
       return
     }
     setSaving(true)
-    const saved = await saveGoldPrice(draftValue, 'update')
-    setSaving(false)
-    if (!saved) {
-      toast.error('تعذّر حفظ السعر لدى النظام.')
+    try {
+      // سعر بشري = isManual. الوسم يبقى في السجل ليعرف المراجع أن السعر
+      // لم يُجلب من البورصة بل أدخله مستخدم، فما يحتسبه تدقيق الفاتورة
+      // يُقرأ على أنه لقطة سوق.
+      await saveGoldPrice({ sell: draftValue, isManual: true, branchId: activeBranchId })
+    } catch {
+      setSaving(false)
+      toast.error('تعذّر حفظ السعر لدى النظام — لم يُسجَّل على السيرفر.')
       return
     }
+    setSaving(false)
     onSave(draftValue)
     onOpenChange(false)
     toast.success(`تم تحديث سعر الذهب إلى ${draftValue} ${currencySymbol(currency)}`)

@@ -3,7 +3,7 @@ import {
   Banknote,
   ShoppingCart,
   Store,
-  TrendingUp,
+  TrendingDown,
   Wallet,
   Package,
   Boxes,
@@ -42,7 +42,9 @@ interface Metric {
   label: string
   value: string
   icon: typeof ShoppingCart
-  tone: 'neutral' | 'success' | 'warning' | 'error' | 'profit'
+  tone: 'neutral' | 'success' | 'warning' | 'error'
+  badge?: string
+  to?: string
 }
 
 const quickActions = [
@@ -102,7 +104,7 @@ export function DashboardPage() {
     retry: false,
   })
 
-  // ربح مصنعية اليوم فقط (بدون تكلفة الذهب) — نفس الفترة التي يحسبها card المبيعات اليوم.
+  // ربح مصنعية اليوم فقط (بدون تكلفة الذهب) — لصاحب المحل فقط.
   const today = useMemo(() => resolvePeriod('today'), [])
   const { data: todayProfit } = useQuery({
     queryKey: [
@@ -117,7 +119,7 @@ export function DashboardPage() {
         endDate: today.endDate,
         branchId: activeBranchId ?? undefined,
       }),
-    enabled: hasValidBranch,
+    enabled: hasValidBranch && isOwner,
     retry: false,
   })
 
@@ -209,27 +211,34 @@ export function DashboardPage() {
     {
       label: 'المصروفات اليوم',
       value: formatEgp(dashboard?.totalExpenses ?? branchDetails?.totalExpenses ?? 0),
-      icon: TrendingUp,
+      icon: TrendingDown,
       tone: 'error',
     },
-    {
-      label: 'ربح المصنعية اليوم',
-      value: formatEgp(todayProfit?.totalMakingProfit ?? 0),
-      icon: Gem,
-      tone: 'profit',
-    },
+    ...(isOwner
+      ? [
+          {
+            label: 'ربح المصنعية اليوم',
+            value: formatEgp(todayProfit?.totalMakingProfit ?? 0),
+            icon: Gem,
+            tone: 'success' as const,
+            badge: 'بدون تكلفة الذهب',
+            to: '/app/profits',
+          },
+        ]
+      : []),
   ]
+
+  const totalCards = stats.length + (canCloseDay ? 1 : 0)
+  const gridCols =
+    totalCards >= 6
+      ? 'sm:grid-cols-3 lg:grid-cols-6'
+      : totalCards === 5
+        ? 'sm:grid-cols-3 lg:grid-cols-5'
+        : 'sm:grid-cols-2 lg:grid-cols-4'
 
   return (
     <div className="space-y-6 pb-20">
-      <div
-        className={cn(
-          'grid grid-cols-2 gap-2.5 sm:gap-3',
-          canCloseDay
-            ? 'sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6'
-            : 'sm:grid-cols-3 md:grid-cols-5',
-        )}
-      >
+      <div className={cn('grid grid-cols-2 gap-2.5 sm:gap-3', gridCols)}>
         {stats.map((s) => {
           const config = {
             success: {
@@ -264,25 +273,16 @@ export function DashboardPage() {
               badge: 'منصرفات',
               badgeColor: 'bg-rose-500/10 text-rose-700',
             },
-            profit: {
-              border: 'border-violet-500/25 hover:border-violet-500/45',
-              bg: 'bg-gradient-to-br from-white via-white to-violet-50/60',
-              iconBg: 'bg-violet-500/15 text-violet-600',
-              valueColor: 'text-violet-700 dark:text-violet-400',
-              badge: 'بدون تكلفة الذهب',
-              badgeColor: 'bg-violet-500/10 text-violet-700',
-            },
           }[s.tone]
-
-          return (
-            <div
-              key={s.label}
-              className={cn(
-                'group relative flex flex-col justify-between rounded-[14px] border p-3 sm:p-3.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm',
-                config.border,
-                config.bg,
-              )}
-            >
+          const badgeText = s.badge ?? config.badge
+          const cardClass = cn(
+            'group relative flex flex-col justify-between rounded-[14px] border p-3 sm:p-3.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm',
+            config.border,
+            config.bg,
+            s.to && 'cursor-pointer touch-target text-start',
+          )
+          const cardInner = (
+            <>
               <div className="flex items-center justify-between gap-1.5 pb-1">
                 <span className="text-[12px] font-bold text-foreground/85 truncate">
                   {s.label}
@@ -316,11 +316,32 @@ export function DashboardPage() {
                         config.badgeColor,
                       )}
                     >
-                      {config.badge}
+                      {badgeText}
                     </span>
                   </div>
                 )}
               </div>
+            </>
+          )
+
+          if (s.to) {
+            return (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => navigate(s.to as string)}
+                aria-label={`${s.label} — عرض التفاصيل`}
+                title="عرض كشف الأرباح"
+                className={cardClass}
+              >
+                {cardInner}
+              </button>
+            )
+          }
+
+          return (
+            <div key={s.label} className={cardClass}>
+              {cardInner}
             </div>
           )
         })}

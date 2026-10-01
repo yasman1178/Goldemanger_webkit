@@ -15,6 +15,7 @@ import { InitialStockDialog } from '@/features/purchases/components/InitialStock
 import type { Purchase } from '@/features/purchases/types'
 import { getCustomers, getSuppliers } from '@/shared/lib/parties'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { useAuthStore } from '@/shared/stores/auth-store'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
 import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
 import { PaginationBar } from '@/shared/components/ui/pagination'
@@ -72,6 +73,8 @@ export function PurchasesPage() {
   const [imagesTargetId, setImagesTargetId] = useState<number | null>(null)
   const [listPrintOpen, setListPrintOpen] = useState(false)
   const [initialStockOpen, setInitialStockOpen] = useState(false)
+  const roles = useAuthStore((s) => s.user?.roles ?? [])
+  const isOwner = roles.includes('Owner')
 
   const { data: pageResult, isLoading, isError } = useQuery({
     queryKey: ['purchases', activeBranchId, 'page', page, query.trim()],
@@ -176,15 +179,19 @@ export function PurchasesPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setInitialStockOpen(true)}
-            className="h-12 gap-2 rounded-full border-amber-500/30 bg-amber-500/10 px-5 font-bold text-amber-800 hover:bg-amber-500/20 touch-target"
-          >
-            <Sparkles className="size-5 text-amber-600" />
-            <span>رصيد أول المدة</span>
-          </Button>
+          {/* رصيد أول المدة قرار محل لا تفويض موظف: الزر لا يظهر لغير
+              صاحب المحل، والخادم يرفض الحفظ حتى لو طُلب مباشرة من جهازه. */}
+          {isOwner && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setInitialStockOpen(true)}
+              className="h-12 gap-2 rounded-full border-amber-500/30 bg-amber-500/10 px-5 font-bold text-amber-800 hover:bg-amber-500/20 touch-target"
+            >
+              <Sparkles className="size-5 text-amber-600" />
+              <span>رصيد أول المدة</span>
+            </Button>
+          )}
           <Button
             onClick={openCreate}
             className="h-12 gap-2 rounded-full px-6 touch-target"

@@ -23,13 +23,14 @@ import {
   ShieldCheck,
   KeyRound,
   TrendingUp,
-  BadgeDollarSign,
+  Scale,
 } from 'lucide-react'
 
 import { useAuthStore } from '@/shared/stores/auth-store'
 import { useCurrencyStore } from '@/shared/stores/currency-store'
 import { getOverview } from '@/features/settings/api'
 import { BranchSelector } from '@/shared/components/BranchSelector'
+import { ConnectionBadge } from '@/shared/components/ConnectionBadge'
 import { SidebarInstallButton } from '@/features/public-site/components/InstallAppButton'
 import { GoldPriceBar } from '@/features/sales/components/pos/GoldPriceBar'
 import { OnboardingBanner } from '@/features/settings/components/OnboardingBanner'
@@ -65,10 +66,10 @@ const navItems: NavItem[] = [
   { to: '/app/inventory', label: 'الجرد', icon: Boxes },
   { to: '/app/cash', label: 'الخزينة', icon: Banknote },
   { to: '/app/debts', label: 'المديونيات', icon: Wallet },
-  { to: '/app/expenses', label: 'المصروفات', icon: TrendingDown },
-  { to: '/app/salaries', label: 'الأجور', icon: BadgeDollarSign },
-  { to: '/app/profits', label: 'أرباح المصنعية', icon: TrendingUp },
+  { to: '/app/expenses', label: 'المصروفات والأجور', icon: TrendingDown },
+  { to: '/app/profits', label: 'أرباح المصنعية', icon: TrendingUp, roles: ['Owner'] },
   { to: '/app/employee-debts', label: 'سلف الموظفين', icon: HandCoins },
+  { to: '/app/price-reviews', label: 'مراجعة الأسعار', icon: Scale, roles: ['Owner', 'Manager'] },
   { to: '/app/settings', label: 'إدارة الشركة', icon: Settings, roles: ['Owner'] },
   { to: '/app/admin', label: 'إدارة النظام', icon: ShieldCheck, roles: ['Responsible'] },
 ]
@@ -360,6 +361,11 @@ export function AppLayout() {
           <Brand collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((value) => !value)} />
           <div className="px-2.5 pb-2">
             <BranchSelector inSidebar collapsed={sidebarCollapsed} />
+            {!sidebarCollapsed && (
+              <div className="mt-2 flex justify-center">
+                <ConnectionBadge />
+              </div>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto px-2.5 py-2">
             <NavLinks collapsed={sidebarCollapsed} />
@@ -410,6 +416,7 @@ export function AppLayout() {
             <span className="font-bold text-foreground">Gold Master</span>
             {branchName && <span className="text-sm text-muted-foreground">| {branchName}</span>}
           </div>
+          <ConnectionBadge />
         </div>
         <div
           className={cn(

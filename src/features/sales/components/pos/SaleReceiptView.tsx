@@ -1,6 +1,6 @@
 import type { CompanyInfo } from '@/features/purchases/types'
 import type { SalePrintData } from '@/features/sales/api'
-import { purchasePerGram } from '@/shared/lib/gold'
+import { purchasePerGram, TAX_AND_STAMP_RATE } from '@/shared/lib/gold'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
 
 const receiptTypeLabels: Record<number, string> = {
@@ -23,9 +23,11 @@ function formatReceiptDate(iso?: string | null): string {
 interface Props {
   data: SalePrintData
   shop?: CompanyInfo
+  /** إظهار تفاصيل القطعة (المصنعية والضريبة والدمغة) — تُفتح بزرار من الديالوج ولا تُطبع إلا وهي ظاهرة. */
+  showDetails?: boolean
 }
 
-export function SaleReceiptView({ data, shop }: Props) {
+export function SaleReceiptView({ data, shop, showDetails = false }: Props) {
   const shopName = shop?.name?.trim() || 'محل الذهب'
   const address = [
     shop?.location?.trim(),
@@ -45,6 +47,11 @@ export function SaleReceiptView({ data, shop }: Props) {
     const grams = (i.weight ?? 0) * (i.quantity ?? 0)
     return sum + purchasePerGram(gold21, i.karat ?? 21) * grams
   }, 0)
+  const makingSubtotal = items.reduce((sum, i) => {
+    const grams = (i.weight ?? 0) * (i.quantity ?? 0)
+    return sum + (i.factory ?? 0) * grams
+  }, 0)
+  const taxSubtotal = goldSubtotal * TAX_AND_STAMP_RATE
   const rounded = Math.round(data.totalAmount ?? 0)
   const paid = Math.round(data.paid ?? 0)
   const remaining = Math.round(data.amountOwed ?? 0)
@@ -103,6 +110,8 @@ export function SaleReceiptView({ data, shop }: Props) {
             const grams = (i.weight ?? 0) * (i.quantity ?? 0)
             const goldUnit = purchasePerGram(gold21, i.karat ?? 21)
             const makingUnit = i.factory ?? 0
+            const makingPiece = makingUnit * grams
+            const taxPiece = goldUnit * grams * TAX_AND_STAMP_RATE
             const lineTotal = (goldUnit + makingUnit) * grams
             return (
               <div
@@ -133,6 +142,24 @@ export function SaleReceiptView({ data, shop }: Props) {
                 <div className="mt-0.5 flex items-center gap-2 text-[10px]">
                   <span>ذهب: {formatNumber(goldUnit)}/جم</span>
                 </div>
+                {showDetails && (
+                  <div className="mt-0.5 space-y-0.5 text-[10px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>مصنعية: {formatNumber(makingUnit)}/جم</span>
+                      <span className="tabular-nums font-semibold">
+                        للقطعة: {formatEgp(makingPiece)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span>
+                        ضريبة ودمغة (1%): {formatNumber(goldUnit * TAX_AND_STAMP_RATE)}/جم
+                      </span>
+                      <span className="tabular-nums font-semibold">
+                        للقطعة: {formatEgp(taxPiece)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })
@@ -153,6 +180,18 @@ export function SaleReceiptView({ data, shop }: Props) {
             <span>قيمة الذهب</span>
             <span>{formatEgp(goldSubtotal)}</span>
           </div>
+        )}
+        {showDetails && (
+          <>
+            <div className="flex justify-between">
+              <span>إجمالي المصنعية</span>
+              <span className="tabular-nums">{formatEgp(makingSubtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>إجمالي الضريبة والدمغة</span>
+              <span className="tabular-nums">{formatEgp(taxSubtotal)}</span>
+            </div>
+          </>
         )}
         {data.discount > 0 && (
           <div className="flex justify-between">

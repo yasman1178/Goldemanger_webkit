@@ -83,6 +83,54 @@ export async function getLatestGoldPrice(): Promise<number | null> {
   return latest ? latest.newPrice : null
 }
 
+/**
+ * لقطة سعر الفرع كما يراها الخادم — المرجع الذي تُقارن عليه الفاتورة.
+ *
+ * الأهم هنا `priceUpdateGoldeId`: بدونه تُسجَّل الفاتورة بلا رابط بسعرها،
+ * فلا يمكن إعادة حسابها ولا تتبّع أي تعديل على السعر لاحقاً.
+ */
+export interface GoldPriceSnapshot {
+  priceUpdateGoldeId: number | null
+  sell: number
+  buy: number
+  isManual: boolean
+  updateDate: string | null
+}
+
+export async function getGoldPriceSnapshot(
+  branchId?: number | null,
+): Promise<GoldPriceSnapshot> {
+  const { data } = await api.get<PriceUpdateGolde[]>('/api/PriceUpdate/GetAll', {
+    params: branchId ? { branchId } : undefined,
+  })
+
+  const latest = (data ?? [])
+    .filter((p) => p.priceUpdateGoldeId)
+    .sort(
+      (a, b) =>
+        new Date(b.updateDate ?? 0).getTime() -
+        new Date(a.updateDate ?? 0).getTime(),
+    )[0]
+
+  if (!latest) {
+    return {
+      priceUpdateGoldeId: null,
+      sell: 0,
+      buy: 0,
+      isManual: false,
+      updateDate: null,
+    }
+  }
+
+  return {
+    priceUpdateGoldeId: latest.priceUpdateGoldeId,
+    sell: latest.newPrice ?? 0,
+    buy: latest.buyPrice ?? latest.newPrice ?? 0,
+    isManual: latest.isManual ?? false,
+    updateDate: latest.updateDate ?? null,
+  }
+}
+
 export interface LiveGoldPrice {
   gram24Sell: number
   gram24Buy?: number | null
@@ -108,22 +156,27 @@ export async function fetchLiveGoldPrice(
   }
 }
 
-export async function saveGoldPrice(
-  price: number,
-  mode: 'create' | 'update',
-): Promise<PriceUpdateGolde | null> {
-  try {
-    const request =
-      mode === 'create'
-        ? api.post<PriceUpdateGolde>(`/api/PriceUpdate/Create`, null, {
-            params: { price },
-          })
-        : api.put<PriceUpdateGolde>(`/api/PriceUpdate/UpdatePrice`, null, {
-            params: { price },
-          })
-    const { data } = await request
-    return data
-  } catch {
-    return null
-  }
+/**
+ * تسجيل سعر الذهب على الخادم: البيع والشراء في لقطة واحدة.
+ *
+ * كان الحفظ يقبل سعر البيع وحده عبر query parameter، فسعر الشراء لم يكن
+ * يُحفظ إطلاقاً ويبقى في ذاكرة الجهاز. ولأن تدقيق الفاتورة صار يقارن بسعر
+ * الخادم، فالprix الذي لا يُحفظ على الخادم لا يمكن الاعتماد عليه في أي حساب.
+ *
+ * لا نُخفي الخطأ: الفشل يُرمي للواجهة، وحالة «لا يوجد سعر محفوظ» (null) هي
+ * النتيجة الصريحة الوحيدة.
+ */
+export async function saveGoldPrice(input: {
+  sell: number
+  buy?: number | null
+  isManual?: boolean
+  branchId?: number | null
+}): Promise<PriceUpdateGolde> {
+  const { data } = await api.post<PriceUpdateGolde>('/api/PriceUpdate/SetPrices', {
+    sell: input.sell,
+    buy: input.buy ?? input.sell,
+    isManual: input.isManual ?? false,
+    branchId: input.branchId ?? undefined,
+  })
+  return data
 }

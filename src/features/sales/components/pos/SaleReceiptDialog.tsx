@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Printer, X } from 'lucide-react'
 
@@ -32,6 +33,9 @@ export function SaleReceiptDialog({
     queryFn: () => getSaleForPrint(saleId),
     enabled: open && saleId > 0,
   })
+  // تفاصيل القطعة (المصنعية والضريبة والدمغة) مخفية افتراضياً — تُفتح يدوياً
+  // ولا تُطبع إلا وهي ظاهرة، نفس سلوك فاتورة الشراء.
+  const [showDetails, setShowDetails] = useState(false)
 
   if (!open || !data) {
     if (!open) return null
@@ -53,19 +57,30 @@ export function SaleReceiptDialog({
           <h2 className="text-[16px] font-bold text-foreground">
             فاتورة بيع #{data.saleId}
           </h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label="إغلاق"
-            className="size-9 rounded-full touch-target"
-          >
-            <X className="size-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDetails((v) => !v)}
+              className="rounded-full text-[12px] font-semibold text-muted-foreground touch-target"
+            >
+              {showDetails ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="إغلاق"
+              className="size-9 rounded-full touch-target"
+            >
+              <X className="size-5" />
+            </Button>
+          </div>
         </div>
 
-        <SaleReceiptView data={data} shop={shop} />
+        <SaleReceiptView data={data} shop={shop} showDetails={showDetails} />
 
         <div className="mt-3 flex gap-2 receipt-no-print">
           <Button

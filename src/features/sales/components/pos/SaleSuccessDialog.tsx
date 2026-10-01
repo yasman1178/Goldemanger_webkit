@@ -37,6 +37,7 @@ interface Props {
 
 export function SaleSuccessDialog({ info, onClose, onNewSale }: Props) {
   const [copied, setCopied] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
 
   const saleId = info?.saleId ?? 0
 
@@ -121,7 +122,20 @@ export function SaleSuccessDialog({ info, onClose, onNewSale }: Props) {
               </p>
             </div>
           ) : data ? (
-            <SaleReceiptView data={data} shop={shop} />
+            <>
+              <div className="flex justify-end receipt-no-print">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDetails((v) => !v)}
+                  className="rounded-full text-[12px] font-semibold text-muted-foreground touch-target"
+                >
+                  {showDetails ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
+                </Button>
+              </div>
+              <SaleReceiptView data={data} shop={shop} showDetails={showDetails} />
+            </>
           ) : (
             <p className="py-6 text-center text-sm text-muted-foreground">
               جارٍ تجهيز الفاتورة...
