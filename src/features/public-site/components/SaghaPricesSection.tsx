@@ -151,118 +151,96 @@ export function SaghaPricesSection() {
           </div>
         </div>
 
-        {/* 4 Core Real-Time Metric Cards (Hero Highlights) */}
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 4 Core Real-Time Metric Cards (Hero Highlights) — Sleek, compact & balanced */}
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* 1. Gram 21 Card */}
-          <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 via-neutral-900 to-neutral-950 p-5 shadow-lg">
+          <div className="group relative overflow-hidden rounded-xl border border-amber-500/40 bg-gradient-to-b from-amber-500/15 via-neutral-900/90 to-neutral-950 p-3.5 shadow-md hover:border-amber-400 transition-all">
             <div className="flex items-center justify-between">
-              <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-black text-amber-400 border border-amber-500/30">
+              <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[11px] font-black text-amber-300 border border-amber-500/30">
                 عيار 21
               </span>
-              <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/20">
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-500/20">
                 الأكثر تداولاً
               </span>
             </div>
-            <div className="mt-3">
-              <span className="text-xs text-neutral-400">سعر البيع (للمستهلك):</span>
-              <div className="text-2xl sm:text-3xl font-black text-white tabular-nums">
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-[11px] text-neutral-400">سعر البيع:</span>
+              <div className="text-xl sm:text-2xl font-black text-white tabular-nums">
                 {prices.gold21Sell.toLocaleString('ar-EG')}{' '}
-                <span className="text-sm font-bold text-amber-400">ج.م</span>
+                <span className="text-xs font-bold text-amber-400">ج.م</span>
               </div>
             </div>
-            <div className="mt-2.5 pt-2.5 border-t border-neutral-800/80 flex items-center justify-between text-xs">
-              <span className="text-neutral-400">سعر الشراء (كسر):</span>
+            <div className="mt-2 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[11px]">
+              <span className="text-neutral-400">الشراء (كسر):</span>
               <span className="font-bold text-neutral-200 tabular-nums">
                 {prices.gold21Buy.toLocaleString('ar-EG')} ج.م
               </span>
             </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] text-amber-400/90 font-medium">
-              <span>متوسط المصنعية:</span>
-              <span>80 - 150 ج.م/جم</span>
-            </div>
           </div>
 
           {/* 2. Gold Pound Card */}
-          <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-900 to-neutral-950 p-5 shadow-lg hover:border-amber-500/30 transition-all">
+          <div className="group relative overflow-hidden rounded-xl border border-neutral-800 bg-gradient-to-b from-neutral-900/90 to-neutral-950 p-3.5 shadow-md hover:border-amber-500/40 transition-all">
             <div className="flex items-center justify-between">
-              <span className="rounded-md bg-yellow-500/15 px-2 py-0.5 text-xs font-black text-yellow-300 border border-yellow-500/30">
+              <span className="rounded-md bg-yellow-500/15 px-2 py-0.5 text-[11px] font-black text-yellow-300 border border-yellow-500/30">
                 الجنيه الذهب
               </span>
-              <span className="text-[11px] text-neutral-400 font-medium">8 جرام 21</span>
+              <span className="text-[10px] text-neutral-400 font-medium">8 جرام عيار 21</span>
             </div>
-            <div className="mt-3">
-              <span className="text-xs text-neutral-400">سعر البيع الآن:</span>
-              <div className="text-2xl sm:text-3xl font-black text-white tabular-nums">
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-[11px] text-neutral-400">سعر البيع:</span>
+              <div className="text-xl sm:text-2xl font-black text-white tabular-nums">
                 {prices.goldPoundSell.toLocaleString('ar-EG')}{' '}
-                <span className="text-sm font-bold text-yellow-400">ج.م</span>
+                <span className="text-xs font-bold text-yellow-400">ج.م</span>
               </div>
             </div>
-            <div className="mt-2.5 pt-2.5 border-t border-neutral-800/80 flex items-center justify-between text-xs">
-              <span className="text-neutral-400">سعر الشراء:</span>
+            <div className="mt-2 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[11px]">
+              <span className="text-neutral-400">الشراء:</span>
               <span className="font-bold text-neutral-200 tabular-nums">
                 {prices.goldPoundBuy.toLocaleString('ar-EG')} ج.م
-              </span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-400">
-              <span>نصف الجنيه (4g):</span>
-              <span className="font-bold text-neutral-300 tabular-nums">
-                {prices.halfPoundSell.toLocaleString('ar-EG')} ج.م
               </span>
             </div>
           </div>
 
           {/* 3. Bullion 10g 24K Card */}
-          <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-900 to-neutral-950 p-5 shadow-lg hover:border-amber-500/30 transition-all">
+          <div className="group relative overflow-hidden rounded-xl border border-neutral-800 bg-gradient-to-b from-neutral-900/90 to-neutral-950 p-3.5 shadow-md hover:border-amber-500/40 transition-all">
             <div className="flex items-center justify-between">
-              <span className="rounded-md bg-amber-400/15 px-2 py-0.5 text-xs font-black text-amber-300 border border-amber-400/30">
-                سبيكة 10 جرام BTC
+              <span className="rounded-md bg-amber-400/15 px-2 py-0.5 text-[11px] font-black text-amber-300 border border-amber-400/30">
+                سبيكة 10g BTC
               </span>
-              <span className="text-[11px] text-emerald-400 font-semibold">عيار 24 نقي</span>
+              <span className="text-[10px] text-emerald-400 font-semibold">24K نقي</span>
             </div>
-            <div className="mt-3">
-              <span className="text-xs text-neutral-400">سعر السبيكة بالغلاف:</span>
-              <div className="text-2xl sm:text-3xl font-black text-white tabular-nums">
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-[11px] text-neutral-400">بالغلاف:</span>
+              <div className="text-xl sm:text-2xl font-black text-white tabular-nums">
                 {(prices.gold24Sell * 10 + 580).toLocaleString('ar-EG')}{' '}
-                <span className="text-sm font-bold text-amber-400">ج.م</span>
+                <span className="text-xs font-bold text-amber-400">ج.م</span>
               </div>
             </div>
-            <div className="mt-2.5 pt-2.5 border-t border-neutral-800/80 flex items-center justify-between text-xs">
-              <span className="text-neutral-400">كاش باك عند الإعادة:</span>
+            <div className="mt-2 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[11px]">
+              <span className="text-neutral-400">كاش باك:</span>
               <span className="font-bold text-emerald-400 tabular-nums">260 ج.م</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-400">
-              <span>سعر جرام 24 خام:</span>
-              <span className="font-bold text-neutral-300 tabular-nums">
-                {prices.gold24Sell.toLocaleString('ar-EG')} ج.م
-              </span>
             </div>
           </div>
 
           {/* 4. Gram 18 & Scrap Card */}
-          <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-900 to-neutral-950 p-5 shadow-lg hover:border-amber-500/30 transition-all">
+          <div className="group relative overflow-hidden rounded-xl border border-neutral-800 bg-gradient-to-b from-neutral-900/90 to-neutral-950 p-3.5 shadow-md hover:border-amber-500/40 transition-all">
             <div className="flex items-center justify-between">
-              <span className="rounded-md bg-blue-500/15 px-2 py-0.5 text-xs font-black text-blue-300 border border-blue-500/30">
+              <span className="rounded-md bg-blue-500/15 px-2 py-0.5 text-[11px] font-black text-blue-300 border border-blue-500/30">
                 عيار 18
               </span>
-              <span className="text-[11px] text-neutral-400">مشغولات عصرية</span>
+              <span className="text-[10px] text-neutral-400">مشغولات</span>
             </div>
-            <div className="mt-3">
-              <span className="text-xs text-neutral-400">سعر البيع بدون مصنعية:</span>
-              <div className="text-2xl sm:text-3xl font-black text-white tabular-nums">
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-[11px] text-neutral-400">سعر البيع:</span>
+              <div className="text-xl sm:text-2xl font-black text-white tabular-nums">
                 {prices.gold18Sell.toLocaleString('ar-EG')}{' '}
-                <span className="text-sm font-bold text-blue-400">ج.م</span>
+                <span className="text-xs font-bold text-blue-400">ج.م</span>
               </div>
             </div>
-            <div className="mt-2.5 pt-2.5 border-t border-neutral-800/80 flex items-center justify-between text-xs">
-              <span className="text-neutral-400">سعر الشراء (كسر 18):</span>
+            <div className="mt-2 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[11px]">
+              <span className="text-neutral-400">الشراء (كسر):</span>
               <span className="font-bold text-neutral-200 tabular-nums">
                 {prices.gold18Buy.toLocaleString('ar-EG')} ج.م
-              </span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-400">
-              <span>الأونصة عالمياً:</span>
-              <span className="font-bold text-amber-300 tabular-nums">
-                ${prices.ounceUsd.toLocaleString()}
               </span>
             </div>
           </div>

@@ -21,12 +21,12 @@ import { salePerGram } from '@/shared/lib/gold'
 import { getLatestGoldPrice } from '@/shared/lib/parties'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
-import { formatEgp, formatNumber } from '@/shared/lib/utils'
+import { formatEgp, formatNumber, cn } from '@/shared/lib/utils'
 import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
 import { PaginationBar } from '@/shared/components/ui/pagination'
 import { getSiteUrl, resolveProductImage } from '@/shared/lib/seo'
 import { buildProductShareImage, canvasToPngBlob, SHARE_IMAGE_STYLES } from '@/shared/lib/share-image'
-import type { ShareImageStyleId } from '@/shared/lib/share-image'
+import type { ShareImageStyleId, ShareImageAspectRatio } from '@/shared/lib/share-image'
 import { getStoreSummary } from '@/features/settings/api'
 import { Button } from '@/shared/components/ui/button'
 import { Badge } from '@/shared/components/ui/badge'
@@ -92,6 +92,8 @@ export function ProductsPage() {
   const [shareBusy, setShareBusy] = useState(false)
   const [shareStyle, setShareStyle] = useState<ShareImageStyleId>('gold-luxury')
   const [pendingStyle, setPendingStyle] = useState<ShareImageStyleId>('gold-luxury')
+  const [shareRatio, setShareRatio] = useState<ShareImageAspectRatio>('9:16')
+  const [pendingRatio, setPendingRatio] = useState<ShareImageAspectRatio>('9:16')
   const [makingDiscount, setMakingDiscount] = useState('')
   const [query, setQuery] = useState('')
   const [karatFilter, setKaratFilter] = useState('all')
@@ -163,6 +165,7 @@ export function ProductsPage() {
     const original = resolveProductImage(getProductImage(p))
     setShare({ product: p, original, composed: null, link: base })
     setPendingStyle(shareStyle)
+    setPendingRatio(shareRatio)
     setMakingDiscount('')
     setShareBusy(true)
     try {
@@ -175,6 +178,7 @@ export function ProductsPage() {
         phoneDisplay: storeSummary?.phone ?? null,
         storeName: storeSummary?.name ?? null,
         style: shareStyle,
+        aspectRatio: shareRatio,
         makingDiscountPercent: 0,
       })
       const blob = await canvasToPngBlob(canvas)
@@ -200,6 +204,7 @@ export function ProductsPage() {
       Math.min(100, Number(makingDiscount) || 0),
     )
     setShareStyle(pendingStyle)
+    setShareRatio(pendingRatio)
     setShare((s) => (s ? { ...s, composed: null } : s))
     setShareBusy(true)
     try {
@@ -212,6 +217,7 @@ export function ProductsPage() {
         phoneDisplay: storeSummary?.phone ?? null,
         storeName: storeSummary?.name ?? null,
         style: pendingStyle,
+        aspectRatio: pendingRatio,
         makingDiscountPercent: discountValue,
       })
       const blob = await canvasToPngBlob(canvas)
@@ -229,8 +235,8 @@ export function ProductsPage() {
       )
       toast.success(
         discountValue > 0
-          ? `تم تطبيق خصم ${discountValue}% على المصنعية وإنشاء الصورة`
-          : 'تم إنشاء صورة المشاركة بالاستايل المختار',
+          ? `تم تطبيق خصم ${discountValue}% وإنشاء صورة ${pendingRatio === '9:16' ? 'الستوري (9:16)' : 'البوست'}`
+          : `تم إنشاء صورة ${pendingRatio === '9:16' ? 'الستوري (9:16)' : 'البوست'} بالاستايل المختار`,
       )
     } catch {
       toast.error('تعذّر إعادة إنشاء صورة المشاركة')
@@ -506,33 +512,45 @@ export function ProductsPage() {
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto">
-                  <div className="grid gap-0 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,1fr)]">
+                  <div className="grid gap-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(340px,1fr)]">
                     {/* ─── Preview pane ─────────────────────────────── */}
-                    <section className="flex flex-col gap-3 border-border bg-secondary/40 p-6 md:border-l">
-                      <p className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">
-                        المعاينة
-                      </p>
-                      <div className="relative overflow-hidden rounded-[16px] bg-muted ring-1 ring-black/5">
+                    <section className="flex flex-col gap-3 border-border bg-secondary/40 p-4 sm:p-6 md:border-l">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">
+                          المعاينة المباشرة
+                        </p>
+                        <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                          {shareRatio === '9:16' ? 'قياس ستوري 9:16' : 'قياس بوست 1.91:1'}
+                        </span>
+                      </div>
+
+                      <div className="relative overflow-hidden rounded-[16px] bg-muted/60 ring-1 ring-black/5 flex items-center justify-center p-3 min-h-[340px]">
                         {share.composed ? (
                           <img
                             src={share.composed}
                             alt={`صورة مشاركة ${share.product.productName}`}
-                            className="block aspect-[1200/630] w-full object-cover"
+                            className={cn(
+                              'block rounded-[12px] shadow-md object-contain transition-all duration-200',
+                              shareRatio === '9:16'
+                                ? 'max-h-[440px] aspect-[9/16] w-auto'
+                                : 'w-full aspect-[1200/630]',
+                            )}
                           />
                         ) : (
-                          <div className="grid aspect-[1200/630] w-full place-items-center text-center">
+                          <div className="grid place-items-center text-center py-12">
                             <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                              <Wand2 className="size-8 opacity-40" />
+                              <Wand2 className="size-8 opacity-40 animate-pulse" />
                               <p className="text-[13px]">
-                                لم تُنشأ صورة بعد — اختر استايلاً ثم اضغط «تطبيق».
+                                اختر الاستايل والقياس واضغط «تطبيق وإنشاء الصورة».
                               </p>
                             </div>
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 rounded-full bg-background px-3 py-2 ring-1 ring-border">
+
+                      <div className="flex items-center gap-2 rounded-full bg-background px-3.5 py-2 ring-1 ring-border shadow-xs">
                         <span
-                          className="block size-5 shrink-0 rounded-full ring-1 ring-black/10"
+                          className="block size-4.5 shrink-0 rounded-full ring-1 ring-black/10"
                           style={{
                             background:
                               SHARE_IMAGE_STYLES.find((s) => s.id === pendingStyle)
@@ -540,13 +558,16 @@ export function ProductsPage() {
                           }}
                         />
                         <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
-                          {SHARE_IMAGE_STYLES.find((s) => s.id === pendingStyle)?.label}
+                          <strong className="text-foreground font-semibold">
+                            {SHARE_IMAGE_STYLES.find((s) => s.id === pendingStyle)?.label}
+                          </strong>
                           {Number(makingDiscount) > 0
                             ? ` • خصم ${Math.round(Number(makingDiscount))}٪ على المصنعية`
                             : ''}
+                          {` • ${pendingRatio === '9:16' ? 'ستوري 9:16' : 'بوست فيسبوك'}`}
                         </span>
-                        {pendingStyle === shareStyle && (
-                          <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success">
+                        {pendingStyle === shareStyle && pendingRatio === shareRatio && (
+                          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-bold text-success">
                             مُطبَّق
                           </span>
                         )}
@@ -554,34 +575,71 @@ export function ProductsPage() {
                     </section>
 
                     {/* ─── Controls pane ─────────────────────────────── */}
-                    <section className="flex flex-col gap-5 p-6">
+                    <section className="flex flex-col gap-4 p-4 sm:p-6">
+                      {/* اختيار قياس النشر (9:16 vs 1.91:1) */}
+                      <div>
+                        <Label className="text-[13px] font-bold text-foreground">
+                          قياس ومنصة النشر
+                        </Label>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPendingRatio('9:16')}
+                            disabled={shareBusy}
+                            className={cn(
+                              'flex flex-col items-center justify-center gap-1 rounded-[12px] border-2 p-2.5 text-center transition-all cursor-pointer touch-target',
+                              pendingRatio === '9:16'
+                                ? 'border-primary bg-primary/10 text-primary shadow-xs'
+                                : 'border-border bg-background text-foreground hover:border-primary/40',
+                            )}
+                          >
+                            <span className="text-xs font-black">📱 ستوري وريلز (9:16)</span>
+                            <span className="text-[10px] text-muted-foreground">إنستا • فيسبوك • واتساب</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPendingRatio('1.91:1')}
+                            disabled={shareBusy}
+                            className={cn(
+                              'flex flex-col items-center justify-center gap-1 rounded-[12px] border-2 p-2.5 text-center transition-all cursor-pointer touch-target',
+                              pendingRatio === '1.91:1'
+                                ? 'border-primary bg-primary/10 text-primary shadow-xs'
+                                : 'border-border bg-background text-foreground hover:border-primary/40',
+                            )}
+                          >
+                            <span className="text-xs font-black">🖼️ بوست عرضي (1.91:1)</span>
+                            <span className="text-[10px] text-muted-foreground">منشورات فيسبوك ولينكدإن</span>
+                          </button>
+                        </div>
+                      </div>
+
                       {/* Style picker */}
                       <div>
                         <div className="mb-2 flex items-baseline justify-between">
                           <Label className="text-[13px] font-bold text-foreground">
-                            استايل الصورة
+                            استايل التصميم
                           </Label>
                           <span className="text-[11px] text-muted-foreground">
-                            {SHARE_IMAGE_STYLES.length} استايلات
+                            10 تصاميم عصرية
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" dir="ltr">
                           {SHARE_IMAGE_STYLES.map((s) => {
                             const active = pendingStyle === s.id
-                            const applied = shareStyle === s.id
+                            const applied = shareStyle === s.id && shareRatio === pendingRatio
                             return (
                               <button
                                 key={s.id}
                                 type="button"
                                 onClick={() => selectShareStyle(s.id)}
                                 disabled={shareBusy}
-                                className={[
-                                  'group relative flex flex-col items-center gap-1.5 rounded-[12px] border-2 bg-background px-1.5 py-2 transition-all touch-target',
+                                className={cn(
+                                  'group relative flex flex-col items-center gap-1 rounded-[12px] border-2 bg-background p-1.5 transition-all touch-target cursor-pointer',
                                   active
-                                    ? 'border-primary ring-2 ring-primary/30'
+                                    ? 'border-primary ring-2 ring-primary/30 shadow-xs'
                                     : 'border-border hover:border-primary/40',
-                                  shareBusy ? 'opacity-60' : '',
-                                ].join(' ')}
+                                  shareBusy && 'opacity-60',
+                                )}
                                 aria-label={`استايل ${s.label}`}
                                 aria-pressed={active}
                               >
@@ -589,8 +647,11 @@ export function ProductsPage() {
                                   className="block h-7 w-full rounded-md ring-1 ring-black/10"
                                   style={{ background: s.swatch }}
                                 />
-                                <span className="line-clamp-1 text-[10px] font-semibold text-foreground">
+                                <span className="line-clamp-1 text-[10px] font-bold text-foreground">
                                   {s.label}
+                                </span>
+                                <span className="line-clamp-1 text-[8.5px] text-muted-foreground">
+                                  {s.subtitle}
                                 </span>
                                 {applied && (
                                   <span className="absolute -top-1.5 -end-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[8px] font-bold text-white shadow">
@@ -604,20 +665,20 @@ export function ProductsPage() {
                       </div>
 
                       {/* Discount card */}
-                      <div className="rounded-[14px] border border-border bg-secondary/60 p-4">
+                      <div className="rounded-[14px] border border-border bg-secondary/50 p-3.5">
                         <div className="flex items-center justify-between gap-3">
                           <Label
                             htmlFor="making-discount"
-                            className="flex items-center gap-2 text-[13px] font-bold text-foreground"
+                            className="flex items-center gap-1.5 text-[12px] font-bold text-foreground"
                           >
-                            <Percent className="size-4 text-primary" />
-                            خصم على المصنعية
+                            <Percent className="size-3.5 text-primary" />
+                            شعار خصم على المصنعية
                           </Label>
-                          <span className="text-[11px] text-muted-foreground">
-                            اختياري
+                          <span className="text-[10px] text-muted-foreground">
+                            وسام ذهبي ترويجي
                           </span>
                         </div>
-                        <div className="mt-3 flex items-center gap-3">
+                        <div className="mt-2.5 flex items-center gap-2">
                           <div className="relative flex-1">
                             <Input
                               id="making-discount"
@@ -629,36 +690,32 @@ export function ProductsPage() {
                               value={makingDiscount}
                               onChange={(e) => setMakingDiscount(e.target.value)}
                               placeholder="0"
-                              className="h-12 rounded-[12px] border-border bg-background pe-10 text-[17px] font-bold tabular-nums"
+                              className="h-10 rounded-[10px] border-border bg-background pe-8 text-[15px] font-bold tabular-nums"
                               disabled={shareBusy}
                             />
-                            <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[15px] font-bold text-muted-foreground">
+                            <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
                               ٪
                             </span>
                           </div>
-                          <div className="flex flex-col gap-1.5">
+                          <div className="flex gap-1">
                             {[10, 20, 30].map((preset) => (
                               <button
                                 key={preset}
                                 type="button"
                                 onClick={() => setMakingDiscount(String(preset))}
                                 disabled={shareBusy}
-                                className={[
-                                  'h-7 min-w-[48px] rounded-full px-3 text-[12px] font-bold tabular-nums transition-colors',
+                                className={cn(
+                                  'h-8 px-2.5 rounded-lg text-xs font-bold tabular-nums transition-colors cursor-pointer',
                                   makingDiscount === String(preset)
                                     ? 'bg-primary text-primary-foreground'
-                                    : 'bg-background text-foreground ring-1 ring-border hover:ring-primary/40',
-                                ].join(' ')}
-                                aria-label={`خصم ${preset} في المئة`}
+                                    : 'bg-background text-foreground border border-border hover:border-primary/40',
+                                )}
                               >
                                 {preset}٪
                               </button>
                             ))}
                           </div>
                         </div>
-                        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-                          يظهر كشعار أحمر أعلى الصورة — لا يغيّر سعر البيع الفعلي.
-                        </p>
                       </div>
 
                       {/* Primary action */}
@@ -666,10 +723,10 @@ export function ProductsPage() {
                         type="button"
                         onClick={applyShare}
                         disabled={shareBusy || !share}
-                        className="h-12 w-full gap-2 rounded-full text-[15px] font-bold touch-target"
+                        className="h-11 w-full gap-2 rounded-full text-sm font-bold touch-target shadow-xs cursor-pointer"
                       >
-                        <Wand2 className="size-5" />
-                        {shareBusy ? 'جارٍ التطبيق...' : 'تطبيق وإنشاء الصورة'}
+                        <Wand2 className="size-4" />
+                        {shareBusy ? 'جارٍ المعالجة وإنشاء الصورة...' : 'تطبيق وإنشاء الصورة'}
                       </Button>
                     </section>
                   </div>
@@ -677,50 +734,52 @@ export function ProductsPage() {
               )}
 
               {/* ─── Footer ───────────────────────────────────────────── */}
-              <footer className="flex flex-wrap items-center gap-2 border-t border-border bg-secondary/40 px-6 py-4">
+              <footer className="flex flex-wrap items-center gap-2 border-t border-border bg-secondary/40 px-4 sm:px-6 py-3.5">
                 <div
                   dir="ltr"
                   title={share.link}
-                  className="min-w-0 basis-full whitespace-nowrap overflow-x-auto rounded-full bg-background px-4 py-2 text-[12px] text-muted-foreground ring-1 ring-border"
+                  className="min-w-0 basis-full sm:basis-auto sm:flex-1 whitespace-nowrap overflow-x-auto rounded-full bg-background px-3.5 py-1.5 text-[11px] text-muted-foreground ring-1 ring-border"
                 >
                   {share.link}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    share.composed &&
-                    (() => {
-                      const a = document.createElement('a')
-                      a.href = share.composed
-                      a.download = `share-${share.product.productId}.png`
-                      a.click()
-                    })()
-                  }
-                  disabled={!share.composed}
-                  className="h-11 gap-1.5 rounded-full px-4 touch-target"
-                >
-                  <Download className="size-4" />
-                  تنزيل
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={copyShareLink}
-                  disabled={!share.link}
-                  className="h-11 rounded-full px-4 touch-target"
-                >
-                  نسخ الرابط
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={shareOnFacebook}
-                  disabled={!share.link}
-                  className="h-11 gap-2 rounded-full px-5 touch-target"
-                >
-                  <ExternalLink className="size-4" />
-                  نشر على فيسبوك
-                </Button>
+                <div className="flex items-center gap-2 ms-auto">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      share.composed &&
+                      (() => {
+                        const a = document.createElement('a')
+                        a.href = share.composed
+                        a.download = `gold-master-${share.product.productId}-${shareRatio === '9:16' ? 'story' : 'post'}.png`
+                        a.click()
+                      })()
+                    }
+                    disabled={!share.composed}
+                    className="h-10 gap-1.5 rounded-full px-4 text-xs font-bold touch-target cursor-pointer"
+                  >
+                    <Download className="size-3.5" />
+                    تنزيل الصورة
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={copyShareLink}
+                    disabled={!share.link}
+                    className="h-10 rounded-full px-3.5 text-xs font-bold touch-target cursor-pointer"
+                  >
+                    نسخ الرابط
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={shareOnFacebook}
+                    disabled={!share.link}
+                    className="h-10 gap-1.5 rounded-full px-4 text-xs font-bold touch-target cursor-pointer"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    نشر على فيسبوك
+                  </Button>
+                </div>
               </footer>
             </div>
           )}
