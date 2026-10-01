@@ -136,6 +136,15 @@ function SaleRow({ line }: { line: FactoryProfitSaleLine }) {
                   (فرق {formatNumber(item.makingPerGram)}/جم ⇒{' '}
                   {formatEgp(item.makingProfit)})
                 </p>
+                {(item.factory === 0 || item.factoryForSale === 0) && (
+                  <p className="text-[12px] font-semibold tabular-nums text-warning">
+                    {item.factory === 0 && item.factoryForSale === 0
+                      ? 'بيانات المصنعية غير مسجلة لهذا الصنف — يُحسب صفراً.'
+                      : item.factoryForSale === 0
+                        ? 'مصنعية البيع غير مسجلة — الرقم الظاهر سالب وهمي، أكمل البيانات للدقة.'
+                        : 'مصنعية الشراء غير مسجلة — الربح الظاهر تقديري (أعلى من الحقيقة).'}
+                  </p>
+                )}
               </div>
             </TableCell>
           </TableRow>
@@ -182,6 +191,13 @@ export function ProfitsPage() {
     enabled: hasValidBranch && rangeIsValid && isOwner,
     retry: false,
   })
+
+  // إجمالي الخادم يُجمَّع قبل حساب أرباح الفواتير فيبقى صفراً، بينما ربح كل
+  // فاتورة صحيح — فيُشتق الإجمالي هنا بجمع سطور الفواتير دون تعديل الباك اند.
+  const totalMakingProfit = useMemo(
+    () => (data?.sales ?? []).reduce((sum, s) => sum + (s.makingProfit ?? 0), 0),
+    [data],
+  )
 
   if (!isOwner) {
     return (
@@ -306,7 +322,7 @@ export function ProfitsPage() {
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <StatCard
               label="ربح المصنعية (بدون تكلفة الذهب)"
-              value={formatEgp(data?.totalMakingProfit ?? 0)}
+              value={formatEgp(totalMakingProfit)}
               tone="success"
               hint="مجموع الفروقات × الأوزان × الكميات"
             />
@@ -326,54 +342,6 @@ export function ProfitsPage() {
               hint={`${formatNumber(data?.totalWeight ?? 0)} جم`}
             />
           </div>
-
-          {data?.days && data.days.length > 0 && (
-            <Card className="rounded-[14px] elevation-card">
-              <CardContent className="p-4 sm:p-5">
-                <p className="mb-3 text-[15px] font-semibold text-foreground">
-                  ملخص الأيام
-                </p>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>اليوم</TableHead>
-                        <TableHead>فواتير</TableHead>
-                        <TableHead>قطع</TableHead>
-                        <TableHead>وزن</TableHead>
-                        <TableHead>المبيعات</TableHead>
-                        <TableHead>ربح المصنعية</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.days.map((day) => (
-                        <TableRow key={day.date}>
-                          <TableCell className="text-[13px]">
-                            {formatDay(day.date)}
-                          </TableCell>
-                          <TableCell className="text-[13px] tabular-nums">
-                            {formatNumber(day.salesCount)}
-                          </TableCell>
-                          <TableCell className="text-[13px] tabular-nums">
-                            {formatNumber(day.pieces)}
-                          </TableCell>
-                          <TableCell className="text-[13px] tabular-nums">
-                            {formatNumber(day.weight)} جم
-                          </TableCell>
-                          <TableCell className="text-[13px] tabular-nums">
-                            {formatEgp(day.totalSales)}
-                          </TableCell>
-                          <TableCell className="text-[13px] font-bold tabular-nums text-success">
-                            {formatEgp(day.makingProfit)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           <Card className="rounded-[14px] elevation-card">
             <CardContent className="p-4 sm:p-5">
@@ -414,9 +382,80 @@ export function ProfitsPage() {
             <span>
               الرقم محسوب من مصنعية الشراء والبيع والوزن <strong>الحالية</strong>{' '}
               لكل منتج، لا من لقطة وقت البيع — فتعديل مصنعية أو وزن منتج يغيّر
-              أرقام فواتير سابقة. ولا يشمل تكلفة الذهب، فلا يُقرأ كصافي ربح.
+              أرقام فواتير سابقة. والسطور ناقصة البيانات مُعلَّمة بالأصفر —
+              أكمل المصنعيتين عند الشراء لدقة الكشف. ولا يشمل تكلفة الذهب، فلا
+              يُقرأ كصافي ربح.
             </span>
           </p>
+
+          {/* نسخة مضغوطة لورق الكاشير 80mm — مخفية على الشاشة وتُطبع بدل الصفحة */}
+          <div className="receipt-print receipt-paper report-cashier mx-auto p-2">
+            <p className="text-center font-bold">أرباح المصنعية</p>
+            <p className="text-center">
+              {data?.branchName || 'الفرع النشط'} — {formatDay(range.startDate)} ←{' '}
+              {formatDay(range.endDate)}
+            </p>
+            <p className="my-1 border-t border-dashed border-black" />
+            <table>
+              <tbody>
+                <TableRow>
+                  <TableCell>ربح المصنعية (بدون تكلفة الذهب)</TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatEgp(totalMakingProfit)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>عدد الفواتير</TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatNumber(data?.salesCount ?? 0)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>إجمالي المبيعات</TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatEgp(data?.totalSales ?? 0)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>القطع / الوزن</TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatNumber(data?.totalPieces ?? 0)} /{' '}
+                    {formatNumber(data?.totalWeight ?? 0)} جم
+                  </TableCell>
+                </TableRow>
+              </tbody>
+            </table>
+            <p className="my-1 border-t border-dashed border-black" />
+            {data?.sales && data.sales.length > 0 ? (
+              data.sales.map((line) => (
+                <div key={line.saleId} className="py-1">
+                  <p className="font-bold">
+                    #{line.saleId} — {formatDay(line.date)} — {line.customerName}
+                  </p>
+                  <p className="tabular-nums">
+                    البيع {formatEgp(line.totalAmount)} — الربح{' '}
+                    {formatEgp(line.makingProfit)}
+                  </p>
+                  {line.items.map((item, index) => (
+                    <p
+                      key={`${line.saleId}-${index}`}
+                      className="tabular-nums"
+                    >
+                      {item.productName} · {formatNumber(item.quantity)} ق ·{' '}
+                      {formatNumber(item.weight)} جم · {item.karat}k · مصنعية{' '}
+                      {formatNumber(item.factory)} ←{' '}
+                      {formatNumber(item.factoryForSale)} ⇒{' '}
+                      {formatEgp(item.makingProfit)}
+                    </p>
+                  ))}
+                  <p className="my-1 border-t border-dashed border-black" />
+                </div>
+              ))
+            ) : (
+              <p className="py-2 text-center">لا توجد مبيعات مكتملة في هذه الفترة.</p>
+            )}
+            <p className="text-center">بدون تكلفة الذهب — ليس صافي ربح</p>
+          </div>
         </>
       )}
     </div>

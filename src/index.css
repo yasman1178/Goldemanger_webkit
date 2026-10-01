@@ -162,6 +162,11 @@ h1, h2, h3, h4, h5, h6 {
   border-top: 1px dashed #000;
 }
 
+/* بلوك تقرير مضغوط لورق الكاشير 80mm — مخفي على الشاشة ويظهر في الطباعة فقط */
+.report-cashier {
+  display: none;
+}
+
 @media print {
   @page {
     size: 80mm auto;
@@ -184,6 +189,10 @@ h1, h2, h3, h4, h5, h6 {
     margin: 0 !important;
     z-index: 9999 !important;
     box-shadow: none !important;
+  }
+  .report-cashier {
+    display: block !important;
+    position: static !important;
   }
   .receipt-no-print,
   .receipt-no-print * {

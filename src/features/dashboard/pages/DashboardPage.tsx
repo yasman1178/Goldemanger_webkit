@@ -123,6 +123,17 @@ export function DashboardPage() {
     retry: false,
   })
 
+  // نفس اشتقاق صفحة الأرباح: إجمالي الخادم يبقى صفراً (يُجمَّع قبل حساب
+  // أرباح الفواتير)، فيُجمع ربح اليوم من سطور الفواتير في الواجهة.
+  const todayMakingProfit = useMemo(
+    () =>
+      (todayProfit?.sales ?? []).reduce(
+        (sum, s) => sum + (s.makingProfit ?? 0),
+        0,
+      ),
+    [todayProfit],
+  )
+
   const { data: sales = [], isLoading: salesLoading } = useQuery({
     queryKey: ['sales', activeBranchId],
     queryFn: () => getSales(activeBranchId ?? undefined),
@@ -218,7 +229,7 @@ export function DashboardPage() {
       ? [
           {
             label: 'ربح المصنعية اليوم',
-            value: formatEgp(todayProfit?.totalMakingProfit ?? 0),
+            value: formatEgp(todayMakingProfit),
             icon: Gem,
             tone: 'success' as const,
             badge: 'بدون تكلفة الذهب',

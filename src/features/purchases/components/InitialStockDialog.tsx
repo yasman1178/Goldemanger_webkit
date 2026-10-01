@@ -23,32 +23,32 @@ import {
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/components/ui/select'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { createPurchase } from '@/features/purchases/api'
 import { verifySensitivePassword } from '@/features/auth/api'
 import { depositCash } from '@/features/cash/api'
 import { invalidateAfterPurchase } from '@/shared/lib/invalidateShop'
-import { getStorages, getSuppliers } from '@/shared/lib/parties'
+import { createStorage, getStorages, getSuppliers } from '@/shared/lib/parties'
 import { amountToNumber } from '@/shared/lib/gold'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
 import { extractServerMessage } from '@/shared/lib/serverError'
+import {
+  AddPieceDialog,
+  type PieceDraft,
+} from '@/features/purchases/components/AddPieceDialog'
 
-interface InitialStockItemDraft {
+/** صنف رصيد أول المدة — نفس PieceDraft المستخدم في ديالوج المشتريات. */
+interface InitialStockPiece {
   id: string
-  productName: string
-  weight: string
-  karat: string
-  quantity: string
-  storageId: string
-  factory: string
+  draft: PieceDraft
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  '1': 'جديد',
+  '2': 'مجدّد',
+  '3': 'كسر',
+  '4': 'فضة',
 }
 
 interface InitialStockDialogProps {
@@ -75,18 +75,9 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
   // بيانات رصيد الكاش الافتتاحي
   const [cashAmount, setCashAmount] = useState('')
 
-  // بضاعة أول المدة
-  const [items, setItems] = useState<InitialStockItemDraft[]>([
-    {
-      id: '1',
-      productName: '',
-      weight: '',
-      karat: '21',
-      quantity: '1',
-      storageId: '',
-      factory: '0',
-    },
-  ])
+  // بضاعة أول المدة — تُضاف عبر ديالوج المشتريات نفسه (AddPieceDialog)
+  const [pieces, setPieces] = useState<InitialStockPiece[]>([])
+  const [pieceDialogOpen, setPieceDialogOpen] = useState(false)
 
   const { data: storages = [] } = useQuery({
     queryKey: ['storages'],
@@ -128,33 +119,25 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
     unlockMutation.mutate(password)
   }
 
-  function addItem() {
-    setItems((prev) => [
-      ...prev,
-      {
-        id: String(Date.now()),
-        productName: '',
-        weight: '',
-        karat: '21',
-        quantity: '1',
-        storageId: prev[prev.length - 1]?.storageId || '',
-        factory: '0',
-      },
-    ])
+  function confirmPiece(draft: PieceDraft) {
+    setPieces((prev) => [...prev, { id: `${Date.now()}-${prev.length}`, draft }])
+    toast.success('أُضيفت القطعة لرصيد أول المدة')
   }
 
-  function updateItem(id: string, field: keyof InitialStockItemDraft, value: string) {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
-    )
+  function removePiece(id: string) {
+    setPieces((prev) => prev.filter((p) => p.id !== id))
   }
 
-  function removeItem(id: string) {
-    if (items.length === 1) {
-      toast.error('يجب أن تحتوي القائمة على صنف واحد على الأقل.')
-      return
-    }
-    setItems((prev) => prev.filter((item) => item.id !== id))
+  function storageName(storageId?: string): string {
+    const found = storages.find((s) => String(s.id) === String(storageId ?? ''))
+    return found?.name || found?.location || '—'
+  }
+
+  async function handleCreateStorage(name: string) {
+    const created = await createStorage(name, activeBranchId ?? undefined)
+    queryClient.invalidateQueries({ queryKey: ['storages'] })
+    toast.success('تم إنشاء المخزن ' + (created.name || created.location || name))
+    return created
   }
 
   // العملية الرئيسية لتسجيل رصيد أول المدة
@@ -170,16 +153,16 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
         await depositCash(initialCashNum, activeBranchId)
       }
 
-      // 2. تصفية الأصناف الصالحة
-      const validItems = items.filter(
-        (i) => i.productName.trim() && amountToNumber(i.weight) > 0,
+      // 2. تصفية الأصناف الصالحة (الديالوج يضمن الاسم والوزن والمخزن)
+      const validPieces = pieces.filter(
+        (p) => p.draft.productName.trim() && amountToNumber(p.draft.weight) > 0,
       )
 
-      if (validItems.length > 0) {
+      if (validPieces.length > 0) {
         // التحقق من وجود مخزن لكل صنف
         const defaultStorageId = storages[0]?.id
-        for (const it of validItems) {
-          if (!it.storageId && !defaultStorageId) {
+        for (const p of validPieces) {
+          if (!p.draft.storageId && !defaultStorageId) {
             throw new Error('يرجى تحديد المخزن لجميع الأصناف أو إنشاء مخزن أولاً.')
           }
         }
@@ -199,17 +182,17 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
           paymentType: 'goldTradeIn', // تسوية رصيد افتتاحية بدون مطالبة سيولة نقدية
           stampTaxRate: 0,
           tradeInSettleMode: 0,
-          products: validItems.map((it) => ({
-            productName: it.productName.trim(),
-            weight: amountToNumber(it.weight),
-            karat: amountToNumber(it.karat),
-            typegolde: 1, // ذهب مصاغ جديد
-            factory: amountToNumber(it.factory),
-            factoryForSale: 0,
-            quantity: amountToNumber(it.quantity) || 1,
-            size: 0,
-            storageId: Number(it.storageId || defaultStorageId),
-            imageLink: '',
+          products: validPieces.map(({ draft }) => ({
+            productName: draft.productName.trim(),
+            weight: amountToNumber(draft.weight),
+            karat: amountToNumber(draft.karat) || 21,
+            typegolde: Number(draft.typegolde) || 1,
+            factory: amountToNumber(draft.factory),
+            factoryForSale: amountToNumber(draft.factoryForSale),
+            quantity: amountToNumber(draft.quantity) || 1,
+            size: amountToNumber(draft.size ?? '') || 0,
+            storageId: Number(draft.storageId || defaultStorageId),
+            imageLink: draft.imageLink ?? '',
           })),
         })
       }
@@ -221,17 +204,7 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
       setIsUnlocked(false)
       setPassword('')
       setCashAmount('')
-      setItems([
-        {
-          id: '1',
-          productName: '',
-          weight: '',
-          karat: '21',
-          quantity: '1',
-          storageId: '',
-          factory: '0',
-        },
-      ])
+      setPieces([])
     },
     onError: (err: unknown) => {
       toast.error(extractServerMessage(err, 'فشل تسجيل رصيد أول المدة. تأكد من البيانات.'))
@@ -242,20 +215,23 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
     setIsUnlocked(false)
     setPassword('')
     setUnlockError('')
+    setPieceDialogOpen(false)
     onOpenChange(false)
   }
 
   // ملخص بضاعة أول المدة
-  const totalWeight = items.reduce(
-    (sum, i) => sum + amountToNumber(i.weight) * (amountToNumber(i.quantity) || 1),
+  const totalWeight = pieces.reduce(
+    (sum, p) =>
+      sum + amountToNumber(p.draft.weight) * (amountToNumber(p.draft.quantity) || 1),
     0,
   )
-  const totalPieces = items.reduce(
-    (sum, i) => sum + (amountToNumber(i.quantity) || 0),
+  const totalPieces = pieces.reduce(
+    (sum, p) => sum + (amountToNumber(p.draft.quantity) || 0),
     0,
   )
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
@@ -373,7 +349,7 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={addItem}
+                  onClick={() => setPieceDialogOpen(true)}
                   className="gap-1.5 rounded-full text-xs font-bold touch-target"
                 >
                   <Plus className="size-3.5" />
@@ -381,102 +357,50 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
                 </Button>
               </div>
 
-              {/* قائمة الأصناف */}
+              {/* قائمة الأصناف — تُضاف عبر ديالوج المشتريات نفسه */}
               <div className="space-y-3">
-                {items.map((item, index) => (
+                {pieces.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-black/10 bg-white px-4 py-8 text-center">
+                    <p className="text-[14px] font-semibold text-foreground">
+                      لا توجد قطع بعد
+                    </p>
+                    <p className="mt-1 text-[12px] text-muted-foreground">
+                      اضغط «إضافة صنف» لإدخال القطعة بنفس بيانات المشتريات
+                      (المصنعية، المخزن، الصورة).
+                    </p>
+                  </div>
+                )}
+                {pieces.map(({ id, draft }, index) => (
                   <div
-                    key={item.id}
-                    className="relative rounded-2xl border border-black/10 bg-slate-50/80 p-3.5 space-y-3"
+                    key={id}
+                    className="relative rounded-2xl border border-black/10 bg-slate-50/80 p-3.5 space-y-2"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-bold text-slate-500">
                         القطعة #{index + 1}
                       </span>
-                      {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.id)}
-                          className="text-error hover:text-red-700 transition-colors p-1"
-                          title="حذف القطعة"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => removePiece(id)}
+                        className="text-error hover:text-red-700 transition-colors p-1"
+                        title="حذف القطعة"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
                     </div>
-
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                      <div className="space-y-1 sm:col-span-2">
-                        <Label className="text-xs">اسم الصنف أو القطعة *</Label>
-                        <Input
-                          value={item.productName}
-                          onChange={(e) => updateItem(item.id, 'productName', e.target.value)}
-                          placeholder="مثال: غوايش عيار 21، كسر قديم، سلاسل لازوردي..."
-                          className="h-10 rounded-[12px] bg-white text-sm"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-xs">الوزن الإجمالي (جرام) *</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={item.weight}
-                          onChange={(e) => updateItem(item.id, 'weight', e.target.value)}
-                          placeholder="0.00"
-                          className="h-10 rounded-[12px] bg-white text-sm tabular-nums"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-xs">العيار</Label>
-                        <Select
-                          value={item.karat}
-                          onValueChange={(val) => updateItem(item.id, 'karat', val)}
-                        >
-                          <SelectTrigger className="h-10 rounded-[12px] bg-white text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="24">عيار 24 (سبائك)</SelectItem>
-                            <SelectItem value="21">عيار 21 (شائع)</SelectItem>
-                            <SelectItem value="18">عيار 18</SelectItem>
-                            <SelectItem value="14">عيار 14</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-xs">العدد / الكمية</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
-                          placeholder="1"
-                          className="h-10 rounded-[12px] bg-white text-sm tabular-nums"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-xs">المخزن المستهدف</Label>
-                        <Select
-                          value={item.storageId || String(storages[0]?.id ?? '')}
-                          onValueChange={(val) => updateItem(item.id, 'storageId', val)}
-                        >
-                          <SelectTrigger className="h-10 rounded-[12px] bg-white text-sm">
-                            <SelectValue placeholder="اختر المخزن" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {storages.map((s) => (
-                              <SelectItem key={s.id} value={String(s.id)}>
-                                {s.name || s.location || `مخزن #${s.id}`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+                    <p className="text-[14px] font-bold text-foreground">
+                      {draft.productName}
+                    </p>
+                    <p className="text-[12px] tabular-nums text-muted-foreground">
+                      {formatNumber(amountToNumber(draft.weight))} جم ·{' '}
+                      {draft.karat}k · {TYPE_LABELS[draft.typegolde] ?? 'جديد'} ·{' '}
+                      {formatNumber(amountToNumber(draft.quantity) || 1)} ق ·{' '}
+                      {storageName(draft.storageId)}
+                    </p>
+                    <p className="text-[12px] tabular-nums text-muted-foreground">
+                      مصنعية المورد {formatNumber(amountToNumber(draft.factory))} ·
+                      مصنعية المحل {formatNumber(amountToNumber(draft.factoryForSale))}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -526,5 +450,20 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
         )}
       </DialogContent>
     </Dialog>
+
+    {/* ديالوج المشتريات نفسه لإضافة القطعة — شقيق لا متداخل لتفادي تزاحم الفوكس */}
+    <AddPieceDialog
+      open={pieceDialogOpen}
+      onOpenChange={setPieceDialogOpen}
+      goldPrice={goldPrice21}
+      includeTax={false}
+      commissionRate={0}
+      taxRate={0}
+      storages={storages}
+      onCreateStorage={handleCreateStorage}
+      branchId={activeBranchId ?? undefined}
+      onConfirm={confirmPiece}
+    />
+    </>
   )
 }
