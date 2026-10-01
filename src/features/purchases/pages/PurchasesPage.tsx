@@ -1,7 +1,18 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, Eye, Images, PackagePlus, Plus, Printer, SearchX, Sparkles } from 'lucide-react'
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  Images,
+  PackagePlus,
+  Plus,
+  Printer,
+  Scale,
+  SearchX,
+  Sparkles,
+} from 'lucide-react'
 
 import {
   getPurchase,
@@ -20,7 +31,7 @@ import { formatEgp, formatNumber } from '@/shared/lib/utils'
 import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
 import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Button } from '@/shared/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card'
+import { Card } from '@/shared/components/ui/card'
 import { Badge } from '@/shared/components/ui/badge'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { Fab } from '@/shared/components/ui/fab'
@@ -37,21 +48,24 @@ function formatDate(value: string): string {
 
 function PurchaseCardSkeleton() {
   return (
-    <Card className="elevation-card">
-      <CardHeader className="flex-row items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
-          <Skeleton className="h-6 w-28" />
-          <Skeleton className="h-4 w-24" />
+    <Card className="rounded-[18px] border border-black/8 bg-white p-4 elevation-card space-y-3">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-6 w-32 rounded-lg" />
+        <Skeleton className="h-6 w-20 rounded-full" />
+      </div>
+      <div className="flex items-center gap-2">
+        <Skeleton className="size-8 rounded-full" />
+        <div className="space-y-1">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-3 w-20" />
         </div>
-        <Skeleton className="size-11 rounded-2xl" />
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex gap-2">
-          <Skeleton className="h-6 w-16 rounded-full" />
-          <Skeleton className="h-6 w-24 rounded-full" />
-        </div>
-        <Skeleton className="h-16 rounded-2xl" />
-      </CardContent>
+      </div>
+      <Skeleton className="h-14 rounded-xl" />
+      <Skeleton className="h-16 rounded-xl" />
+      <div className="flex justify-between pt-1">
+        <Skeleton className="h-8 w-28" />
+        <Skeleton className="h-9 w-24 rounded-full" />
+      </div>
     </Card>
   )
 }
@@ -320,111 +334,183 @@ export function PurchasesPage() {
       ) : (
         <>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {displayed.map((purchase) => (
-            <Card key={purchase.id} className="elevation-card">
-              <CardHeader className="flex-row items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <CardTitle className="truncate">
-                    شراء #{purchase.id}
-                  </CardTitle>
-                  <p className="mt-1 text-[13px] text-muted-foreground">
-                    {formatDate(purchase.date)}
-                  </p>
-                  {purchase.supplierName && (
-                    <p className="mt-1 truncate text-[14px] font-semibold text-foreground">
-                      {purchase.supplierName}
-                      {purchase.supplierPhone && (
-                        <span className="text-[12px] font-normal text-muted-foreground">
-                          {' '}• {purchase.supplierPhone}
-                        </span>
-                      )}
-                    </p>
-                  )}
-                  {purchase.userName && purchase.userName !== 'N/A' && (
-                    <p className="mt-0.5 text-[12px] text-muted-foreground">
-                      المسؤول: {purchase.userName}
-                    </p>
-                  )}
-                </div>
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-amber-300 to-amber-500 shadow-sm">
-                  <PackagePlus className="size-6 text-white" />
-                </div>
-              </CardHeader>
+          {displayed.map((purchase) => {
+            const pieces =
+              purchase.productsDot?.reduce((sum, p) => sum + (p.quantity ?? 1), 0) ??
+              (purchase.quantity ?? 1)
+            const totalWeight =
+              purchase.productsDot?.reduce((sum, p) => sum + (p.weight ?? 0) * (p.quantity ?? 1), 0) ?? 0
+            const supplierLabel = purchase.supplierName?.trim() || 'مورد / عميل ذهب'
+            const initialLetter = supplierLabel.charAt(0)
+            const docsCount = purchase.documentsCount ?? 0
+            const hasImages = purchase.hasDocuments || docsCount > 0 || purchase.image || purchase.idCardImage
 
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge>
-                    {purchase.productsDot?.length ?? purchase.quantity ?? 0}{' '}
-                    قطعة
-                  </Badge>
-                  {purchase.goldPrice21AtPurchase != null && (
-                    <Badge variant="secondary">
-                      سعر الذهب {formatEgp(purchase.goldPrice21AtPurchase)}
-                    </Badge>
-                  )}
-                  {!purchase.isActive && (
-                    <Badge variant="destructive">معطلة</Badge>
-                  )}
-                </div>
+            return (
+              <Card
+                key={purchase.id}
+                className="group relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-black/8 bg-white shadow-xs elevation-card transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500/40 hover:shadow-md"
+              >
+                {/* شريط تمييز علوي ذهبي دافئ */}
+                <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 via-amber-300 to-amber-600/40" />
 
-                {purchase.productsDot && purchase.productsDot.length > 0 && (
-                  <div className="rounded-2xl bg-black/5 p-3">
-                    <div className="flex flex-col gap-1">
-                      {purchase.productsDot.map((p) => (
-                        <div
-                          key={p.productId ?? `${purchase.id}-${p.productName}`}
-                          className="flex items-center justify-between gap-2 text-[14px]"
-                        >
-                          <span className="truncate text-foreground">
-                            {p.productName}
-                          </span>
-                          <span className="shrink-0 tabular-nums text-muted-foreground">
-                            {formatNumber(p.weight ?? 0)} gm × {p.quantity ?? 1}
+                <div className="p-4 space-y-3.5">
+                  {/* رأس الكارت: رقم الفاتورة والحالة والوقت */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700">
+                        <PackagePlus className="size-4" />
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[15px] font-black text-foreground">
+                            فاتورة شراء #{purchase.id}
                           </span>
                         </div>
-                      ))}
+                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground tabular-nums">
+                          <Clock className="size-3" />
+                          {formatDate(purchase.date)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {!purchase.isActive ? (
+                      <Badge variant="destructive" className="text-[11px] font-bold px-2 py-0.5 rounded-full">
+                        معطلة
+                      </Badge>
+                    ) : purchase.paymentType === 2 ? (
+                      <Badge
+                        variant="secondary"
+                        className="bg-amber-100 text-amber-800 border border-amber-300 text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      >
+                        بدل ذهب / كسر
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="secondary"
+                        className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      >
+                        <CheckCircle2 className="me-1 size-3 text-emerald-600" />
+                        شراء كاش
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* بيانات المورد / العميل والمسؤول */}
+                  <div className="flex items-center gap-2.5 rounded-[12px] bg-secondary/50 p-2.5">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white text-xs font-bold shadow-xs">
+                      {initialLetter}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-bold text-foreground">
+                        {supplierLabel}
+                      </p>
+                      {purchase.supplierPhone && (
+                        <span className="text-[11px] text-muted-foreground tabular-nums block">
+                          📞 {purchase.supplierPhone}
+                        </span>
+                      )}
+                    </div>
+                    {purchase.userName && purchase.userName !== 'N/A' && (
+                      <span className="shrink-0 text-[11px] text-muted-foreground bg-black/5 px-2 py-0.5 rounded-md">
+                        المسؤول: {purchase.userName}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* شريط الإجماليات والذهب */}
+                  <div className="flex items-baseline justify-between border-b border-black/5 pb-2.5">
+                    <div>
+                      <span className="text-[11px] font-semibold text-muted-foreground block">
+                        إجمالي الشراء
+                      </span>
+                      <span className="text-[22px] font-black tabular-nums text-foreground tracking-tight">
+                        {formatEgp(purchase.totalAmount)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-end">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-black/5 px-2 py-1 text-[12px] font-bold text-foreground tabular-nums">
+                        {formatNumber(pieces)} قطعة
+                      </span>
+                      {totalWeight > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 text-amber-800 border border-amber-300/40 px-2 py-1 text-[12px] font-bold tabular-nums">
+                          <Scale className="size-3 text-amber-700" />
+                          {formatNumber(totalWeight)} جم
+                        </span>
+                      )}
                     </div>
                   </div>
-                )}
 
-                {(purchase.hasDocuments ||
-                  (purchase.documentsCount ?? 0) > 0 ||
-                  purchase.image ||
-                  purchase.idCardImage) && (
+                  {/* سعر الذهب وقت الشراء */}
+                  {purchase.goldPrice21AtPurchase != null && (
+                    <div className="flex items-center justify-between text-[11px] bg-amber-50/60 border border-amber-200/50 rounded-lg px-2.5 py-1 text-amber-900">
+                      <span>سعر عيار 21 المسجل وقت الشراء:</span>
+                      <span className="font-bold tabular-nums">{formatEgp(purchase.goldPrice21AtPurchase)} / جم</span>
+                    </div>
+                  )}
+
+                  {/* درج استعراض القطع المشتراة */}
+                  {purchase.productsDot && purchase.productsDot.length > 0 && (
+                    <div className="space-y-1.5 rounded-[12px] bg-black/[0.02] p-2.5 border border-black/5">
+                      <div className="flex flex-col divide-y divide-black/5">
+                        {purchase.productsDot.slice(0, 3).map((p) => (
+                          <div
+                            key={p.productId ?? `${purchase.id}-${p.productName}`}
+                            className="flex items-center justify-between gap-2 py-1 text-[12px] first:pt-0 last:pb-0"
+                          >
+                            <span className="truncate font-medium text-foreground flex items-center gap-1.5">
+                              <span className="size-1.5 rounded-full bg-amber-600 shrink-0" />
+                              {p.productName}
+                              {p.karat ? <span className="text-[10px] text-amber-700 font-bold">(عيار {p.karat})</span> : null}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-muted-foreground font-semibold">
+                              {formatNumber(p.weight ?? 0)} جم × {p.quantity ?? 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {purchase.productsDot.length > 3 && (
+                        <p className="text-[11px] text-muted-foreground pt-1 text-center font-bold">
+                          + {purchase.productsDot.length - 3} قطع إضافية بالفاتورة
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* تذييل الكارت والإجراءات */}
+                <div className="flex items-center justify-between border-t border-black/5 bg-secondary/30 p-3">
+                  {hasImages ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setImagesTargetId(purchase.id)}
+                      className="h-9 gap-1.5 rounded-full px-3 text-xs font-bold touch-target"
+                      title="عرض صور الفاتورة والمستندات"
+                    >
+                      <Images className="size-3.5 text-amber-700" />
+                      <span>الصور</span>
+                      {docsCount > 0 && <span className="tabular-nums">({docsCount})</span>}
+                    </Button>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground font-medium">
+                      إيصال شراء موثق
+                    </span>
+                  )}
+
                   <Button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setImagesTargetId(purchase.id)}
-                    className="gap-1.5 rounded-full touch-target"
-                    title="عرض صور الفاتورة المخزنة"
+                    onClick={() => printPurchase(purchase)}
+                    className="h-9 gap-1.5 rounded-full px-4 text-xs font-bold touch-target shadow-xs"
                   >
-                    <Images className="size-4" />
-                    عرض الصور
-                    {(purchase.documentsCount ?? 0) > 0 && (
-                      <span className="tabular-nums">({purchase.documentsCount})</span>
-                    )}
+                    <Printer className="size-3.5" />
+                    <span>عرض وطباعة</span>
                   </Button>
-                )}
-              </CardContent>
-
-              <CardFooter className="justify-between pt-0">
-                <span className="text-[20px] font-bold tabular-nums text-foreground">
-                  {formatEgp(purchase.totalAmount)}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => printPurchase(purchase)}
-                  className="gap-1.5 rounded-full touch-target"
-                >
-                  <Eye className="size-4" />
-                  عرض
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                </div>
+              </Card>
+            )
+          })}
         </div>
 
         {!dateSearching && (

@@ -17,7 +17,7 @@ import {
 import { getProductKarats, getProductsPage } from '@/features/products/api'
 import type { Product } from '@/features/products/types'
 import { ProductFormSheet } from '@/features/products/components/ProductFormSheet'
-import { salePerGram } from '@/shared/lib/gold'
+import { salePerGram, cartLineMath } from '@/shared/lib/gold'
 import { getLatestGoldPrice } from '@/shared/lib/parties'
 import { useGoldStore } from '@/shared/stores/gold-store'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
@@ -90,8 +90,8 @@ export function ProductsPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [share, setShare] = useState<ShareState | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
-  const [shareStyle, setShareStyle] = useState<ShareImageStyleId>('gold-luxury')
-  const [pendingStyle, setPendingStyle] = useState<ShareImageStyleId>('gold-luxury')
+  const [shareStyle, setShareStyle] = useState<ShareImageStyleId>('royal-arch')
+  const [pendingStyle, setPendingStyle] = useState<ShareImageStyleId>('royal-arch')
   const [shareRatio, setShareRatio] = useState<ShareImageAspectRatio>('9:16')
   const [pendingRatio, setPendingRatio] = useState<ShareImageAspectRatio>('9:16')
   const [makingDiscount, setMakingDiscount] = useState('')
@@ -152,7 +152,7 @@ export function ProductsPage() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const effectiveGold = gold21 > 0 ? gold21 : serverPrice ?? 0
+  const effectiveGold = (gold21 > 0 ? gold21 : serverPrice ?? 0) || 3600
 
   const { data: storeSummary } = useQuery({
     queryKey: ['store-summary'],
@@ -168,6 +168,9 @@ export function ProductsPage() {
     setPendingRatio(shareRatio)
     setMakingDiscount('')
     setShareBusy(true)
+
+    const lineMath = cartLineMath(effectiveGold, p.karat, p.weight, p.factoryForSale)
+
     try {
       const canvas = await buildProductShareImage({
         productName: p.productName,
@@ -177,9 +180,17 @@ export function ProductsPage() {
         imageUrl: getProductImage(p),
         phoneDisplay: storeSummary?.phone ?? null,
         storeName: storeSummary?.name ?? null,
+        storeCity: storeSummary?.city ?? null,
         style: shareStyle,
         aspectRatio: shareRatio,
         makingDiscountPercent: 0,
+        gold21Price: effectiveGold,
+        pricePerGram: salePerGram(effectiveGold, p.karat),
+        makingFeePerGram: p.factoryForSale,
+        totalPrice: lineMath.total,
+        originalTotalPrice: lineMath.total,
+        barcode: p.barcode || p.sku || `GM-${p.productId}`,
+        productType: p.productType,
       })
       const blob = await canvasToPngBlob(canvas)
       if (blob) {
@@ -207,6 +218,11 @@ export function ProductsPage() {
     setShareRatio(pendingRatio)
     setShare((s) => (s ? { ...s, composed: null } : s))
     setShareBusy(true)
+
+    const effectiveMaking = share.product.factoryForSale * (1 - discountValue / 100)
+    const lineMath = cartLineMath(effectiveGold, share.product.karat, share.product.weight, effectiveMaking)
+    const originalMath = cartLineMath(effectiveGold, share.product.karat, share.product.weight, share.product.factoryForSale)
+
     try {
       const canvas = await buildProductShareImage({
         productName: share.product.productName,
@@ -216,9 +232,17 @@ export function ProductsPage() {
         imageUrl: getProductImage(share.product),
         phoneDisplay: storeSummary?.phone ?? null,
         storeName: storeSummary?.name ?? null,
+        storeCity: storeSummary?.city ?? null,
         style: pendingStyle,
         aspectRatio: pendingRatio,
         makingDiscountPercent: discountValue,
+        gold21Price: effectiveGold,
+        pricePerGram: salePerGram(effectiveGold, share.product.karat),
+        makingFeePerGram: share.product.factoryForSale,
+        totalPrice: lineMath.total,
+        originalTotalPrice: originalMath.total,
+        barcode: share.product.barcode || share.product.sku || `GM-${share.product.productId}`,
+        productType: share.product.productType,
       })
       const blob = await canvasToPngBlob(canvas)
       if (!blob) {
@@ -581,34 +605,48 @@ export function ProductsPage() {
                         <Label className="text-[13px] font-bold text-foreground">
                           قياس ومنصة النشر
                         </Label>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div className="mt-2 grid grid-cols-3 gap-2">
                           <button
                             type="button"
                             onClick={() => setPendingRatio('9:16')}
                             disabled={shareBusy}
                             className={cn(
-                              'flex flex-col items-center justify-center gap-1 rounded-[12px] border-2 p-2.5 text-center transition-all cursor-pointer touch-target',
+                              'flex flex-col items-center justify-center gap-1 rounded-[12px] border-2 p-2 text-center transition-all cursor-pointer touch-target',
                               pendingRatio === '9:16'
                                 ? 'border-primary bg-primary/10 text-primary shadow-xs'
                                 : 'border-border bg-background text-foreground hover:border-primary/40',
                             )}
                           >
-                            <span className="text-xs font-black">📱 ستوري وريلز (9:16)</span>
-                            <span className="text-[10px] text-muted-foreground">إنستا • فيسبوك • واتساب</span>
+                            <span className="text-xs font-black">📱 ستوري (9:16)</span>
+                            <span className="text-[9px] text-muted-foreground">إنستا • واتساب</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPendingRatio('1:1')}
+                            disabled={shareBusy}
+                            className={cn(
+                              'flex flex-col items-center justify-center gap-1 rounded-[12px] border-2 p-2 text-center transition-all cursor-pointer touch-target',
+                              pendingRatio === '1:1'
+                                ? 'border-primary bg-primary/10 text-primary shadow-xs'
+                                : 'border-border bg-background text-foreground hover:border-primary/40',
+                            )}
+                          >
+                            <span className="text-xs font-black">⏹️ مربع (1:1)</span>
+                            <span className="text-[9px] text-muted-foreground">بوست فيسبوك وإنستا</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => setPendingRatio('1.91:1')}
                             disabled={shareBusy}
                             className={cn(
-                              'flex flex-col items-center justify-center gap-1 rounded-[12px] border-2 p-2.5 text-center transition-all cursor-pointer touch-target',
+                              'flex flex-col items-center justify-center gap-1 rounded-[12px] border-2 p-2 text-center transition-all cursor-pointer touch-target',
                               pendingRatio === '1.91:1'
                                 ? 'border-primary bg-primary/10 text-primary shadow-xs'
                                 : 'border-border bg-background text-foreground hover:border-primary/40',
                             )}
                           >
-                            <span className="text-xs font-black">🖼️ بوست عرضي (1.91:1)</span>
-                            <span className="text-[10px] text-muted-foreground">منشورات فيسبوك ولينكدإن</span>
+                            <span className="text-xs font-black">🖼️ عرضي (1.91:1)</span>
+                            <span className="text-[9px] text-muted-foreground">تويتر وفيسبوك</span>
                           </button>
                         </div>
                       </div>
@@ -623,7 +661,7 @@ export function ProductsPage() {
                             10 تصاميم عصرية
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" dir="ltr">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" dir="rtl">
                           {SHARE_IMAGE_STYLES.map((s) => {
                             const active = pendingStyle === s.id
                             const applied = shareStyle === s.id && shareRatio === pendingRatio
@@ -633,24 +671,25 @@ export function ProductsPage() {
                                 type="button"
                                 onClick={() => selectShareStyle(s.id)}
                                 disabled={shareBusy}
+                                title={s.description}
                                 className={cn(
-                                  'group relative flex flex-col items-center gap-1 rounded-[12px] border-2 bg-background p-1.5 transition-all touch-target cursor-pointer',
+                                  'group relative flex flex-col items-center gap-1 rounded-[12px] border-2 bg-background p-2 transition-all touch-target cursor-pointer text-center',
                                   active
                                     ? 'border-primary ring-2 ring-primary/30 shadow-xs'
                                     : 'border-border hover:border-primary/40',
                                   shareBusy && 'opacity-60',
                                 )}
-                                aria-label={`استايل ${s.label}`}
+                                aria-label={`تصميم ${s.label}`}
                                 aria-pressed={active}
                               >
                                 <span
-                                  className="block h-7 w-full rounded-md ring-1 ring-black/10"
+                                  className="block h-7 w-full rounded-md ring-1 ring-black/10 shadow-inner"
                                   style={{ background: s.swatch }}
                                 />
-                                <span className="line-clamp-1 text-[10px] font-bold text-foreground">
+                                <span className="line-clamp-1 text-[11px] font-bold text-foreground">
                                   {s.label}
                                 </span>
-                                <span className="line-clamp-1 text-[8.5px] text-muted-foreground">
+                                <span className="line-clamp-1 text-[9px] text-muted-foreground">
                                   {s.subtitle}
                                 </span>
                                 {applied && (

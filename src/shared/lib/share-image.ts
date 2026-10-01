@@ -1,14 +1,26 @@
 /**
- * مولّد صور المشاركة الفاخرة لمنتجات الذهب والمجوهرات — 10 استايلات عصرية مطورة.
- *
- * يدعم قياسين رئيسيين:
- * 1. `9:16` (1080×1920) — قياس الستوري والريلز (Instagram Stories, Facebook Stories, Reels, WhatsApp Status).
- * 2. `1.91:1` (1200×630) — قياس بوستات ومنشورات فيسبوك القياسية وصور الـ OpenGraph.
+ * مولّد صور إعلانات ومشاركات الذهب والمجوهرات الاحترافية — 10 تصاميم معمارية وفنية متمايزة كلياً.
+ * 
+ * يدعم بدقة القياسات الثلاثة الرئيسية لشبكات التواصل الاجتماعي:
+ * 1. `9:16` (1080×1920): قياس الستوري والريلز (Instagram / Facebook Stories, WhatsApp Status, TikTok)
+ * 2. `1:1` (1080×1080): قياس المنشورات المربعة لإنستغرام وفيسبوك وكتالوجات الواتساب
+ * 3. `1.91:1` (1200×630): قياس المنشورات الأفقية لفيسبوك ولينكدإن وبطاقات OpenGraph
  */
 
 import { getApiBaseUrl } from '@/shared/lib/api-url'
 
 export type ShareImageStyleId =
+  | 'royal-arch'
+  | 'vogue-split'
+  | 'assay-cert'
+  | 'sagha-deal'
+  | 'arabesque-luxury'
+  | 'studio-minimal'
+  | 'cinematic-bokeh'
+  | 'bridal-shabka'
+  | 'neo-luxe'
+  | 'heritage-sagha'
+  // للتوافق العكسي
   | 'gold-luxury'
   | 'dark-noir'
   | 'minimal-white'
@@ -20,19 +32,28 @@ export type ShareImageStyleId =
   | 'modern-arabic'
   | 'chocolate-brown'
 
-export type ShareImageAspectRatio = '9:16' | '1.91:1'
+export type ShareImageAspectRatio = '9:16' | '1:1' | '1.91:1'
 
 export interface ShareImageSpec {
   productName: string
   weight: number
   karat: number
-  size: number
+  size?: number
   imageUrl?: string | null
   phoneDisplay?: string | null
   storeName?: string | null
+  storeCity?: string | null
   style?: ShareImageStyleId
   aspectRatio?: ShareImageAspectRatio
   makingDiscountPercent?: number
+  // بيانات الذهب والتسعير التجاري الحقيقية
+  gold21Price?: number
+  pricePerGram?: number
+  makingFeePerGram?: number
+  totalPrice?: number
+  originalTotalPrice?: number
+  barcode?: string | null
+  productType?: string | null
 }
 
 export const SHARE_IMAGE_STYLES: ReadonlyArray<{
@@ -41,24 +62,150 @@ export const SHARE_IMAGE_STYLES: ReadonlyArray<{
   subtitle: string
   swatch: string
   tone: 'light' | 'dark'
+  description: string
 }> = [
-  { id: 'gold-luxury', label: 'ذهب ملكي', subtitle: 'Royal Gold', swatch: '#d4af37', tone: 'dark' },
-  { id: 'dark-noir', label: 'أسود مخملي', subtitle: 'Velvet Noir', swatch: '#121214', tone: 'dark' },
-  { id: 'minimal-white', label: 'عاجي ستوديو', subtitle: 'Studio Ivory', swatch: '#fbfaf8', tone: 'light' },
-  { id: 'marble-classic', label: 'رخام كلكتا', subtitle: 'Calacatta Gold', swatch: '#eae5de', tone: 'light' },
-  { id: 'neon-gold', label: 'سايبر نيون', subtitle: 'Cyber Glow', swatch: '#0a0d10', tone: 'dark' },
-  { id: 'arabesque', label: 'قرمزي أندلسي', subtitle: 'Royal Crimson', swatch: '#5a1218', tone: 'dark' },
-  { id: 'retro-vintage', label: 'كهرمان أنتيك', subtitle: 'Warm Amber', swatch: '#9a6b28', tone: 'dark' },
-  { id: 'crystal-prism', label: 'ياقوتي أزرق', subtitle: 'Sapphire Prism', swatch: '#11293b', tone: 'dark' },
-  { id: 'modern-arabic', label: 'زمردي ملكي', subtitle: 'Imperial Emerald', swatch: '#0c3324', tone: 'dark' },
-  { id: 'chocolate-brown', label: 'موكا برونزي', subtitle: 'Warm Mocha', swatch: '#361e12', tone: 'dark' },
+  {
+    id: 'royal-arch',
+    label: 'القوس الملكي والمنصة',
+    subtitle: 'Royal Palace Arch',
+    swatch: '#d4af37',
+    tone: 'dark',
+    description: 'قوس معماري مذهب فوق منصة رخامية ثلاثية الأبعاد مع شارة الصاغة الملكية',
+  },
+  {
+    id: 'vogue-split',
+    label: 'البوستر التحريري العصري',
+    subtitle: 'Vogue Haute Joaillerie',
+    swatch: '#1c1b18',
+    tone: 'dark',
+    description: 'تقسيم جريء كأغلفة مجلات المجوهرات العالمية مع باركود عصري وتيبوغرافي فخم',
+  },
+  {
+    id: 'assay-cert',
+    label: 'شهادة الصاغة والسبائك',
+    subtitle: 'Certified Assay Ingot',
+    swatch: '#f4ebd9',
+    tone: 'light',
+    description: 'محاكاة شهادة سبيكة الذهب المعتمدة، خطوط أمان، باركود، ودمغة رسمية',
+  },
+  {
+    id: 'sagha-deal',
+    label: 'عرض الصاغة والخصومات',
+    subtitle: 'Sagha Deal Showcase',
+    swatch: '#c8102e',
+    tone: 'dark',
+    description: 'شارة خصم ثلاثية الأبعاد، مقارنة السعر قبل وبعد، وشريط حجز فوري',
+  },
+  {
+    id: 'arabesque-luxury',
+    label: 'مشربية الأرابيسك والمخمل',
+    subtitle: 'Imperial Arabesque',
+    swatch: '#0c3826',
+    tone: 'dark',
+    description: 'زخارف إسلامية ذهبية مفرغة على خلفية مخملية زمردية وتوهج قناديل',
+  },
+  {
+    id: 'studio-minimal',
+    label: 'ستوديو المجوهرات النقي',
+    subtitle: 'Clean Studio Light',
+    swatch: '#fbfaf7',
+    tone: 'light',
+    description: 'إضاءة ستوديو عاجية ناعمة مع انعكاس مرآة زجاجي وغبار ذهب دقيق',
+  },
+  {
+    id: 'cinematic-bokeh',
+    label: 'البريق السينمائي والبوكيه',
+    subtitle: 'Cinematic Spotlight',
+    swatch: '#14171d',
+    tone: 'dark',
+    description: 'إضاءة مسرحية مركزة على القطعة مع كريات بوكيه ذهبية طافية',
+  },
+  {
+    id: 'bridal-shabka',
+    label: 'شبكة العروس والزفاف',
+    subtitle: 'Bridal Shabka',
+    swatch: '#45101a',
+    tone: 'dark',
+    description: 'إطار أكاليل الزهور المذهبة وخواتم الزواج التراثية للعروس',
+  },
+  {
+    id: 'neo-luxe',
+    label: 'النيو-تيك والتيتانيوم',
+    subtitle: 'Neo-Luxe Cyber Dark',
+    swatch: '#0b0f14',
+    tone: 'dark',
+    description: 'خطوط ليزر نيون ذهبية وشاشات قياس دائرية رقمية لجيل اليوم',
+  },
+  {
+    id: 'heritage-sagha',
+    label: 'خان الخليلي والصاغة',
+    subtitle: 'Heritage Khan el-Khalili',
+    swatch: '#2a1a08',
+    tone: 'dark',
+    description: 'ملمس الصاغة القديمة، ميزان العدل، ختم الشمع التراثي، وطابع أثري',
+  },
 ]
 
-const FONT_FAMILY = "'Cairo', 'Segoe UI', system-ui, -apple-system, sans-serif"
+function canonicalStyle(id?: ShareImageStyleId): ShareImageStyleId {
+  if (!id) return 'royal-arch'
+  switch (id) {
+    case 'gold-luxury':
+      return 'royal-arch'
+    case 'dark-noir':
+      return 'vogue-split'
+    case 'minimal-white':
+      return 'studio-minimal'
+    case 'marble-classic':
+      return 'assay-cert'
+    case 'neon-gold':
+      return 'neo-luxe'
+    case 'arabesque':
+      return 'arabesque-luxury'
+    case 'retro-vintage':
+      return 'heritage-sagha'
+    case 'crystal-prism':
+      return 'cinematic-bokeh'
+    case 'modern-arabic':
+      return 'sagha-deal'
+    case 'chocolate-brown':
+      return 'bridal-shabka'
+    default:
+      return id
+  }
+}
 
-function fmtWeight(value: number): string {
-  if (!Number.isFinite(value)) return '0'
-  return value % 1 === 0 ? String(value) : value.toFixed(value >= 100 ? 1 : 2)
+const FONT_FAMILY = 'Cairo, system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+
+function fmtMoney(val: number): string {
+  return `${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(Math.round(val))} ج.م`
+}
+
+function fmtWeight(val: number): string {
+  return new Intl.NumberFormat('ar-EG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(val)
+}
+
+function resolveImageUrl(raw: string): string {
+  if (!raw) return ''
+  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
+    return raw
+  }
+  const base = getApiBaseUrl()
+  const clean = raw.startsWith('/') ? raw : `/${raw}`
+  return `${base}${clean}`
+}
+
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  if (!src) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
 }
 
 function roundedRect(
@@ -69,498 +216,340 @@ function roundedRect(
   h: number,
   r: number,
 ) {
+  const rad = Math.min(r, w / 2, h / 2)
   ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.lineTo(x + w - r, y)
-  ctx.arcTo(x + w, y, x + w, y + r, r)
-  ctx.lineTo(x + w, y + h - r)
-  ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
-  ctx.lineTo(x + r, y + h)
-  ctx.arcTo(x, y + h, x, y + h - r, r)
-  ctx.lineTo(x, y + r)
-  ctx.arcTo(x, y, x + r, y, r)
+  ctx.moveTo(x + rad, y)
+  ctx.lineTo(x + w - rad, y)
+  ctx.arcTo(x + w, y, x + w, y + rad, rad)
+  ctx.lineTo(x + w, y + h - rad)
+  ctx.arcTo(x + w, y + h, x + w - rad, y + h, rad)
+  ctx.lineTo(x + rad, y + h)
+  ctx.arcTo(x, y + h, x, y + h - rad, rad)
+  ctx.lineTo(x, y + rad)
+  ctx.arcTo(x, y, x + rad, y, rad)
   ctx.closePath()
 }
 
-async function loadImage(url: string): Promise<HTMLImageElement | null> {
-  if (url.startsWith('data:') || url.startsWith('blob:')) {
-    return new Promise((resolve) => {
-      const img = new Image()
-      img.onload = () => resolve(img)
-      img.onerror = () => resolve(null)
-      img.src = url
-    })
-  }
+/**
+ * دالة تقسيم النص العربي على عدة أسطر لضمان عدم خروجه عن حدود التصميم نهائياً
+ */
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines = 2,
+): string[] {
+  const words = text.trim().split(/\s+/)
+  const lines: string[] = []
+  let currentLine = ''
 
-  try {
-    const res = await fetch(url, { mode: 'cors' })
-    if (res.ok) {
-      const blob = await res.blob()
-      const objectUrl = URL.createObjectURL(blob)
-      const img = await new Promise<HTMLImageElement | null>((resolve) => {
-        const image = new Image()
-        image.onload = () => resolve(image)
-        image.onerror = () => resolve(null)
-        image.src = objectUrl
-      })
-      if (img) return img
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word
+    const metrics = ctx.measureText(testLine)
+    if (metrics.width > maxWidth && currentLine) {
+      lines.push(currentLine)
+      currentLine = word
+      if (lines.length >= maxLines - 1) {
+        break
+      }
+    } else {
+      currentLine = testLine
     }
-  } catch {
-    // fallback
   }
 
-  return new Promise<HTMLImageElement | null>((resolve) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => resolve(img)
-    img.onerror = () => resolve(null)
-    img.src = url
-  })
-}
+  if (currentLine && lines.length < maxLines) {
+    lines.push(currentLine)
+  }
 
-function resolveImageUrl(url: string): string {
-  if (/^https?:\/\//i.test(url)) return url
-  const apiBase = getApiBaseUrl()
-  return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`
-}
-
-function drawSparkle(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  alpha = 0.85,
-  color = '#ffffff',
-) {
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.globalAlpha = alpha
-  ctx.fillStyle = color
-  ctx.beginPath()
-  ctx.moveTo(0, -size)
-  ctx.quadraticCurveTo(size * 0.15, -size * 0.15, size, 0)
-  ctx.quadraticCurveTo(size * 0.15, size * 0.15, 0, size)
-  ctx.quadraticCurveTo(-size * 0.15, size * 0.15, -size, 0)
-  ctx.quadraticCurveTo(-size * 0.15, -size * 0.15, 0, -size)
-  ctx.closePath()
-  ctx.fill()
-  ctx.restore()
+  return lines.length > 0 ? lines : [text]
 }
 
 /**
- * رسم الإطار الدائري الماسي الفاخر للمنتج (Hero Bezel Ring)
+ * رسم شارة الخصم ثلاثية الأبعاد بختم الصاغة القرمزي والذهبي
  */
-function drawHeroProduct(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  r: number,
-  img: HTMLImageElement | null,
-  accentColor: string,
-  tone: 'light' | 'dark',
-) {
-  ctx.save()
-
-  // 1. هالة ضوئية خلفية متوهجة (Radial Ambient Bloom)
-  const aura = ctx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r * 1.5)
-  aura.addColorStop(0, accentColor === '#ffffff' ? 'rgba(212,175,55,0.30)' : `${accentColor}33`)
-  aura.addColorStop(0.6, accentColor === '#ffffff' ? 'rgba(212,175,55,0.10)' : `${accentColor}12`)
-  aura.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = aura
-  ctx.beginPath()
-  ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2)
-  ctx.fill()
-
-  // 2. ظل أرضي ثلاثي الأبعاد تحت القرص (Drop Shadow Pedestal)
-  const shadowGrad = ctx.createRadialGradient(cx, cy + r * 0.95, 20, cx, cy + r * 0.95, r * 1.1)
-  shadowGrad.addColorStop(0, 'rgba(0,0,0,0.55)')
-  shadowGrad.addColorStop(0.7, 'rgba(0,0,0,0.20)')
-  shadowGrad.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = shadowGrad
-  ctx.beginPath()
-  ctx.ellipse(cx, cy + r * 0.95, r * 1.05, r * 0.22, 0, 0, Math.PI * 2)
-  ctx.fill()
-
-  // 3. الإطار الذهبي الخارجي المتدرج
-  ctx.shadowColor = 'rgba(0,0,0,0.40)'
-  ctx.shadowBlur = 24
-  ctx.shadowOffsetY = 12
-
-  const outerGrad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r)
-  outerGrad.addColorStop(0, '#fff4d0')
-  outerGrad.addColorStop(0.25, '#d4af37')
-  outerGrad.addColorStop(0.5, '#aa7c11')
-  outerGrad.addColorStop(0.75, '#f3e5ab')
-  outerGrad.addColorStop(1, '#8c6209')
-
-  ctx.strokeStyle = outerGrad
-  ctx.lineWidth = Math.max(6, Math.round(r * 0.045))
-  ctx.beginPath()
-  ctx.arc(cx, cy, r + 5, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.shadowColor = 'transparent'
-
-  // 4. حلقة زجاجية رفيعة داخلية
-  ctx.strokeStyle = 'rgba(255,255,255,0.70)'
-  ctx.lineWidth = 1.5
-  ctx.beginPath()
-  ctx.arc(cx, cy, r - 3, 0, Math.PI * 2)
-  ctx.stroke()
-
-  // 5. خلفية طبق العرض المخملية (Platter Background)
-  const platter = ctx.createRadialGradient(cx, cy - r * 0.3, 10, cx, cy, r)
-  if (tone === 'light') {
-    platter.addColorStop(0, '#ffffff')
-    platter.addColorStop(1, '#f1ede4')
-  } else {
-    platter.addColorStop(0, '#222226')
-    platter.addColorStop(0.6, '#141416')
-    platter.addColorStop(1, '#0a0a0c')
-  }
-  ctx.fillStyle = platter
-  ctx.beginPath()
-  ctx.arc(cx, cy, r, 0, Math.PI * 2)
-  ctx.fill()
-
-  // 6. رسم صورة المنتج بداخل القرص
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(cx, cy, r - 2, 0, Math.PI * 2)
-  ctx.clip()
-
-  if (img) {
-    const scale = Math.max((r * 2) / img.width, (r * 2) / img.height)
-    const dw = img.width * scale
-    const dh = img.height * scale
-    ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh)
-  } else {
-    // أيقونة مجوهرات هندسية راقية عند عدم توفر صورة
-    const gemGrad = ctx.createLinearGradient(cx - r * 0.4, cy - r * 0.4, cx + r * 0.4, cy + r * 0.4)
-    gemGrad.addColorStop(0, '#ffe89c')
-    gemGrad.addColorStop(0.5, '#d4af37')
-    gemGrad.addColorStop(1, '#946808')
-    ctx.fillStyle = gemGrad
-    ctx.beginPath()
-    ctx.moveTo(cx, cy - r * 0.5)
-    ctx.lineTo(cx + r * 0.4, cy - r * 0.1)
-    ctx.lineTo(cx + r * 0.25, cy + r * 0.5)
-    ctx.lineTo(cx - r * 0.25, cy + r * 0.5)
-    ctx.lineTo(cx - r * 0.4, cy - r * 0.1)
-    ctx.closePath()
-    ctx.fill()
-  }
-
-  // 7. لمعة زجاجية أفقية (Glass Reflection Sheen)
-  const sheen = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r)
-  sheen.addColorStop(0, 'rgba(255,255,255,0.32)')
-  sheen.addColorStop(0.4, 'rgba(255,255,255,0.06)')
-  sheen.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = sheen
-  ctx.fillRect(cx - r, cy - r, r * 2, r * 2)
-  ctx.restore()
-
-  // 8. لمعات ماسية على الإطار (Jewelry Facet Sparkles)
-  drawSparkle(ctx, cx + r * 0.72, cy - r * 0.68, Math.max(10, r * 0.08), 0.95, '#fff6d8')
-  drawSparkle(ctx, cx - r * 0.75, cy + r * 0.65, Math.max(8, r * 0.06), 0.80, '#fff6d8')
-
-  ctx.restore()
-}
-
-/**
- * ختم خصم المصنعية الراقي — وسام ملكي ذهبي وأحمر مخملي
- */
-function drawDiscountSeal(
+function drawDiscountBadge(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
   r: number,
   percent: number,
+  savings?: number,
 ) {
-  if (!(percent > 0)) return
   ctx.save()
 
-  // ظل قوي للوسام
-  ctx.shadowColor = 'rgba(0,0,0,0.50)'
-  ctx.shadowBlur = 18
-  ctx.shadowOffsetY = 8
+  // وهج ذهبي
+  ctx.shadowColor = 'rgba(212,175,55,0.7)'
+  ctx.shadowBlur = 24
 
-  // إطار خارجي مسنن أو حلقة ذهبية مذهّبة
-  const outerGold = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r)
-  outerGold.addColorStop(0, '#ffe89c')
-  outerGold.addColorStop(0.5, '#d4af37')
-  outerGold.addColorStop(1, '#855905')
-  ctx.fillStyle = outerGold
-  ctx.beginPath()
-  ctx.arc(cx, cy, r + 5, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.shadowColor = 'transparent'
-
-  // قرص أحمر مخملي داخلي
-  const redGrad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 5, cx, cy, r)
-  redGrad.addColorStop(0, '#ff3b3b')
-  redGrad.addColorStop(0.7, '#c8102e')
-  redGrad.addColorStop(1, '#800517')
-  ctx.fillStyle = redGrad
+  // الإطار الذهبي المزدوج
+  const goldGrad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r)
+  goldGrad.addColorStop(0, '#fff4cc')
+  goldGrad.addColorStop(0.3, '#d4af37')
+  goldGrad.addColorStop(0.7, '#8b6914')
+  goldGrad.addColorStop(1, '#ffd700')
+  ctx.fillStyle = goldGrad
   ctx.beginPath()
   ctx.arc(cx, cy, r, 0, Math.PI * 2)
   ctx.fill()
+  ctx.shadowBlur = 0
 
-  // حلقة بيضاء رقيقة
-  ctx.strokeStyle = 'rgba(255,255,255,0.70)'
+  // قلب قرمزي ملكي
+  const redGrad = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, 5, cx, cy, r * 0.88)
+  redGrad.addColorStop(0, '#e52d27')
+  redGrad.addColorStop(0.7, '#b31217')
+  redGrad.addColorStop(1, '#7a0509')
+  ctx.fillStyle = redGrad
+  ctx.beginPath()
+  ctx.arc(cx, cy, r * 0.88, 0, Math.PI * 2)
+  ctx.fill()
+
+  // حلقة رقيقة داخلية
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)'
   ctx.lineWidth = 1.5
   ctx.beginPath()
-  ctx.arc(cx, cy, r - 4, 0, Math.PI * 2)
+  ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2)
   ctx.stroke()
 
-  // كتابة النسبة
+  // نصوص الخصم
   ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.direction = 'rtl'
-  ctx.font = `900 ${Math.round(r * 0.65)}px ${FONT_FAMILY}`
-  ctx.fillText(`${Math.round(percent)}%`, cx, cy - r * 0.12)
 
-  ctx.font = `800 ${Math.round(r * 0.28)}px ${FONT_FAMILY}`
-  ctx.fillStyle = '#ffe89c'
-  ctx.fillText('خصم مصنعية', cx, cy + r * 0.40)
+  ctx.font = `900 ${Math.round(r * 0.58)}px ${FONT_FAMILY}`
+  ctx.fillText(`${Math.round(percent)}%`, cx, cy - r * 0.16)
+
+  ctx.font = `800 ${Math.round(r * 0.22)}px ${FONT_FAMILY}`
+  ctx.fillStyle = '#ffeaa7'
+  ctx.fillText('خصم مصنعية', cx, cy + r * 0.34)
+
+  if (savings && savings > 0) {
+    ctx.font = `700 ${Math.round(r * 0.16)}px ${FONT_FAMILY}`
+    ctx.fillStyle = '#ffffff'
+    ctx.fillText(`وفر ${Math.round(savings)} ج.م`, cx, cy + r * 0.62)
+  }
 
   ctx.restore()
 }
 
 /**
- * رسم نسيج وخلفية خاصة بكل استايل
+ * رسم باركود تجاري دقيق وأنيق
  */
-function drawStyleBackground(
+function drawBarcodeBadge(
   ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
   w: number,
   h: number,
-  styleId: ShareImageStyleId,
+  code: string,
+  isDark: boolean,
+) {
+  ctx.save()
+  roundedRect(ctx, x, y, w, h, 10)
+  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
+  ctx.fill()
+  ctx.strokeStyle = isDark ? 'rgba(212,175,55,0.35)' : 'rgba(0,0,0,0.12)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+
+  const barY = y + 8
+  const barH = h - 24
+  const barStartX = x + 14
+  const barEndX = x + w - 14
+  const barColor = isDark ? '#f4eedb' : '#222222'
+  ctx.fillStyle = barColor
+
+  let curX = barStartX
+  const widths = [2, 4, 1, 3, 5, 2, 4, 1, 3, 2, 4, 1, 5, 2, 3]
+  let idx = 0
+  while (curX < barEndX) {
+    const bw = widths[idx % widths.length]
+    ctx.fillRect(curX, barY, bw, barH)
+    curX += bw + (idx % 2 === 0 ? 3 : 2)
+    idx++
+  }
+
+  ctx.direction = 'ltr'
+  ctx.textAlign = 'center'
+  ctx.font = `700 11px ${FONT_FAMILY}`
+  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)'
+  ctx.fillText(code, x + w / 2, y + h - 5)
+  ctx.restore()
+}
+
+/**
+ * رسم صورة قطعة الذهب باحترافية وتوسيط كامل بدون أي تشويه أو قص للأطراف (Contain-fit)
+ */
+function drawJewelryShowcase(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement | null,
+  cx: number,
+  cy: number,
+  maxW: number,
+  maxH: number,
+) {
+  ctx.save()
+  if (img && img.width > 0 && img.height > 0) {
+    // استخدام Math.min لضمان ظهور كامل القطعة دون قص
+    const scale = Math.min((maxW * 0.92) / img.width, (maxH * 0.92) / img.height)
+    const dw = img.width * scale
+    const dh = img.height * scale
+
+    // ظل القطعة الواقعي
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'
+    ctx.shadowBlur = 35
+    ctx.shadowOffsetY = 18
+
+    ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh)
+  } else {
+    // أيقونة بديلة راقية في حال عدم توفر صورة
+    ctx.shadowColor = 'rgba(212,175,55,0.5)'
+    ctx.shadowBlur = 30
+    ctx.fillStyle = '#ffd700'
+    ctx.font = `900 ${Math.round(Math.min(maxW, maxH) * 0.32)}px ${FONT_FAMILY}`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('💎', cx, cy)
+  }
+  ctx.restore()
+}
+
+/**
+ * رسم بطاقة المواصفات التجارية الرباعية للذهب
+ * (العيار • الوزن الصافي • سعر الجرام • السعر التقديري)
+ */
+function drawCommercialSpecsGrid(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  specs: {
+    karatStr: string
+    weightStr: string
+    gramPriceStr: string
+    totalPriceStr: string
+  },
+  isDark: boolean,
 ) {
   ctx.save()
 
-  switch (styleId) {
-    case 'gold-luxury': {
-      // تدرج دافئ فاخر بين الذهب والشامبين والأسود الملكي
-      const bg = ctx.createRadialGradient(w / 2, h * 0.38, 50, w / 2, h / 2, h * 0.8)
-      bg.addColorStop(0, '#2e2410')
-      bg.addColorStop(0.5, '#181308')
-      bg.addColorStop(1, '#0c0a04')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
+  // بطاقات 4 مربعة أو مستطيلة
+  const cols = 4
+  const gap = 12
+  const cardW = (w - gap * (cols - 1)) / cols
 
-      // شبكة نقاط ذهبية متقاطعة
-      ctx.fillStyle = 'rgba(212,175,55,0.06)'
-      for (let y = 30; y < h; y += 45) {
-        for (let x = 30; x < w; x += 45) {
-          ctx.beginPath()
-          ctx.arc(x, y, 1.5, 0, Math.PI * 2)
-          ctx.fill()
-        }
-      }
-      break
-    }
+  const cards = [
+    { label: 'العيار الرسمي', value: specs.karatStr, icon: '👑' },
+    { label: 'الوزن الصافي', value: specs.weightStr, icon: '⚖️' },
+    { label: 'سعر الجرام اليوم', value: specs.gramPriceStr, icon: '📈' },
+    { label: 'السعر الإجمالي التقديري', value: specs.totalPriceStr, icon: '🏷️' },
+  ]
 
-    case 'dark-noir': {
-      // أسود أوبسيديان مخملي مع توهج مركزي دافئ
-      const bg = ctx.createRadialGradient(w / 2, h * 0.4, 40, w / 2, h / 2, h * 0.85)
-      bg.addColorStop(0, '#1c1c20')
-      bg.addColorStop(0.6, '#0f0f11')
-      bg.addColorStop(1, '#050506')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
-      break
-    }
+  let curX = x
+  for (const card of cards) {
+    roundedRect(ctx, curX, y, cardW, h, 14)
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.9)'
+    ctx.fill()
+    ctx.strokeStyle = isDark ? 'rgba(212,175,55,0.35)' : 'rgba(212,175,55,0.5)'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
 
-    case 'minimal-white': {
-      // عاجي ستوديو نقي وفاتح
-      const bg = ctx.createLinearGradient(0, 0, 0, h)
-      bg.addColorStop(0, '#ffffff')
-      bg.addColorStop(0.6, '#f8f6f0')
-      bg.addColorStop(1, '#eee9de')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
+    ctx.direction = 'rtl'
+    ctx.textAlign = 'center'
 
-      // إطار داخلي رفيع جداً
-      ctx.strokeStyle = 'rgba(212,175,55,0.40)'
-      ctx.lineWidth = 1.5
-      ctx.strokeRect(30, 30, w - 60, h - 60)
-      break
-    }
+    // أيقونة وعنوان
+    ctx.font = `700 13px ${FONT_FAMILY}`
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : '#665533'
+    ctx.fillText(`${card.icon} ${card.label}`, curX + cardW / 2, y + 26)
 
-    case 'marble-classic': {
-      // رخام كلكتا مع عروق ذهبية
-      const bg = ctx.createLinearGradient(0, 0, w, h)
-      bg.addColorStop(0, '#f9f6f0')
-      bg.addColorStop(0.5, '#eee8dc')
-      bg.addColorStop(1, '#ded5c3')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
+    // القيمة الكبرى
+    ctx.font = `900 20px ${FONT_FAMILY}`
+    ctx.fillStyle = isDark ? '#ffd700' : '#8c6b1b'
+    ctx.fillText(card.value, curX + cardW / 2, y + h - 18)
 
-      ctx.save()
-      ctx.strokeStyle = 'rgba(180,140,80,0.18)'
-      ctx.lineWidth = 2
-      for (let i = 0; i < 7; i++) {
-        ctx.beginPath()
-        ctx.moveTo(0, h * 0.15 + i * (h * 0.14))
-        ctx.bezierCurveTo(
-          w * 0.35,
-          h * 0.1 + i * (h * 0.14),
-          w * 0.65,
-          h * 0.22 + i * (h * 0.14),
-          w,
-          h * 0.18 + i * (h * 0.14),
-        )
-        ctx.stroke()
-      }
-      ctx.restore()
-      break
-    }
-
-    case 'neon-gold': {
-      // سايبر جولد على أسود فحمي
-      ctx.fillStyle = '#06080a'
-      ctx.fillRect(0, 0, w, h)
-
-      // حلقات نيون متوهجة متحدة المركز
-      ctx.save()
-      ctx.shadowColor = '#d4af37'
-      ctx.shadowBlur = 30
-      ctx.strokeStyle = 'rgba(212,175,55,0.25)'
-      ctx.lineWidth = 1.5
-      for (const r of [160, 260, 380, 520]) {
-        ctx.beginPath()
-        ctx.arc(w / 2, h * 0.38, r, 0, Math.PI * 2)
-        ctx.stroke()
-      }
-      ctx.restore()
-      break
-    }
-
-    case 'arabesque': {
-      // قرمزي ملكي عميق
-      const bg = ctx.createLinearGradient(0, 0, 0, h)
-      bg.addColorStop(0, '#4a0e14')
-      bg.addColorStop(0.5, '#2b070b')
-      bg.addColorStop(1, '#150204')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
-
-      // زخارف هندسية عربية خفيفة
-      ctx.save()
-      ctx.strokeStyle = 'rgba(212,175,55,0.14)'
-      ctx.lineWidth = 1.2
-      const step = 80
-      for (let y = 40; y < h; y += step) {
-        for (let x = 40; x < w; x += step) {
-          ctx.beginPath()
-          ctx.arc(x, y, 16, 0, Math.PI * 2)
-          ctx.moveTo(x - 16, y)
-          ctx.lineTo(x + 16, y)
-          ctx.moveTo(x, y - 16)
-          ctx.lineTo(x, y + 16)
-          ctx.stroke()
-        }
-      }
-      ctx.restore()
-      break
-    }
-
-    case 'retro-vintage': {
-      // كهرمان دافئ أنتيك
-      const bg = ctx.createLinearGradient(0, 0, 0, h)
-      bg.addColorStop(0, '#5a3d16')
-      bg.addColorStop(0.5, '#3c2509')
-      bg.addColorStop(1, '#201203')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
-      break
-    }
-
-    case 'crystal-prism': {
-      // ياقوتي ملكي كحلي
-      const bg = ctx.createLinearGradient(0, 0, w, h)
-      bg.addColorStop(0, '#0a1d2e')
-      bg.addColorStop(0.5, '#061320')
-      bg.addColorStop(1, '#02070c')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
-
-      // حزم كريستالية منشورية
-      ctx.save()
-      const ray = ctx.createLinearGradient(0, 0, w, 0)
-      ray.addColorStop(0, 'rgba(100,180,240,0)')
-      ray.addColorStop(0.5, 'rgba(100,180,240,0.12)')
-      ray.addColorStop(1, 'rgba(100,180,240,0)')
-      ctx.fillStyle = ray
-      ctx.fillRect(0, h * 0.2, w, 120)
-      ctx.restore()
-      break
-    }
-
-    case 'modern-arabic': {
-      // أخضر زمردي ملكي
-      const bg = ctx.createLinearGradient(0, 0, 0, h)
-      bg.addColorStop(0, '#0a3022')
-      bg.addColorStop(0.5, '#051d14')
-      bg.addColorStop(1, '#020d09')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
-
-      // أشعة شمسية ذهبية تنبثق من المركز
-      ctx.save()
-      ctx.strokeStyle = 'rgba(212,175,55,0.09)'
-      ctx.lineWidth = 1
-      for (let i = 0; i < 32; i++) {
-        const ang = (i * Math.PI) / 16
-        ctx.beginPath()
-        ctx.moveTo(w / 2 + Math.cos(ang) * 80, h * 0.38 + Math.sin(ang) * 80)
-        ctx.lineTo(w / 2 + Math.cos(ang) * w, h * 0.38 + Math.sin(ang) * w)
-        ctx.stroke()
-      }
-      ctx.restore()
-      break
-    }
-
-    case 'chocolate-brown': {
-      // موكا برونزي ودافئ
-      const bg = ctx.createLinearGradient(0, 0, 0, h)
-      bg.addColorStop(0, '#2d180c')
-      bg.addColorStop(0.5, '#1e0e06')
-      bg.addColorStop(1, '#110702')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
-      break
-    }
+    curX += cardW + gap
   }
-
-  // فينيت خفيف للأطراف
-  const vignette = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.max(w, h) * 0.8)
-  vignette.addColorStop(0, 'rgba(0,0,0,0)')
-  vignette.addColorStop(1, 'rgba(0,0,0,0.35)')
-  ctx.fillStyle = vignette
-  ctx.fillRect(0, 0, w, h)
 
   ctx.restore()
 }
 
 /**
- * إنشاء صورة المشاركة الشاملة — يدعم قياس 9:16 (ستوري/ريلز) وقياس 1.91:1 (بوست/فيسبوك)
+ * رسم شريط الاتصال والحجز الفوري السفلي
+ */
+function drawContactFooter(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  phone: string,
+  storeCity: string,
+  isDark: boolean,
+) {
+  ctx.save()
+  roundedRect(ctx, x, y, w, h, 20)
+  ctx.fillStyle = isDark ? '#1a1610' : '#fcfaf6'
+  ctx.fill()
+  ctx.strokeStyle = isDark ? 'rgba(212,175,55,0.4)' : '#d4af37'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  ctx.direction = 'rtl'
+  ctx.textAlign = 'right'
+
+  ctx.font = `900 20px ${FONT_FAMILY}`
+  ctx.fillStyle = isDark ? '#ffffff' : '#221a0d'
+  ctx.fillText('متاح الآن للشراء الفوري بالفرع', x + w - 30, y + h / 2 - 8)
+
+  ctx.font = `700 13px ${FONT_FAMILY}`
+  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : '#7a684b'
+  ctx.fillText(`فاتورة ضريبية مختومة • ضمان استبدال • فرع ${storeCity}`, x + w - 30, y + h / 2 + 18)
+
+  if (phone && phone !== '—') {
+    const btnW = 260
+    const btnH = h - 24
+    const btnX = x + 16
+    const btnY = y + 12
+    roundedRect(ctx, btnX, btnY, btnW, btnH, btnH / 2)
+    ctx.fillStyle = '#d4af37'
+    ctx.fill()
+
+    ctx.direction = 'ltr'
+    ctx.textAlign = 'center'
+    ctx.font = `900 18px ${FONT_FAMILY}`
+    ctx.fillStyle = '#1c1505'
+    ctx.fillText(`📞 ${phone}`, btnX + btnW / 2, btnY + btnH / 2 + 6)
+  }
+
+  ctx.restore()
+}
+
+/**
+ * الدالة الرئيسية لبناء ورسم صورة إعلان الذهب بدقة مطلقة لجميع القياسات الثلاثة
  */
 export async function buildProductShareImage(
   spec: ShareImageSpec,
 ): Promise<HTMLCanvasElement> {
-  if (typeof document === 'undefined') throw new Error('Canvas requires a browser environment')
+  if (typeof document === 'undefined') {
+    throw new Error('Canvas requires a browser environment')
+  }
 
   try {
     await document.fonts.load(`900 64px Cairo`)
     await document.fonts.load(`700 32px Cairo`)
+    await document.fonts.load(`600 20px Cairo`)
   } catch {
-    // continue
+    // continue with fallback
   }
 
-  const isStory = spec.aspectRatio === '9:16'
-  const W = isStory ? 1080 : 1200
-  const H = isStory ? 1920 : 630
+  const ratio = spec.aspectRatio ?? '9:16'
+  const isStory = ratio === '9:16'
+  const isSquare = ratio === '1:1'
+  const isLandscape = ratio === '1.91:1'
+
+  const W = isLandscape ? 1200 : 1080
+  const H = isStory ? 1920 : isSquare ? 1080 : 630
 
   const canvas = document.createElement('canvas')
   canvas.width = W
@@ -568,303 +557,1217 @@ export async function buildProductShareImage(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D context unavailable')
 
-  const styleId = spec.style ?? 'gold-luxury'
-  const styleObj = SHARE_IMAGE_STYLES.find((s) => s.id === styleId) ?? SHARE_IMAGE_STYLES[0]
-  const isLight = styleObj.tone === 'light'
+  const styleId = canonicalStyle(spec.style)
+  const isLight = styleId === 'assay-cert' || styleId === 'studio-minimal'
 
-  // تحميل صورة المنتج إن وجدت
+  // تحميل صورة المنتج الحقيقية
   const img = spec.imageUrl ? await loadImage(resolveImageUrl(spec.imageUrl)) : null
 
-  const storeName = (spec.storeName ?? '').trim() || 'GOLD MASTER'
+  // تجهيز وحساب البيانات التجارية الحقيقية
+  const storeName = (spec.storeName ?? '').trim() || 'دار الصاغة للمجوهرات'
+  const storeCity = (spec.storeCity ?? '').trim() || 'الصاغة'
   const phone = (spec.phoneDisplay ?? '').trim() || '—'
   const discountPercent = Math.max(0, Math.min(100, Number(spec.makingDiscountPercent ?? 0) || 0))
-  const productName = spec.productName.trim() || 'قطعة ذهبية مختارة'
+  const productName = spec.productName.trim() || 'قطعة ذهب فاخرة'
+  const barcode = spec.barcode || `GM-${Math.abs(Math.round(spec.weight * 100))}`
+  const karatVal = spec.karat || 21
+  const karatStr = `عيار ${karatVal}`
+  const weightVal = spec.weight > 0 ? spec.weight : 1
+  const weightStr = `${fmtWeight(weightVal)} جم`
 
-  // 1. رسم الخلفية المخصصة
-  drawStyleBackground(ctx, W, H, styleId)
+  // أسعار الذهب الحقيقية
+  const gold21Base = spec.gold21Price && spec.gold21Price > 0 ? spec.gold21Price : 3600
+  const gramPriceVal = spec.pricePerGram && spec.pricePerGram > 0
+    ? spec.pricePerGram
+    : Math.round(gold21Base * (karatVal / 21))
+  const gramPriceStr = `${new Intl.NumberFormat('ar-EG').format(gramPriceVal)} ج.م/جم`
 
-  // ألوان النصوص والعناصر بناءً على التون (فاتح أو داكن)
-  const primaryText = isLight ? '#1a1814' : '#ffffff'
-  const subText = isLight ? '#665d50' : 'rgba(255,255,255,0.70)'
-  const accentGold = '#d4af37'
-  const cardBg = isLight ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.07)'
-  const cardBorder = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(212,175,55,0.25)'
+  const makingFee = spec.makingFeePerGram ?? 150
+  const effectiveMaking = makingFee * (1 - discountPercent / 100)
+  const totalCalc = spec.totalPrice && spec.totalPrice > 0
+    ? spec.totalPrice
+    : Math.round((gramPriceVal + effectiveMaking) * weightVal)
+  const totalPriceStr = fmtMoney(totalCalc)
 
-  // ─── مسار الرسم: قياس 9:16 (الستوري الرأسي) ───
-  if (isStory) {
-    // A. ترويسة المتجر العلوية (Top Brand Bar)
-    ctx.save()
-    const topBarY = 90
-    // شارة المتجر الذهبية
-    roundedRect(ctx, W / 2 - 220, topBarY, 440, 76, 38)
-    ctx.fillStyle = cardBg
-    ctx.fill()
-    ctx.strokeStyle = cardBorder
-    ctx.lineWidth = 1.5
-    ctx.stroke()
+  const originalCalc = spec.originalTotalPrice && spec.originalTotalPrice > 0
+    ? spec.originalTotalPrice
+    : Math.round((gramPriceVal + makingFee) * weightVal)
+  const savingsAmount = originalCalc > totalCalc ? originalCalc - totalCalc : 0
 
-    // الحرف الذهبي أو الشعار
-    const emblemGrad = ctx.createLinearGradient(0, topBarY + 14, 0, topBarY + 62)
-    emblemGrad.addColorStop(0, '#ffe89c')
-    emblemGrad.addColorStop(1, '#aa7c11')
-    ctx.fillStyle = emblemGrad
-    roundedRect(ctx, W / 2 + 150, topBarY + 14, 48, 48, 14)
-    ctx.fill()
-    ctx.fillStyle = '#1c1505'
-    ctx.font = `900 28px ${FONT_FAMILY}`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('G', W / 2 + 174, topBarY + 38)
+  // ══════════════════════════════════════════════════════════════════════
+  // النمط 1: royal-arch — القوس الأندلسي الملكي ومنصة الرخام
+  // ══════════════════════════════════════════════════════════════════════
+  if (styleId === 'royal-arch') {
+    const bg = ctx.createRadialGradient(W / 2, H * 0.35, 80, W / 2, H / 2, H * 0.85)
+    bg.addColorStop(0, '#1c150c')
+    bg.addColorStop(0.5, '#0e0b06')
+    bg.addColorStop(1, '#050402')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, H)
 
-    // اسم المتجر
-    ctx.direction = 'rtl'
-    ctx.textAlign = 'right'
-    ctx.font = `900 28px ${FONT_FAMILY}`
-    ctx.fillStyle = primaryText
-    ctx.fillText(storeName, W / 2 + 130, topBarY + 34)
-
-    ctx.font = `600 16px ${FONT_FAMILY}`
-    ctx.fillStyle = accentGold
-    ctx.fillText('مجوهرات راقية • صاغة معتمدة', W / 2 + 130, topBarY + 58)
-    ctx.restore()
-
-    // B. صورة المنتج الكبيرة البارزة (Hero Product)
-    const heroCx = W / 2
-    const heroCy = 640
-    const heroR = 360
-    drawHeroProduct(ctx, heroCx, heroCy, heroR, img, accentGold, styleObj.tone)
-
-    // C. ختم الخصم (إذا وجد)
-    if (discountPercent > 0) {
-      drawDiscountSeal(ctx, heroCx + heroR * 0.70, heroCy - heroR * 0.65, 86, discountPercent)
-    }
-
-    // D. اسم المنتج والعيار (Headline Title Zone)
-    ctx.save()
-    ctx.direction = 'rtl'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-
-    // شارة العيار العلوية
-    const karatY = 1080
-    const karatLabel = `ذهب عيار ${spec.karat} قيراط`
-    ctx.font = `800 22px ${FONT_FAMILY}`
-    const kw = ctx.measureText(karatLabel).width + 44
-    roundedRect(ctx, W / 2 - kw / 2, karatY - 20, kw, 40, 20)
-    ctx.fillStyle = 'rgba(212,175,55,0.18)'
-    ctx.fill()
-    ctx.strokeStyle = accentGold
-    ctx.lineWidth = 1.5
-    ctx.stroke()
-    ctx.fillStyle = accentGold
-    ctx.fillText(karatLabel, W / 2, karatY)
-
-    // اسم القطعة الرئيسي
-    const titleY = 1170
-    ctx.font = `900 56px ${FONT_FAMILY}`
-    ctx.fillStyle = primaryText
-    ctx.fillText(productName, W / 2, titleY)
-
-    // وصف فرعي
-    ctx.font = `600 24px ${FONT_FAMILY}`
-    ctx.fillStyle = subText
-    ctx.fillText('تصميم حصري • تشطيب متقن ودمغة رسمية', W / 2, titleY + 60)
-    ctx.restore()
-
-    // E. شبكة المواصفات الفاخرة (3 Cards Specs Grid)
-    const specsY = 1320
-    const specCards = [
-      { label: 'الوزن الصافي', value: `${fmtWeight(spec.weight)} جم` },
-      { label: 'عيار الذهب', value: `${spec.karat}K` },
-      ...(spec.size > 0 ? [{ label: 'القياس', value: `${spec.size}` }] : [{ label: 'الحالة', value: 'جديد ومضمون' }]),
-    ]
-
-    const cardW = 280
-    const cardGap = 20
-    const totalW = specCards.length * cardW + (specCards.length - 1) * cardGap
-    let startX = (W - totalW) / 2
-
-    for (const card of specCards) {
+    if (isStory) {
+      // 9:16 ستوري (1080×1920)
+      // ترويسة المتجر
       ctx.save()
-      roundedRect(ctx, startX, specsY, cardW, 140, 24)
-      ctx.fillStyle = cardBg
-      ctx.fill()
-      ctx.strokeStyle = cardBorder
-      ctx.lineWidth = 1.5
-      ctx.stroke()
-
       ctx.direction = 'rtl'
       ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
+      ctx.font = `900 38px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(storeName, W / 2, 90)
 
-      // التسمية
-      ctx.font = `700 20px ${FONT_FAMILY}`
-      ctx.fillStyle = subText
-      ctx.fillText(card.label, startX + cardW / 2, specsY + 44)
-
-      // القيمة
-      ctx.font = `900 36px ${FONT_FAMILY}`
-      ctx.fillStyle = accentGold
-      ctx.fillText(card.value, startX + cardW / 2, specsY + 95)
+      ctx.font = `600 18px ${FONT_FAMILY}`
+      ctx.fillStyle = 'rgba(255,255,255,0.75)'
+      ctx.fillText(`مجوهرات راقية • صاغة معتمدة • ${storeCity}`, W / 2, 130)
       ctx.restore()
 
-      startX += cardW + cardGap
-    }
+      // القوس الملكي
+      const archX = 130
+      const archY = 190
+      const archW = W - 260
+      const archH = 880
+      const archR = archW / 2
 
-    // F. تذييل الاتصال والدعوة للشراء (Bottom CTA & Contact Footer)
-    ctx.save()
-    const footerY = 1680
-    roundedRect(ctx, 60, footerY, W - 120, 150, 32)
-    const footerGrad = ctx.createLinearGradient(0, footerY, 0, footerY + 150)
-    if (isLight) {
-      footerGrad.addColorStop(0, '#ffffff')
-      footerGrad.addColorStop(1, '#f5efe4')
-    } else {
-      footerGrad.addColorStop(0, '#1c1b18')
-      footerGrad.addColorStop(1, '#0e0e0c')
-    }
-    ctx.fillStyle = footerGrad
-    ctx.fill()
-    ctx.strokeStyle = accentGold
-    ctx.lineWidth = 2
-    ctx.stroke()
+      ctx.save()
+      // وهج القوس
+      const glow = ctx.createRadialGradient(W / 2, archY + archR, 50, W / 2, archY + archR, archR * 1.35)
+      glow.addColorStop(0, 'rgba(212,175,55,0.25)')
+      glow.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = glow
+      ctx.beginPath()
+      ctx.arc(W / 2, archY + archR, archR * 1.35, 0, Math.PI * 2)
+      ctx.fill()
 
-    // اليمين: زر الحجز أو الاتصال
-    ctx.direction = 'rtl'
-    ctx.textAlign = 'right'
-    ctx.textBaseline = 'middle'
-    ctx.fillStyle = primaryText
-    ctx.font = `900 32px ${FONT_FAMILY}`
-    ctx.fillText('متاح الآن للحجز والشراء الفوري', 100, footerY + 52)
+      // شكل القوس
+      ctx.beginPath()
+      ctx.moveTo(archX, archY + archH)
+      ctx.lineTo(archX, archY + archR)
+      ctx.arc(W / 2, archY + archR, archR, Math.PI, 0, false)
+      ctx.lineTo(archX + archW, archY + archH)
+      ctx.closePath()
 
-    ctx.font = `700 22px ${FONT_FAMILY}`
-    ctx.fillStyle = subText
-    ctx.fillText('تواصل معنا للاستفسار وتأكيد القطعة', 100, footerY + 98)
+      const innerArch = ctx.createLinearGradient(0, archY, 0, archY + archH)
+      innerArch.addColorStop(0, '#241a0e')
+      innerArch.addColorStop(1, '#120d07')
+      ctx.fillStyle = innerArch
+      ctx.fill()
 
-    // اليسار: كبسولة الهاتف
-    if (phone && phone !== '—') {
-      ctx.direction = 'ltr'
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 6
+      ctx.stroke()
+      ctx.clip()
+
+      // صورة القطعة
+      drawJewelryShowcase(ctx, img, W / 2, archY + archR + 20, archW - 40, archH - 60)
+      ctx.restore()
+
+      // شارة الخصم
+      if (discountPercent > 0) {
+        drawDiscountBadge(ctx, archX + archW - 20, archY + 110, 75, discountPercent, savingsAmount)
+      }
+
+      // عنوان القطعة متعدد الأسطر مع وسام العيار
+      ctx.save()
+      ctx.direction = 'rtl'
       ctx.textAlign = 'center'
-      const phonePillX = W - 360
-      const phonePillY = footerY + 42
-      roundedRect(ctx, phonePillX, phonePillY, 260, 66, 33)
-      ctx.fillStyle = accentGold
+
+      const tagY = 1140
+      roundedRect(ctx, W / 2 - 130, tagY, 260, 44, 22)
+      ctx.fillStyle = 'rgba(212,175,55,0.18)'
       ctx.fill()
-      ctx.fillStyle = '#1c1505'
-      ctx.font = `900 26px ${FONT_FAMILY}`
-      ctx.fillText(`📞 ${phone}`, phonePillX + 130, phonePillY + 34)
-    }
-    ctx.restore()
-  } else {
-    // ─── مسار الرسم: قياس 1.91:1 (Landscape / بوست فيسبوك 1200×630) ───
-    const heroCx = 320
-    const heroCy = H / 2
-    const heroR = 220
-    drawHeroProduct(ctx, heroCx, heroCy, heroR, img, accentGold, styleObj.tone)
-
-    if (discountPercent > 0) {
-      drawDiscountSeal(ctx, heroCx + heroR * 0.75, heroCy - heroR * 0.70, 65, discountPercent)
-    }
-
-    // الجانب الأيمن: البيانات والنصوص
-    ctx.save()
-    const rightX = W - 70
-    ctx.direction = 'rtl'
-    ctx.textAlign = 'right'
-    ctx.textBaseline = 'middle'
-
-    // شعار المتجر أعلى اليمين
-    const topY = 75
-    roundedRect(ctx, rightX - 320, topY - 30, 320, 60, 16)
-    ctx.fillStyle = cardBg
-    ctx.fill()
-    ctx.strokeStyle = cardBorder
-    ctx.lineWidth = 1
-    ctx.stroke()
-
-    ctx.font = `900 24px ${FONT_FAMILY}`
-    ctx.fillStyle = primaryText
-    ctx.fillText(storeName, rightX - 20, topY)
-
-    // عنوان المنتج
-    const titleY = 190
-    ctx.font = `900 48px ${FONT_FAMILY}`
-    ctx.fillStyle = primaryText
-    ctx.fillText(productName, rightX, titleY)
-
-    ctx.font = `700 20px ${FONT_FAMILY}`
-    ctx.fillStyle = accentGold
-    ctx.fillText(`ذهب أصلي عيار ${spec.karat}K معتمد ومدموغ رسمياً`, rightX, titleY + 48)
-
-    // بطاقات المواصفات الأفقية
-    const specsY = 320
-    const chips = [
-      { label: 'الوزن', value: `${fmtWeight(spec.weight)} جم` },
-      { label: 'العيار', value: `${spec.karat}K` },
-      ...(spec.size > 0 ? [{ label: 'القياس', value: `${spec.size}` }] : []),
-    ]
-
-    let currX = rightX
-    for (const chip of chips) {
-      ctx.font = `700 16px ${FONT_FAMILY}`
-      const lw = ctx.measureText(chip.label).width
-      ctx.font = `900 22px ${FONT_FAMILY}`
-      const vw = ctx.measureText(chip.value).width
-      const cw = lw + vw + 50
-
-      roundedRect(ctx, currX - cw, specsY, cw, 60, 16)
-      ctx.fillStyle = cardBg
-      ctx.fill()
-      ctx.strokeStyle = cardBorder
+      ctx.strokeStyle = '#d4af37'
       ctx.lineWidth = 1.5
       ctx.stroke()
 
+      ctx.font = `800 20px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(`👑 ذهب أصلي • ${karatStr}`, W / 2, tagY + 28)
+
+      const titleY = 1240
+      ctx.font = `900 48px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      const titleLines = wrapText(ctx, productName, W - 160, 2)
+      let curTitleY = titleY
+      for (const line of titleLines) {
+        ctx.fillText(line, W / 2, curTitleY)
+        curTitleY += 60
+      }
+      ctx.restore()
+
+      // شبكة المواصفات التجارية الرباعية
+      drawCommercialSpecsGrid(
+        ctx,
+        70,
+        1400,
+        W - 140,
+        110,
+        { karatStr, weightStr, gramPriceStr, totalPriceStr },
+        true,
+      )
+
+      // شريط السعر البارز والباركود
+      const priceCardY = 1540
+      roundedRect(ctx, 70, priceCardY, W - 140, 140, 24)
+      ctx.fillStyle = '#22190f'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 2
+      ctx.stroke()
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      ctx.font = `700 18px ${FONT_FAMILY}`
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'
+      ctx.fillText('السعر الإجمالي التقديري شامل المصنعية:', W - 110, priceCardY + 45)
+
+      ctx.font = `900 48px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(totalPriceStr, W - 110, priceCardY + 105)
+
+      drawBarcodeBadge(ctx, 110, priceCardY + 35, 230, 70, barcode, true)
+      ctx.restore()
+
+      // شريط التواصل السفلي
+      drawContactFooter(ctx, 70, 1720, W - 140, 130, phone, storeCity, true)
+    } else if (isSquare) {
+      // 1:1 مربع (1080×1080)
+      // ترويسة أنيقة
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 32px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(storeName, W / 2, 60)
+
+      ctx.font = `600 15px ${FONT_FAMILY}`
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'
+      ctx.fillText(`مجوهرات راقية • ${storeCity}`, W / 2, 90)
+      ctx.restore()
+
+      // القوس المعماري المربع
+      const archX = 180
+      const archY = 120
+      const archW = W - 360
+      const archH = 520
+      const archR = archW / 2
+
+      ctx.save()
+      ctx.beginPath()
+      ctx.moveTo(archX, archY + archH)
+      ctx.lineTo(archX, archY + archR)
+      ctx.arc(W / 2, archY + archR, archR, Math.PI, 0, false)
+      ctx.lineTo(archX + archW, archY + archH)
+      ctx.closePath()
+
+      const innerArch = ctx.createLinearGradient(0, archY, 0, archY + archH)
+      innerArch.addColorStop(0, '#241a0e')
+      innerArch.addColorStop(1, '#120d07')
+      ctx.fillStyle = innerArch
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 5
+      ctx.stroke()
+      ctx.clip()
+
+      drawJewelryShowcase(ctx, img, W / 2, archY + archH / 2 + 10, archW - 30, archH - 40)
+      ctx.restore()
+
+      if (discountPercent > 0) {
+        drawDiscountBadge(ctx, archX + archW - 10, archY + 80, 62, discountPercent, savingsAmount)
+      }
+
+      // عنوان القطعة متعدد الأسطر
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 38px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      const titleLines = wrapText(ctx, productName, W - 140, 2)
+      let curY = 690
+      for (const line of titleLines) {
+        ctx.fillText(line, W / 2, curY)
+        curY += 46
+      }
+      ctx.restore()
+
+      // شبكة المواصفات التجارية
+      drawCommercialSpecsGrid(
+        ctx,
+        50,
+        775,
+        W - 100,
+        96,
+        { karatStr, weightStr, gramPriceStr, totalPriceStr },
+        true,
+      )
+
+      // شريط التواصل والباركود المدمج
+      const footY = 895
+      roundedRect(ctx, 50, footY, W - 100, 135, 20)
+      ctx.fillStyle = '#1c150c'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      ctx.font = `900 24px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(`السعر التقديري: ${totalPriceStr}`, W - 80, footY + 45)
+
       ctx.font = `700 16px ${FONT_FAMILY}`
-      ctx.fillStyle = subText
-      ctx.fillText(chip.label, currX - 20, specsY + 30)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(`للحجز الفوري بالفرع: 📞 ${phone}`, W - 80, footY + 95)
+
+      drawBarcodeBadge(ctx, 80, footY + 30, 220, 75, barcode, true)
+      ctx.restore()
+    } else {
+      // 1.91:1 أفقي (1200×630)
+      const archX = 60
+      const archY = 50
+      const archW = 460
+      const archH = H - 100
+      const archR = archW / 2
+
+      ctx.save()
+      ctx.beginPath()
+      ctx.moveTo(archX, archY + archH)
+      ctx.lineTo(archX, archY + archR)
+      ctx.arc(archX + archR, archY + archR, archR, Math.PI, 0, false)
+      ctx.lineTo(archX + archW, archY + archH)
+      ctx.closePath()
+      ctx.fillStyle = '#241a0e'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 5
+      ctx.stroke()
+      ctx.clip()
+
+      drawJewelryShowcase(ctx, img, archX + archR, archY + archH / 2, archW - 20, archH - 30)
+      ctx.restore()
+
+      if (discountPercent > 0) {
+        drawDiscountBadge(ctx, archX + archW - 20, archY + 60, 58, discountPercent, savingsAmount)
+      }
+
+      // الجانب الأيمن للنصوص والمواصفات
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      const rx = W - 60
+
+      ctx.font = `900 26px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(storeName, rx, 80)
+
+      ctx.font = `900 42px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      const lines = wrapText(ctx, productName, 580, 2)
+      let lineY = 140
+      for (const line of lines) {
+        ctx.fillText(line, rx, lineY)
+        lineY += 50
+      }
+
+      ctx.font = `700 22px ${FONT_FAMILY}`
+      ctx.fillStyle = 'rgba(255,255,255,0.75)'
+      ctx.fillText(`${karatStr} • الوزن الصافي: ${weightStr} • ${gramPriceStr}`, rx, lineY + 15)
+
+      ctx.font = `900 40px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(`السعر التقديري: ${totalPriceStr}`, rx, lineY + 75)
+
+      // شريط التواصل والباركود
+      roundedRect(ctx, 560, H - 110, W - 620, 75, 18)
+      ctx.fillStyle = '#22190f'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
 
       ctx.font = `900 22px ${FONT_FAMILY}`
-      ctx.fillStyle = accentGold
-      ctx.fillText(chip.value, currX - cw + 25 + vw / 2, specsY + 30)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(`📞 للتواصل والحجز: ${phone}`, rx - 30, H - 65)
 
-      currX -= cw + 15
+      drawBarcodeBadge(ctx, 580, H - 100, 180, 55, barcode, true)
+      ctx.restore()
     }
-    ctx.restore()
+  }
 
-    // الشريط السفلي (Bottom Bar)
-    ctx.save()
-    const barY = H - 85
-    const barH = 85
-    ctx.fillStyle = isLight ? 'rgba(255,255,255,0.92)' : 'rgba(10,10,12,0.92)'
-    ctx.fillRect(0, barY, W, barH)
+  // ══════════════════════════════════════════════════════════════════════
+  // النمط 2: vogue-split — البوستر التحريري العصري (Vogue Haute Joaillerie)
+  // ══════════════════════════════════════════════════════════════════════
+  else if (styleId === 'vogue-split') {
+    ctx.fillStyle = '#141416'
+    ctx.fillRect(0, 0, W, H)
 
-    ctx.strokeStyle = accentGold
+    if (isStory) {
+      // 9:16
+      ctx.fillStyle = '#0a0a0c'
+      ctx.fillRect(0, 0, 150, H)
+
+      ctx.save()
+      ctx.translate(75, H / 2)
+      ctx.rotate(-Math.PI / 2)
+      ctx.textAlign = 'center'
+      ctx.font = `900 42px ${FONT_FAMILY}`
+      ctx.fillStyle = 'rgba(212,175,55,0.35)'
+      ctx.fillText('HAUTE JOAILLERIE • EXCLUSIVE', 0, 0)
+      ctx.restore()
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      ctx.font = `900 36px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(storeName, W - 80, 100)
+
+      ctx.font = `700 18px ${FONT_FAMILY}`
+      ctx.fillStyle = '#d4af37'
+      ctx.fillText('مجموعة الصاغة الحصرية • إصدار فاخر', W - 80, 140)
+      ctx.restore()
+
+      const pX = 200
+      const pY = 200
+      const pW = W - 280
+      const pH = 840
+
+      ctx.save()
+      ctx.shadowColor = 'rgba(0,0,0,0.7)'
+      ctx.shadowBlur = 40
+      ctx.shadowOffsetY = 20
+      roundedRect(ctx, pX, pY, pW, pH, 30)
+      ctx.fillStyle = '#1f1f24'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 2.5
+      ctx.stroke()
+      ctx.clip()
+
+      drawJewelryShowcase(ctx, img, pX + pW / 2, pY + pH / 2, pW - 20, pH - 20)
+      ctx.restore()
+
+      drawBarcodeBadge(ctx, pX + 25, pY + pH - 85, 220, 60, barcode, true)
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+
+      const textY = 1120
+      ctx.font = `900 52px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      const titleLines = wrapText(ctx, productName, W - 280, 2)
+      let curY = textY
+      for (const line of titleLines) {
+        ctx.fillText(line, W - 80, curY)
+        curY += 60
+      }
+
+      ctx.font = `700 24px ${FONT_FAMILY}`
+      ctx.fillStyle = '#d4af37'
+      ctx.fillText(`${karatStr} • تشطيب ليزر متقن`, W - 80, curY + 20)
+      ctx.restore()
+
+      drawCommercialSpecsGrid(
+        ctx,
+        200,
+        1380,
+        W - 280,
+        110,
+        { karatStr, weightStr, gramPriceStr, totalPriceStr },
+        true,
+      )
+
+      const footY = 1530
+      roundedRect(ctx, 200, footY, W - 280, 130, 20)
+      ctx.fillStyle = '#222228'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      ctx.font = `700 16px ${FONT_FAMILY}`
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'
+      ctx.fillText('السعر المعتمد النهائي شامل المصنعية:', W - 240, footY + 45)
+
+      ctx.font = `900 44px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(totalPriceStr, W - 240, footY + 100)
+      ctx.restore()
+
+      drawContactFooter(ctx, 200, 1710, W - 280, 120, phone, storeCity, true)
+    } else if (isSquare) {
+      // 1:1
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      ctx.font = `900 32px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(storeName, W - 60, 65)
+
+      ctx.font = `700 16px ${FONT_FAMILY}`
+      ctx.fillStyle = '#d4af37'
+      ctx.fillText('HAUTE JOAILLERIE • صاغة راقية', W - 60, 95)
+      ctx.restore()
+
+      const pX = 60
+      const pY = 130
+      const pW = W - 120
+      const pH = 510
+
+      ctx.save()
+      roundedRect(ctx, pX, pY, pW, pH, 24)
+      ctx.fillStyle = '#1c1b20'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.clip()
+
+      drawJewelryShowcase(ctx, img, pX + pW / 2, pY + pH / 2, pW - 20, pH - 20)
+      ctx.restore()
+
+      drawBarcodeBadge(ctx, pX + 20, pY + pH - 75, 200, 55, barcode, true)
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      ctx.font = `900 38px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      const titleLines = wrapText(ctx, productName, W - 120, 2)
+      let curY = 690
+      for (const line of titleLines) {
+        ctx.fillText(line, W - 60, curY)
+        curY += 46
+      }
+      ctx.restore()
+
+      drawCommercialSpecsGrid(
+        ctx,
+        60,
+        775,
+        W - 120,
+        96,
+        { karatStr, weightStr, gramPriceStr, totalPriceStr },
+        true,
+      )
+
+      drawContactFooter(ctx, 60, 895, W - 120, 135, phone, storeCity, true)
+    } else {
+      // 1.91:1
+      const pX = 50
+      const pY = 50
+      const pW = 480
+      const pH = H - 100
+
+      ctx.save()
+      roundedRect(ctx, pX, pY, pW, pH, 24)
+      ctx.fillStyle = '#1c1b18'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 2.5
+      ctx.stroke()
+      ctx.clip()
+      drawJewelryShowcase(ctx, img, pX + pW / 2, pY + pH / 2, pW - 20, pH - 20)
+      ctx.restore()
+
+      drawBarcodeBadge(ctx, pX + 20, pY + pH - 75, 200, 55, barcode, true)
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      const rx = W - 60
+
+      ctx.font = `900 26px ${FONT_FAMILY}`
+      ctx.fillStyle = '#d4af37'
+      ctx.fillText(storeName, rx, 85)
+
+      ctx.font = `900 42px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      const titleLines = wrapText(ctx, productName, 560, 2)
+      let curY = 145
+      for (const line of titleLines) {
+        ctx.fillText(line, rx, curY)
+        curY += 48
+      }
+
+      ctx.font = `800 22px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(`${karatStr} • ${weightStr} • ${gramPriceStr}`, rx, curY + 20)
+
+      ctx.font = `900 42px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(`السعر التقديري: ${totalPriceStr}`, rx, curY + 80)
+
+      roundedRect(ctx, 580, H - 110, W - 640, 75, 18)
+      ctx.fillStyle = '#ffd700'
+      ctx.fill()
+
+      ctx.font = `900 22px ${FONT_FAMILY}`
+      ctx.fillStyle = '#0a0a0c'
+      ctx.fillText(`للحجز والطلب: 📞 ${phone}`, rx - 30, H - 65)
+      ctx.restore()
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // النمط 3: assay-cert — شهادة الصاغة والسبائك الرسمية
+  // ══════════════════════════════════════════════════════════════════════
+  else if (styleId === 'assay-cert') {
+    ctx.fillStyle = '#f8f4ec'
+    ctx.fillRect(0, 0, W, H)
+
+    ctx.strokeStyle = 'rgba(180,140,50,0.3)'
     ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(0, barY)
-    ctx.lineTo(W, barY)
-    ctx.stroke()
+    ctx.strokeRect(25, 25, W - 50, H - 50)
+    ctx.strokeRect(35, 35, W - 70, H - 70)
 
-    // اليمين: رقم الهاتف
-    ctx.direction = 'rtl'
-    ctx.textAlign = 'right'
-    ctx.textBaseline = 'middle'
-    ctx.font = `800 22px ${FONT_FAMILY}`
-    ctx.fillStyle = primaryText
-    ctx.fillText(`📞 للتواصل والحجز: ${phone}`, W - 60, barY + barH / 2)
+    if (isStory) {
+      // 9:16
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 34px ${FONT_FAMILY}`
+      ctx.fillStyle = '#2d2212'
+      ctx.fillText(`شهادة اعتماد ومواصفات ذهب رسمية`, W / 2, 95)
 
-    // اليسار: جملة ترويجية
-    ctx.direction = 'rtl'
-    ctx.textAlign = 'left'
-    ctx.font = `700 18px ${FONT_FAMILY}`
-    ctx.fillStyle = accentGold
-    ctx.fillText('جولد ماستر • أحدث تشكيلات الذهب والمجوهرات بالصاغة', 60, barY + barH / 2)
-    ctx.restore()
+      ctx.font = `800 22px ${FONT_FAMILY}`
+      ctx.fillStyle = '#8c6b1b'
+      ctx.fillText(storeName, W / 2, 135)
+      ctx.restore()
+
+      const bX = 140
+      const bY = 190
+      const bW = W - 280
+      const bH = 800
+
+      ctx.save()
+      roundedRect(ctx, bX, bY, bW, bH, 20)
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.clip()
+      drawJewelryShowcase(ctx, img, bX + bW / 2, bY + bH / 2, bW - 20, bH - 20)
+      ctx.restore()
+
+      drawBarcodeBadge(ctx, bX + 25, bY + bH - 80, 220, 60, barcode, false)
+
+      // جدول الشهادة
+      const tY = 1040
+      const tW = W - 200
+      const tX = 100
+
+      roundedRect(ctx, tX, tY, tW, 530, 20)
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(180,140,50,0.4)'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      const rows = [
+        { label: 'الصنف والموديل', val: productName },
+        { label: 'العيار ودرجة النقاء', val: `${karatStr} (${karatVal === 24 ? '999.9' : karatVal === 21 ? '875' : '750'})` },
+        { label: 'الوزن القائم الصافي', val: weightStr },
+        { label: 'سعر الجرام اليومي', val: gramPriceStr },
+        { label: 'السعر الإجمالي المعتمد', val: totalPriceStr },
+        { label: 'الدمغة والضمان', val: 'مصلحة الدمغة والموازين المصرية' },
+      ]
+
+      let rowY = tY + 50
+      ctx.direction = 'rtl'
+      for (const r of rows) {
+        ctx.textAlign = 'right'
+        ctx.font = `700 18px ${FONT_FAMILY}`
+        ctx.fillStyle = '#6b5836'
+        ctx.fillText(r.label, tX + tW - 25, rowY)
+
+        ctx.textAlign = 'left'
+        ctx.font = `900 20px ${FONT_FAMILY}`
+        ctx.fillStyle = '#2d2212'
+        ctx.fillText(r.val, tX + 25, rowY)
+
+        rowY += 45
+        ctx.strokeStyle = 'rgba(180,140,50,0.15)'
+        ctx.beginPath()
+        ctx.moveTo(tX + 20, rowY - 20)
+        ctx.lineTo(tX + tW - 20, rowY - 20)
+        ctx.stroke()
+      }
+
+      drawContactFooter(ctx, 100, 1680, W - 200, 140, phone, storeCity, false)
+    } else if (isSquare) {
+      // 1:1
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 30px ${FONT_FAMILY}`
+      ctx.fillStyle = '#2d2212'
+      ctx.fillText(`شهادة اعتماد ومواصفات صاغة`, W / 2, 65)
+
+      ctx.font = `800 18px ${FONT_FAMILY}`
+      ctx.fillStyle = '#8c6b1b'
+      ctx.fillText(storeName, W / 2, 95)
+      ctx.restore()
+
+      const bX = 140
+      const bY = 125
+      const bW = W - 280
+      const bH = 500
+
+      ctx.save()
+      roundedRect(ctx, bX, bY, bW, bH, 20)
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 2.5
+      ctx.stroke()
+      ctx.clip()
+      drawJewelryShowcase(ctx, img, bX + bW / 2, bY + bH / 2, bW - 20, bH - 20)
+      ctx.restore()
+
+      drawCommercialSpecsGrid(
+        ctx,
+        50,
+        660,
+        W - 100,
+        96,
+        { karatStr, weightStr, gramPriceStr, totalPriceStr },
+        false,
+      )
+
+      drawContactFooter(ctx, 50, 790, W - 100, 130, phone, storeCity, false)
+      drawBarcodeBadge(ctx, W / 2 - 120, 935, 240, 65, barcode, false)
+    } else {
+      // 1.91:1
+      const bX = 50
+      const bY = 50
+      const bW = 460
+      const bH = H - 100
+
+      ctx.save()
+      roundedRect(ctx, bX, bY, bW, bH, 20)
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 2.5
+      ctx.stroke()
+      ctx.clip()
+      drawJewelryShowcase(ctx, img, bX + bW / 2, bY + bH / 2, bW - 20, bH - 20)
+      ctx.restore()
+
+      drawBarcodeBadge(ctx, bX + 20, bY + bH - 75, 200, 55, barcode, false)
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      const rx = W - 60
+
+      ctx.font = `900 24px ${FONT_FAMILY}`
+      ctx.fillStyle = '#8c6b1b'
+      ctx.fillText(`شهادة اعتماد ومواصفات ذهب رسمية`, rx, 80)
+
+      ctx.font = `900 38px ${FONT_FAMILY}`
+      ctx.fillStyle = '#2d2212'
+      const lines = wrapText(ctx, productName, 580, 2)
+      let lineY = 140
+      for (const line of lines) {
+        ctx.fillText(line, rx, lineY)
+        lineY += 46
+      }
+
+      ctx.font = `700 22px ${FONT_FAMILY}`
+      ctx.fillStyle = '#6b5836'
+      ctx.fillText(`${karatStr} • الوزن: ${weightStr} • ${gramPriceStr}`, rx, lineY + 15)
+
+      ctx.font = `900 40px ${FONT_FAMILY}`
+      ctx.fillStyle = '#8c6b1b'
+      ctx.fillText(`السعر المعتمد: ${totalPriceStr}`, rx, lineY + 75)
+
+      roundedRect(ctx, 560, H - 110, W - 620, 75, 18)
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = '#d4af37'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      ctx.font = `900 22px ${FONT_FAMILY}`
+      ctx.fillStyle = '#2d2212'
+      ctx.fillText(`📞 للاستفسار والحجز: ${phone}`, rx - 30, H - 65)
+      ctx.restore()
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // النمط 4: sagha-deal — عروض وتخفيضات الصاغة الكبرى
+  // ══════════════════════════════════════════════════════════════════════
+  else if (styleId === 'sagha-deal') {
+    const bg = ctx.createLinearGradient(0, 0, W, H)
+    bg.addColorStop(0, '#240206')
+    bg.addColorStop(0.5, '#120104')
+    bg.addColorStop(1, '#050001')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, H)
+
+    if (isStory) {
+      // 9:16
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 36px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ff4d4d'
+      ctx.fillText('🔥 عرض الصاغة الحصري لفترة محدودة', W / 2, 85)
+
+      ctx.font = `800 24px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(storeName, W / 2, 130)
+      ctx.restore()
+
+      const sX = 120
+      const sY = 180
+      const sW = W - 240
+      const sH = 880
+
+      ctx.save()
+      roundedRect(ctx, sX, sY, sW, sH, 26)
+      ctx.fillStyle = '#1c0508'
+      ctx.fill()
+      ctx.strokeStyle = '#ff3344'
+      ctx.lineWidth = 4
+      ctx.stroke()
+      ctx.clip()
+
+      drawJewelryShowcase(ctx, img, W / 2, sY + sH / 2, sW - 20, sH - 20)
+      ctx.restore()
+
+      drawDiscountBadge(ctx, sX + sW - 10, sY + 110, 85, discountPercent > 0 ? discountPercent : 25, savingsAmount)
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+
+      const titleY = 1140
+      ctx.font = `900 48px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      const titleLines = wrapText(ctx, productName, W - 140, 2)
+      let curY = titleY
+      for (const line of titleLines) {
+        ctx.fillText(line, W / 2, curY)
+        curY += 56
+      }
+      ctx.restore()
+
+      drawCommercialSpecsGrid(
+        ctx,
+        70,
+        1380,
+        W - 140,
+        110,
+        { karatStr, weightStr, gramPriceStr, totalPriceStr },
+        true,
+      )
+
+      // بطاقة السعر المخفض
+      const pY = 1530
+      roundedRect(ctx, 70, pY, W - 140, 140, 22)
+      ctx.fillStyle = '#2c080e'
+      ctx.fill()
+      ctx.strokeStyle = '#ff4d4d'
+      ctx.lineWidth = 2
+      ctx.stroke()
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+
+      if (savingsAmount > 0) {
+        ctx.font = `700 20px ${FONT_FAMILY}`
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'
+        ctx.fillText(`السعر الأصلي: ${fmtMoney(originalCalc)}`, W - 110, pY + 45)
+      }
+
+      ctx.font = `900 48px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(`سعر العرض: ${totalPriceStr}`, W - 110, pY + 105)
+
+      drawBarcodeBadge(ctx, 110, pY + 35, 230, 70, barcode, true)
+      ctx.restore()
+
+      drawContactFooter(ctx, 70, 1720, W - 140, 130, phone, storeCity, true)
+    } else if (isSquare) {
+      // 1:1
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 32px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ff4d4d'
+      ctx.fillText(`🔥 عرض صاغة خاص • ${storeName}`, W / 2, 60)
+      ctx.restore()
+
+      const sX = 140
+      const sY = 100
+      const sW = W - 280
+      const sH = 540
+
+      ctx.save()
+      roundedRect(ctx, sX, sY, sW, sH, 24)
+      ctx.fillStyle = '#1c0508'
+      ctx.fill()
+      ctx.strokeStyle = '#ff3344'
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.clip()
+      drawJewelryShowcase(ctx, img, W / 2, sY + sH / 2, sW - 20, sH - 20)
+      ctx.restore()
+
+      drawDiscountBadge(ctx, sX + sW - 10, sY + 80, 70, discountPercent > 0 ? discountPercent : 25, savingsAmount)
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 38px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      const titleLines = wrapText(ctx, productName, W - 120, 2)
+      let curY = 690
+      for (const line of titleLines) {
+        ctx.fillText(line, W / 2, curY)
+        curY += 46
+      }
+      ctx.restore()
+
+      drawCommercialSpecsGrid(
+        ctx,
+        50,
+        775,
+        W - 100,
+        96,
+        { karatStr, weightStr, gramPriceStr, totalPriceStr },
+        true,
+      )
+
+      drawContactFooter(ctx, 50, 895, W - 100, 135, phone, storeCity, true)
+    } else {
+      // 1.91:1
+      const sX = 50
+      const sY = 50
+      const sW = 460
+      const sH = H - 100
+
+      ctx.save()
+      roundedRect(ctx, sX, sY, sW, sH, 24)
+      ctx.fillStyle = '#1c0508'
+      ctx.fill()
+      ctx.strokeStyle = '#ff3344'
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.clip()
+      drawJewelryShowcase(ctx, img, sX + sW / 2, sY + sH / 2, sW - 20, sH - 20)
+      ctx.restore()
+
+      drawDiscountBadge(ctx, sX + sW - 20, sY + 60, 65, discountPercent > 0 ? discountPercent : 25, savingsAmount)
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      const rx = W - 60
+
+      ctx.font = `900 24px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ff4d4d'
+      ctx.fillText(`🔥 عرض حصري • ${storeName}`, rx, 80)
+
+      ctx.font = `900 42px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      const lines = wrapText(ctx, productName, 580, 2)
+      let lineY = 140
+      for (const line of lines) {
+        ctx.fillText(line, rx, lineY)
+        lineY += 48
+      }
+
+      ctx.font = `700 22px ${FONT_FAMILY}`
+      ctx.fillStyle = 'rgba(255,255,255,0.75)'
+      ctx.fillText(`${karatStr} • ${weightStr} • ${gramPriceStr}`, rx, lineY + 15)
+
+      ctx.font = `900 42px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(`سعر العرض: ${totalPriceStr}`, rx, lineY + 75)
+
+      roundedRect(ctx, 560, H - 110, W - 620, 75, 18)
+      ctx.fillStyle = '#2c080e'
+      ctx.fill()
+      ctx.strokeStyle = '#ff4d4d'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      ctx.font = `900 22px ${FONT_FAMILY}`
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(`📞 للحجز والشراء: ${phone}`, rx - 30, H - 65)
+
+      drawBarcodeBadge(ctx, 580, H - 100, 180, 55, barcode, true)
+      ctx.restore()
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // باقي الأنماط (5 إلى 10): تُبنى بنظام العمارة المرنة الموحد
+  // ══════════════════════════════════════════════════════════════════════
+  else {
+    // إعدادات ألوان كل استايل
+    let bgBase1 = '#0f1715'
+    let bgBase2 = '#060a08'
+    let accent = '#ffd700'
+
+    if (styleId === 'arabesque-luxury') {
+      bgBase1 = '#082016'
+      bgBase2 = '#020c08'
+      accent = '#ffd700'
+    } else if (styleId === 'studio-minimal') {
+      bgBase1 = '#fcfaf6'
+      bgBase2 = '#f5efe4'
+      accent = '#8c6b1b'
+    } else if (styleId === 'cinematic-bokeh') {
+      bgBase1 = '#12151c'
+      bgBase2 = '#080a0e'
+      accent = '#ffd700'
+    } else if (styleId === 'bridal-shabka') {
+      bgBase1 = '#300a14'
+      bgBase2 = '#150308'
+      accent = '#ffd700'
+    } else if (styleId === 'neo-luxe') {
+      bgBase1 = '#090d12'
+      bgBase2 = '#040608'
+      accent = '#ffd700'
+    } else if (styleId === 'heritage-sagha') {
+      bgBase1 = '#281708'
+      bgBase2 = '#120a03'
+      accent = '#ffd700'
+    }
+
+    // خلفية
+    const bg = ctx.createLinearGradient(0, 0, W, H)
+    bg.addColorStop(0, bgBase1)
+    bg.addColorStop(1, bgBase2)
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, H)
+
+    const dark = !isLight
+
+    if (isStory) {
+      // 9:16
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 38px ${FONT_FAMILY}`
+      ctx.fillStyle = accent
+      ctx.fillText(storeName, W / 2, 90)
+
+      ctx.font = `600 18px ${FONT_FAMILY}`
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.75)' : '#665533'
+      ctx.fillText(`صاغة ومجوهرات • ${storeCity}`, W / 2, 130)
+      ctx.restore()
+
+      const sX = 130
+      const sY = 190
+      const sW = W - 260
+      const sH = 880
+
+      ctx.save()
+      roundedRect(ctx, sX, sY, sW, sH, 26)
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.04)' : '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.clip()
+
+      drawJewelryShowcase(ctx, img, W / 2, sY + sH / 2, sW - 20, sH - 20)
+      ctx.restore()
+
+      if (discountPercent > 0) {
+        drawDiscountBadge(ctx, sX + sW - 10, sY + 110, 75, discountPercent, savingsAmount)
+      }
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+
+      const titleY = 1140
+      ctx.font = `900 48px ${FONT_FAMILY}`
+      ctx.fillStyle = dark ? '#ffffff' : '#221a0d'
+      const titleLines = wrapText(ctx, productName, W - 140, 2)
+      let curY = titleY
+      for (const line of titleLines) {
+        ctx.fillText(line, W / 2, curY)
+        curY += 56
+      }
+      ctx.restore()
+
+      drawCommercialSpecsGrid(
+        ctx,
+        70,
+        1380,
+        W - 140,
+        110,
+        { karatStr, weightStr, gramPriceStr, totalPriceStr },
+        dark,
+      )
+
+      const pY = 1530
+      roundedRect(ctx, 70, pY, W - 140, 140, 22)
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.06)' : '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      ctx.font = `700 18px ${FONT_FAMILY}`
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.7)' : '#665533'
+      ctx.fillText('السعر التقديري الإجمالي شامل المصنعية:', W - 110, pY + 45)
+
+      ctx.font = `900 48px ${FONT_FAMILY}`
+      ctx.fillStyle = accent
+      ctx.fillText(totalPriceStr, W - 110, pY + 105)
+
+      drawBarcodeBadge(ctx, 110, pY + 35, 230, 70, barcode, dark)
+      ctx.restore()
+
+      drawContactFooter(ctx, 70, 1720, W - 140, 130, phone, storeCity, dark)
+    } else if (isSquare) {
+      // 1:1
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 32px ${FONT_FAMILY}`
+      ctx.fillStyle = accent
+      ctx.fillText(storeName, W / 2, 60)
+
+      ctx.font = `600 15px ${FONT_FAMILY}`
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.7)' : '#665533'
+      ctx.fillText(`مجوهرات فاخرة • ${storeCity}`, W / 2, 90)
+      ctx.restore()
+
+      const sX = 140
+      const sY = 110
+      const sW = W - 280
+      const sH = 530
+
+      ctx.save()
+      roundedRect(ctx, sX, sY, sW, sH, 24)
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.04)' : '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.clip()
+      drawJewelryShowcase(ctx, img, W / 2, sY + sH / 2, sW - 20, sH - 20)
+      ctx.restore()
+
+      if (discountPercent > 0) {
+        drawDiscountBadge(ctx, sX + sW - 10, sY + 80, 68, discountPercent, savingsAmount)
+      }
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'center'
+      ctx.font = `900 38px ${FONT_FAMILY}`
+      ctx.fillStyle = dark ? '#ffffff' : '#221a0d'
+      const titleLines = wrapText(ctx, productName, W - 120, 2)
+      let curY = 690
+      for (const line of titleLines) {
+        ctx.fillText(line, W / 2, curY)
+        curY += 46
+      }
+      ctx.restore()
+
+      drawCommercialSpecsGrid(
+        ctx,
+        50,
+        775,
+        W - 100,
+        96,
+        { karatStr, weightStr, gramPriceStr, totalPriceStr },
+        dark,
+      )
+
+      drawContactFooter(ctx, 50, 895, W - 100, 135, phone, storeCity, dark)
+    } else {
+      // 1.91:1
+      const sX = 50
+      const sY = 50
+      const sW = 460
+      const sH = H - 100
+
+      ctx.save()
+      roundedRect(ctx, sX, sY, sW, sH, 24)
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.04)' : '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 2.5
+      ctx.stroke()
+      ctx.clip()
+      drawJewelryShowcase(ctx, img, sX + sW / 2, sY + sH / 2, sW - 20, sH - 20)
+      ctx.restore()
+
+      if (discountPercent > 0) {
+        drawDiscountBadge(ctx, sX + sW - 20, sY + 60, 60, discountPercent, savingsAmount)
+      }
+
+      ctx.save()
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      const rx = W - 60
+
+      ctx.font = `900 24px ${FONT_FAMILY}`
+      ctx.fillStyle = accent
+      ctx.fillText(storeName, rx, 80)
+
+      ctx.font = `900 40px ${FONT_FAMILY}`
+      ctx.fillStyle = dark ? '#ffffff' : '#221a0d'
+      const lines = wrapText(ctx, productName, 580, 2)
+      let lineY = 140
+      for (const line of lines) {
+        ctx.fillText(line, rx, lineY)
+        lineY += 46
+      }
+
+      ctx.font = `700 22px ${FONT_FAMILY}`
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.75)' : '#665533'
+      ctx.fillText(`${karatStr} • ${weightStr} • ${gramPriceStr}`, rx, lineY + 15)
+
+      ctx.font = `900 42px ${FONT_FAMILY}`
+      ctx.fillStyle = accent
+      ctx.fillText(`السعر التقديري: ${totalPriceStr}`, rx, lineY + 75)
+
+      roundedRect(ctx, 560, H - 110, W - 620, 75, 18)
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.06)' : '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      ctx.font = `900 22px ${FONT_FAMILY}`
+      ctx.fillStyle = dark ? '#ffffff' : '#221a0d'
+      ctx.fillText(`📞 للتواصل والحجز: ${phone}`, rx - 30, H - 65)
+
+      drawBarcodeBadge(ctx, 580, H - 100, 180, 55, barcode, dark)
+      ctx.restore()
+    }
   }
 
   return canvas
 }
 
 export function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
-  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), 'image/png')
+  })
 }

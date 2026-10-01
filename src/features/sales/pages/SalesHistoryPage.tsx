@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Eye, Plus, ReceiptText, SearchX, Wallet } from 'lucide-react'
+import {
+  CheckCircle2,
+  Clock,
+  Eye,
+  Plus,
+  ReceiptText,
+  Scale,
+  SearchX,
+  Wallet,
+} from 'lucide-react'
 
 import { getSalesPage } from '@/features/sales/api'
 import { SaleReceiptDialog } from '@/features/sales/components/pos/SaleReceiptDialog'
@@ -11,7 +20,7 @@ import { formatEgp, formatNumber } from '@/shared/lib/utils'
 import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
 import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Button } from '@/shared/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card'
+import { Card } from '@/shared/components/ui/card'
 import { Badge } from '@/shared/components/ui/badge'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { Fab } from '@/shared/components/ui/fab'
@@ -28,21 +37,24 @@ function formatDate(value: string): string {
 
 function SaleCardSkeleton() {
   return (
-    <Card className="elevation-card">
-      <CardHeader className="flex-row items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
-          <Skeleton className="h-6 w-28" />
-          <Skeleton className="h-4 w-24" />
+    <Card className="rounded-[18px] border border-black/8 bg-white p-4 elevation-card space-y-3">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-6 w-32 rounded-lg" />
+        <Skeleton className="h-6 w-20 rounded-full" />
+      </div>
+      <div className="flex items-center gap-2">
+        <Skeleton className="size-8 rounded-full" />
+        <div className="space-y-1">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-3 w-20" />
         </div>
-        <Skeleton className="size-11 rounded-2xl" />
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex gap-2">
-          <Skeleton className="h-6 w-16 rounded-full" />
-          <Skeleton className="h-6 w-24 rounded-full" />
-        </div>
-        <Skeleton className="h-16 rounded-2xl" />
-      </CardContent>
+      </div>
+      <Skeleton className="h-14 rounded-xl" />
+      <Skeleton className="h-16 rounded-xl" />
+      <div className="flex justify-between pt-1">
+        <Skeleton className="h-8 w-28" />
+        <Skeleton className="h-9 w-24 rounded-full" />
+      </div>
     </Card>
   )
 }
@@ -152,74 +164,145 @@ export function SalesHistoryPage() {
               (sum, i) => sum + (i.quantity ?? 0),
               0,
             )
+            const totalWeight = (s.saleItems ?? []).reduce(
+              (sum, i) => sum + (i.weight ?? 0) * (i.quantity ?? 1),
+              0,
+            )
             const hasDebt = s.saleId != null && debtSaleIds.has(s.saleId)
-            return (
-              <Card key={s.saleId} className="elevation-card overflow-hidden border-black/5 transition-shadow hover:shadow-md">
-                <CardHeader className="flex-row items-start justify-between gap-3 bg-secondary/40">
-                  <div className="min-w-0">
-                    <CardTitle className="truncate text-[17px] font-bold">فاتورة بيع #{s.saleId}</CardTitle>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      {formatDate(s.saleDate)}
-                    </p>
-                    <p className="mt-1 truncate text-[14px] font-semibold text-foreground">
-                      {s.customerName?.trim() || 'عميل نقدي'}
-                    </p>
-                  </div>
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
-                    <ReceiptText className="size-5" />
-                  </div>
-                </CardHeader>
+            const customerLabel = s.customerName?.trim() || 'عميل نقدي'
+            const initialLetter = customerLabel.charAt(0)
 
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge>{formatNumber(pieces)} قطعة</Badge>
-                    {hasDebt && (
-                      <Badge variant="secondary" className="bg-warning/10 text-warning">
-                        <Wallet className="me-1 size-3" />
+            return (
+              <Card
+                key={s.saleId}
+                className="group relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-black/8 bg-white shadow-xs elevation-card transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+              >
+                {/* شريط تمييز علوي ذهبي أزرق */}
+                <div className="h-1.5 w-full bg-gradient-to-r from-primary via-amber-400 to-primary/30" />
+
+                <div className="p-4 space-y-3.5">
+                  {/* رأس الكارت: رقم الفاتورة والحالة والوقت */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <ReceiptText className="size-4" />
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[15px] font-black text-foreground">
+                            فاتورة بيع #{s.saleId}
+                          </span>
+                        </div>
+                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground tabular-nums">
+                          <Clock className="size-3" />
+                          {formatDate(s.saleDate)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {hasDebt ? (
+                      <Badge
+                        variant="secondary"
+                        className="bg-warning/15 text-warning-foreground border border-warning/30 text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      >
+                        <Wallet className="me-1 size-3 text-warning" />
                         عليها مديونية
                       </Badge>
-                    )}
-                    {s.discount > 0 && (
-                      <Badge variant="secondary">خصم {formatEgp(s.discount)}</Badge>
+                    ) : (
+                      <Badge
+                        variant="secondary"
+                        className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      >
+                        <CheckCircle2 className="me-1 size-3 text-emerald-600" />
+                        مسددة بالكامل
+                      </Badge>
                     )}
                   </div>
 
+                  {/* بيانات العميل */}
+                  <div className="flex items-center gap-2.5 rounded-[12px] bg-secondary/50 p-2.5">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-white text-xs font-bold shadow-xs">
+                      {initialLetter}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-bold text-foreground">
+                        {customerLabel}
+                      </p>
+                    </div>
+                    {s.discount > 0 && (
+                      <span className="shrink-0 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                        خصم {formatEgp(s.discount)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* شريط الإجماليات والذهب */}
+                  <div className="flex items-baseline justify-between border-b border-black/5 pb-2.5">
+                    <div>
+                      <span className="text-[11px] font-semibold text-muted-foreground block">
+                        إجمالي الفاتورة
+                      </span>
+                      <span className="text-[22px] font-black tabular-nums text-foreground tracking-tight">
+                        {formatEgp(s.totalAmount ?? 0)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-end">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-black/5 px-2 py-1 text-[12px] font-bold text-foreground tabular-nums">
+                        {formatNumber(pieces)} قطعة
+                      </span>
+                      {totalWeight > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 text-amber-800 border border-amber-300/40 px-2 py-1 text-[12px] font-bold tabular-nums">
+                          <Scale className="size-3 text-amber-700" />
+                          {formatNumber(totalWeight)} جم ذهب
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* درج استعراض القطع المباعة */}
                   {s.saleItems && s.saleItems.length > 0 && (
-                    <div className="rounded-xl bg-secondary/70 p-3">
+                    <div className="space-y-1.5 rounded-[12px] bg-black/[0.02] p-2.5 border border-black/5">
                       <div className="flex flex-col divide-y divide-black/5">
-                        {s.saleItems.map((i) => (
+                        {s.saleItems.slice(0, 3).map((i) => (
                           <div
                             key={i.saleItemId ?? `${s.saleId}-${i.productId}`}
-                            className="flex items-center justify-between gap-2 py-1.5 text-[13px] first:pt-0 last:pb-0"
+                            className="flex items-center justify-between gap-2 py-1 text-[12px] first:pt-0 last:pb-0"
                           >
-                            <span className="truncate text-foreground">
+                            <span className="truncate font-medium text-foreground flex items-center gap-1.5">
+                              <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />
                               {i.productName}
                             </span>
-                            <span className="shrink-0 tabular-nums text-muted-foreground">
-                              {formatNumber(i.weight ?? 0)} gm × {i.quantity}
+                            <span className="shrink-0 tabular-nums text-muted-foreground font-semibold">
+                              {formatNumber(i.weight ?? 0)} جم × {i.quantity}
                             </span>
                           </div>
                         ))}
                       </div>
+                      {s.saleItems.length > 3 && (
+                        <p className="text-[11px] text-muted-foreground pt-1 text-center font-bold">
+                          + {s.saleItems.length - 3} قطع إضافية بالفاتورة
+                        </p>
+                      )}
                     </div>
                   )}
-                </CardContent>
+                </div>
 
-                <CardFooter className="justify-between border-t bg-secondary/30 pt-0">
-                  <span className="text-[20px] font-bold tabular-nums text-primary">
-                    {formatEgp(s.totalAmount ?? 0)}
+                {/* تذييل الكارت والإجراءات */}
+                <div className="flex items-center justify-between border-t border-black/5 bg-secondary/30 p-3">
+                  <span className="text-[11px] text-muted-foreground font-medium">
+                    فاتورة رسمية مختومة
                   </span>
+
                   <Button
                     type="button"
-                    variant="outline"
-                    size="sm"
                     onClick={() => setPrintTarget(s.saleId)}
-                    className="gap-1.5 rounded-full touch-target"
+                    className="h-9 gap-1.5 rounded-full px-4 text-xs font-bold touch-target shadow-xs"
                   >
-                    <Eye className="size-4" />
-                    عرض
+                    <Eye className="size-3.5" />
+                    <span>عرض وطباعة</span>
                   </Button>
-                </CardFooter>
+                </div>
               </Card>
             )
           })}

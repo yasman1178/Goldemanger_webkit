@@ -123,14 +123,14 @@ export function SalariesReport() {
             <span className="text-xs font-bold text-muted-foreground me-1 hidden sm:inline">
               الفترة:
             </span>
-            <div className="inline-flex flex-wrap rounded-[10px] bg-secondary p-0.5 border border-black/5">
+            <div className="inline-flex items-center rounded-[10px] bg-secondary p-0.5 border border-black/5 overflow-x-auto no-scrollbar max-w-full flex-nowrap">
               {periodPresets.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   onClick={() => setPreset(option.value)}
                   className={cn(
-                    'h-8 px-3 rounded-[8px] text-xs font-bold transition-all cursor-pointer touch-target',
+                    'h-8 px-3 rounded-[8px] text-xs font-bold transition-all cursor-pointer touch-target whitespace-nowrap shrink-0',
                     preset === option.value
                       ? 'bg-white text-primary shadow-xs'
                       : 'text-muted-foreground hover:text-foreground',
@@ -258,72 +258,121 @@ export function SalariesReport() {
             </div>
 
             {employees.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-secondary/60">
-                    <TableRow className="border-b border-black/5">
-                      <TableHead className="text-xs font-bold text-muted-foreground">
-                        اسم الموظف
-                      </TableHead>
-                      <TableHead className="text-xs font-bold text-muted-foreground w-28 text-center">
-                        عدد الصرفات
-                      </TableHead>
-                      <TableHead className="text-xs font-bold text-muted-foreground w-40 text-start">
-                        إجمالي المستلم
-                      </TableHead>
-                      <TableHead className="text-xs font-bold text-muted-foreground w-44">
-                        النسبة من الإجمالي
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="divide-y divide-black/5">
-                    {employees.map((employee) => {
-                      const totalPayroll = data?.totalAmount ?? 0
-                      const share =
-                        totalPayroll > 0
-                          ? (employee.totalAmount / totalPayroll) * 100
-                          : 0
+              <>
+                {/* ─── عرض البطاقات لشاشات الهواتف المحمولة ─── */}
+                <div className="divide-y divide-black/5 sm:hidden">
+                  {employees.map((employee) => {
+                    const totalPayroll = data?.totalAmount ?? 0
+                    const share =
+                      totalPayroll > 0
+                        ? (employee.totalAmount / totalPayroll) * 100
+                        : 0
 
-                      return (
-                        <TableRow
-                          key={employee.employeeId ?? employee.employeeName}
-                          className="hover:bg-slate-50/70 transition-colors"
-                        >
-                          <TableCell className="text-xs font-bold text-foreground whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
-                                {employee.employeeName.charAt(0)}
-                              </span>
-                              <span>{employee.employeeName}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-xs tabular-nums text-center text-muted-foreground font-semibold">
-                            {formatNumber(employee.paymentsCount)}
-                          </TableCell>
-                          <TableCell className="text-start">
-                            <span className="text-xs font-black tabular-nums text-foreground">
-                              {formatEgp(employee.totalAmount)}
+                    return (
+                      <div key={employee.employeeId ?? employee.employeeName} className="p-3.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
+                              {employee.employeeName.charAt(0)}
                             </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
-                                <div
-                                  className="h-full bg-primary rounded-full transition-all"
-                                  style={{ width: `${Math.min(100, Math.max(2, share))}%` }}
-                                />
-                              </div>
-                              <span className="text-[11px] font-bold tabular-nums text-muted-foreground w-9 text-end">
-                                {share.toFixed(1)}%
+                            <div>
+                              <p className="text-[14px] font-bold text-foreground">
+                                {employee.employeeName}
+                              </p>
+                              <span className="text-[11px] text-muted-foreground tabular-nums">
+                                {formatNumber(employee.paymentsCount)} عملية صرف
                               </span>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                          </div>
+                          <div className="text-end">
+                            <p className="text-[15px] font-black tabular-nums text-foreground">
+                              {formatEgp(employee.totalAmount)}
+                            </p>
+                            <span className="text-[10px] font-bold text-primary tabular-nums">
+                              {share.toFixed(1)}% من الرواتب
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${Math.min(100, Math.max(2, share))}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* ─── عرض الجدول للشاشات الأكبر (التابلت والكمبيوتر) ─── */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-secondary/60">
+                      <TableRow className="border-b border-black/5">
+                        <TableHead className="text-xs font-bold text-muted-foreground">
+                          اسم الموظف
+                        </TableHead>
+                        <TableHead className="text-xs font-bold text-muted-foreground w-28 text-center">
+                          عدد الصرفات
+                        </TableHead>
+                        <TableHead className="text-xs font-bold text-muted-foreground w-40 text-start">
+                          إجمالي المستلم
+                        </TableHead>
+                        <TableHead className="text-xs font-bold text-muted-foreground w-44">
+                          النسبة من الإجمالي
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-black/5">
+                      {employees.map((employee) => {
+                        const totalPayroll = data?.totalAmount ?? 0
+                        const share =
+                          totalPayroll > 0
+                            ? (employee.totalAmount / totalPayroll) * 100
+                            : 0
+
+                        return (
+                          <TableRow
+                            key={employee.employeeId ?? employee.employeeName}
+                            className="hover:bg-slate-50/70 transition-colors"
+                          >
+                            <TableCell className="text-xs font-bold text-foreground whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
+                                  {employee.employeeName.charAt(0)}
+                                </span>
+                                <span>{employee.employeeName}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs tabular-nums text-center text-muted-foreground font-semibold">
+                              {formatNumber(employee.paymentsCount)}
+                            </TableCell>
+                            <TableCell className="text-start">
+                              <span className="text-xs font-black tabular-nums text-foreground">
+                                {formatEgp(employee.totalAmount)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                                  <div
+                                    className="h-full bg-primary rounded-full transition-all"
+                                    style={{ width: `${Math.min(100, Math.max(2, share))}%` }}
+                                  />
+                                </div>
+                                <span className="text-[11px] font-bold tabular-nums text-muted-foreground w-9 text-end">
+                                  {share.toFixed(1)}%
+                                </span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center gap-2.5 py-14 text-center">
                 <UserCheck className="size-10 text-muted-foreground/60" />
