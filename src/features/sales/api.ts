@@ -80,9 +80,13 @@ export interface SalePrintData {
   payments: SalePayment[]
 }
 
-export async function getSaleForPrint(saleId: number): Promise<SalePrintData> {
+export async function getSaleForPrint(
+  saleId: number,
+  branchId?: number,
+): Promise<SalePrintData> {
   const { data } = await api.get<SalePrintData>(
     `${base}/GetSaleForPrint/${saleId}`,
+    { params: branchId ? { branchId } : undefined },
   )
   return data
 }

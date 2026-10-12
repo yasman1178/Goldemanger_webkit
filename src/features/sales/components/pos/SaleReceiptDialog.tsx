@@ -5,6 +5,7 @@ import { Printer, X } from 'lucide-react'
 import { getCompanyInfo } from '@/features/purchases/api'
 import { getSaleForPrint } from '@/features/sales/api'
 import { SaleReceiptView } from '@/features/sales/components/pos/SaleReceiptView'
+import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { Button } from '@/shared/components/ui/button'
 
 interface SaleReceiptDialogProps {
@@ -22,6 +23,8 @@ export function SaleReceiptDialog({
   onNewSale,
   successMode,
 }: SaleReceiptDialogProps) {
+  const activeBranchId = useActiveBranchId()
+
   const { data: shop } = useQuery({
     queryKey: ['company-info'],
     queryFn: getCompanyInfo,
@@ -29,8 +32,8 @@ export function SaleReceiptDialog({
   })
 
   const { data: data, isLoading } = useQuery({
-    queryKey: ['sale-print', saleId],
-    queryFn: () => getSaleForPrint(saleId),
+    queryKey: ['sale-print', saleId, activeBranchId],
+    queryFn: () => getSaleForPrint(saleId, activeBranchId ?? undefined),
     enabled: open && saleId > 0,
   })
   // تفاصيل القطعة (المصنعية والضريبة والدمغة) مخفية افتراضياً — تُفتح يدوياً

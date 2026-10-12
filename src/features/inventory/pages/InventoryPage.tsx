@@ -313,12 +313,13 @@ export function InventoryPage() {
   )
 
   const kaserShop = useMemo(() => {
-    const build = (isKaser: boolean) => {
+    const build = (
+      include: (p: Product, inScrapStore: boolean) => boolean,
+    ) => {
       const map = new Map<number, { pieces: number; weight: number }>()
       for (const p of availableProducts) {
         const inScrapStore = p.storageId != null && scrapStoreIds.has(p.storageId)
-        const isScrapPiece = p.typegolde === 3 || inScrapStore
-        if (isScrapPiece !== isKaser) continue
+        if (!include(p, inScrapStore)) continue
         const current = map.get(p.karat) ?? { pieces: 0, weight: 0 }
         map.set(p.karat, {
           pieces: current.pieces + (p.quantity ?? 0),
@@ -333,7 +334,11 @@ export function InventoryPage() {
         totalWeight: rows.reduce((sum, r) => sum + r.weight, 0),
       }
     }
-    return { kaser: build(true), shop: build(false) }
+    return {
+      kaser: build((p, inScrapStore) => p.typegolde === 3 || inScrapStore),
+      renewed: build((p, inScrapStore) => p.typegolde === 2 && !inScrapStore),
+      shop: build((p, inScrapStore) => p.typegolde !== 3 && !inScrapStore),
+    }
   }, [availableProducts, scrapStoreIds])
 
   return (
@@ -391,7 +396,7 @@ export function InventoryPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Card className="elevation-card border-amber-200/60 bg-gradient-to-br from-amber-50/80 to-card">
           <CardContent className="space-y-1.5 px-3 py-2.5">
             <div className="flex items-center gap-2">
@@ -414,6 +419,32 @@ export function InventoryPage() {
               <span className="font-bold text-foreground">الإجمالي</span>
               <span className="font-bold tabular-nums text-amber-600">
                 {formatNumber(kaserShop.kaser.totalWeight)} جم
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="elevation-card border-primary/20 bg-gradient-to-br from-primary/5 to-card">
+          <CardContent className="space-y-1.5 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="inline-block size-2 rounded-full bg-primary" />
+              <p className="text-[13px] font-bold text-primary">رصيد المجدّد</p>
+            </div>
+            {kaserShop.renewed.rows.length === 0 ? (
+              <p className="text-[12px] text-muted-foreground">لا يوجد رصيد مجدّد</p>
+            ) : (
+              kaserShop.renewed.rows.map((entry) => (
+                <div key={entry.karat} className="flex items-center justify-between gap-2 text-[12px]">
+                  <span className="font-semibold text-foreground">عيار {entry.karat}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatNumber(entry.pieces)} قطعة • {formatNumber(entry.weight)} جم
+                  </span>
+                </div>
+              ))
+            )}
+            <div className="flex items-center justify-between gap-2 border-t border-primary/20 pt-1.5 text-[12px]">
+              <span className="font-bold text-foreground">الإجمالي</span>
+              <span className="font-bold tabular-nums text-primary">
+                {formatNumber(kaserShop.renewed.totalWeight)} جم
               </span>
             </div>
           </CardContent>
@@ -528,10 +559,11 @@ export function InventoryPage() {
                   onClick={() => setSelected(p)}
                 >
                   <TableCell>
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-1.5">
                       <p className="truncate font-semibold text-foreground">
                         {p.productName}
                       </p>
+                      <RenewedBadge typegolde={p.typegolde} />
                     </div>
                   </TableCell>
                   <TableCell className="text-end font-semibold tabular-nums text-foreground">
@@ -635,9 +667,12 @@ export function InventoryPage() {
                   </TableCell>
                   <TableCell>
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-foreground">
-                        {u.products?.productName ?? `منتج #${u.productId}`}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate font-semibold text-foreground">
+                          {u.products?.productName ?? `منتج #${u.productId}`}
+                        </p>
+                        <RenewedBadge typegolde={u.products?.typegolde} />
+                      </div>
                       {u.products?.sku ? (
                         <p className="text-[13px] text-muted-foreground">
                           SKU: {u.products.sku}
@@ -690,6 +725,15 @@ export function InventoryPage() {
         storageNameOf={storageNameOf}
       />
     </div>
+  )
+}
+
+function RenewedBadge({ typegolde }: { typegolde?: number }) {
+  if (typegolde !== 2) return null
+  return (
+    <Badge className="h-5 shrink-0 bg-black/5 px-1.5 text-[10px] text-primary">
+      مجدّد
+    </Badge>
   )
 }
 

@@ -81,4 +81,6 @@ export interface CreateProductPayload {
   notes: string
   branchId: number
   storageId: number | null
+  quantity?: number
+  tax?: number
 }

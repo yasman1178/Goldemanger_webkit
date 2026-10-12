@@ -14,6 +14,7 @@ import {
 import { getCompanyInfo } from '@/features/purchases/api'
 import { getSaleForPrint } from '@/features/sales/api'
 import { SaleReceiptView } from '@/features/sales/components/pos/SaleReceiptView'
+import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { formatNumber } from '@/shared/lib/utils'
 
 export interface SaleSuccessInfo {
@@ -38,6 +39,7 @@ interface Props {
 export function SaleSuccessDialog({ info, onClose, onNewSale }: Props) {
   const [copied, setCopied] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
+  const activeBranchId = useActiveBranchId()
 
   const saleId = info?.saleId ?? 0
 
@@ -47,9 +49,9 @@ export function SaleSuccessDialog({ info, onClose, onNewSale }: Props) {
     enabled: Boolean(info) && !info?.held,
   })
 
-  const { data: data } = useQuery({
-    queryKey: ['sale-print', saleId],
-    queryFn: () => getSaleForPrint(saleId),
+  const { data, isError, refetch } = useQuery({
+    queryKey: ['sale-print', saleId, activeBranchId],
+    queryFn: () => getSaleForPrint(saleId, activeBranchId ?? undefined),
     enabled: Boolean(info) && !info?.held && saleId > 0,
   })
 
@@ -136,6 +138,20 @@ export function SaleSuccessDialog({ info, onClose, onNewSale }: Props) {
               </div>
               <SaleReceiptView data={data} shop={shop} showDetails={showDetails} />
             </>
+          ) : isError ? (
+            <div className="space-y-3 py-4 text-center">
+              <p className="text-sm font-semibold text-error">
+                تعذّر تجهيز الفاتورة.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => refetch()}
+                className="h-11 rounded-full px-6 touch-target"
+              >
+                إعادة المحاولة
+              </Button>
+            </div>
           ) : (
             <p className="py-6 text-center text-sm text-muted-foreground">
               جارٍ تجهيز الفاتورة...
@@ -147,6 +163,7 @@ export function SaleSuccessDialog({ info, onClose, onNewSale }: Props) {
               <Button
                 type="button"
                 variant="outline"
+                disabled={!data}
                 onClick={() => window.print()}
                 className="h-11 flex-1 gap-2 rounded-full touch-target"
               >

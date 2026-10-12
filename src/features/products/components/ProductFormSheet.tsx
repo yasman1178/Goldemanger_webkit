@@ -181,6 +181,8 @@ export function ProductFormSheet({ open, onOpenChange, product = null }: Props) 
       notes: notes.trim(),
       branchId: activeBranchId ?? 0,
       storageId: product?.storageId ?? null,
+      quantity: product?.quantity ?? 0,
+      tax: product?.tax ?? 0,
     })
   }
 
