@@ -18,6 +18,9 @@ import {
   LockOpen,
   ChevronDown,
   Clock,
+  Sparkles,
+  RefreshCw,
+  Recycle,
 } from 'lucide-react'
 
 import type { Product } from '@/features/products/types'
@@ -48,10 +51,16 @@ const categories = [
   { key: 'earring', label: 'حلق', icon: Ear },
   { key: 'set', label: 'أطقم', icon: Layers },
   { key: 'bar', label: 'سبائك', icon: Package },
+  { key: 'new', label: 'جديد', icon: Sparkles },
+  { key: 'renewed', label: 'مجدّد', icon: RefreshCw },
+  { key: 'break', label: 'كسر', icon: Recycle },
 ]
 
 function matchCategory(product: Product, key: string): boolean {
   if (key === 'all') return true
+  if (key === 'new') return product.typegolde === 1
+  if (key === 'renewed') return product.typegolde === 2
+  if (key === 'break') return product.typegolde === 3
   const name = `${product.productName} ${product.productType ?? ''}`.toLowerCase()
   const map: Record<string, string[]> = {
     ring: ['خاتم', 'ring'],
@@ -62,6 +71,12 @@ function matchCategory(product: Product, key: string): boolean {
     bar: ['سبيكة', 'سبائك', 'bar', 'جنيه'],
   }
   return (map[key] ?? []).some((s) => name.includes(s))
+}
+
+const typeBadgeClasses: Record<number, string> = {
+  1: 'bg-black/5 text-success',
+  2: 'bg-black/5 text-primary',
+  3: 'bg-black/5 text-warning',
 }
 
 function salePriceFor(product: Product, goldPrice: number): number {
@@ -391,6 +406,17 @@ export function ProductGrid({
                         <Scale className="size-2.5 text-muted-foreground" />
                         {formatNumber(product.weight)} جم
                       </span>
+                      {product.typegolde >= 1 && product.typegolde <= 3 && (
+                        <span
+                          className={cn(
+                            'inline-flex items-center rounded-[6px] px-1.5 py-px text-[9px] font-black leading-[1.5]',
+                            typeBadgeClasses[product.typegolde] ??
+                              'bg-black/5 text-foreground',
+                          )}
+                        >
+                          {typeLabels[product.typegolde as keyof typeof typeLabels]}
+                        </span>
+                      )}
                     </div>
 
                     {(product.sku || product.barcode) && (

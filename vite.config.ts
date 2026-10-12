@@ -115,6 +115,7 @@ export default defineConfig({
     proxy: {
       '/api': { target: 'https://goldmaster.runasp.net', changeOrigin: true },
       '/uploads': { target: 'https://goldmaster.runasp.net', changeOrigin: true },
+      '/images': { target: 'https://goldmaster.runasp.net', changeOrigin: true },
     },
   },
 })

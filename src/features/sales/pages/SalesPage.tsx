@@ -31,6 +31,7 @@ import {
 } from '@/features/sales/components/pos/SaleSuccessDialog'
 import { HeldSalesList } from '@/features/sales/components/HeldSalesList'
 import type { CartLine, CartTotals } from '@/features/sales/components/pos/types'
+import { isWeightAdjusted } from '@/features/sales/components/pos/types'
 import {
   cancelHeldSale,
   getHeldSales,
@@ -125,8 +126,22 @@ export function SalesPage() {
             : l,
         )
       }
-      return [...prev, { key: nextKey.current++, product, quantity: 1 }]
+      return [
+        ...prev,
+        { key: nextKey.current++, product, quantity: 1, weight: product.weight },
+      ]
     })
+  }
+
+  function changeWeight(key: number, delta: number) {
+    setCart((prev) =>
+      prev.map((l) => {
+        if (l.key !== key) return l
+        // خطوة 0.01 جم — الوزن لا ينزل إلى صفر أو أقل.
+        const weight = Math.max(0.01, Math.round((l.weight + delta) * 100) / 100)
+        return { ...l, weight }
+      }),
+    )
   }
 
   function changeQty(key: number, delta: number) {
@@ -153,7 +168,7 @@ export function SalesPage() {
       const m = cartLineMath(
         effectiveGold,
         l.product.karat,
-        l.product.weight * l.quantity,
+        l.weight * l.quantity,
         l.product.factoryForSale || l.product.factory,
       )
       acc.grams += m.grams
@@ -182,7 +197,7 @@ export function SalesPage() {
 
   function grams21Of(list: CartLine[]): number {
     const total = list.reduce(
-      (s, l) => s + l.quantity * l.product.weight * (l.product.karat / 21),
+      (s, l) => s + l.quantity * l.weight * (l.product.karat / 21),
       0,
     )
     return Math.round(total * 1000) / 1000
@@ -221,7 +236,12 @@ export function SalesPage() {
         toast.error('لا يمكن فتح الفاتورة — أحد الأصناف غير موجود حالياً.')
         return
       }
-      lines.push({ key: nextKey.current++, product, quantity: item.quantity })
+      lines.push({
+        key: nextKey.current++,
+        product,
+        quantity: item.quantity,
+        weight: item.weight ?? product.weight,
+      })
     }
     setCart(lines)
     setCustomerId(sale.customerId)
@@ -252,6 +272,7 @@ export function SalesPage() {
         saleItems: cart.map((l) => ({
           productId: l.product.productId,
           quantity: l.quantity,
+          weight: isWeightAdjusted(l) ? l.weight : undefined,
         })),
         branchId: activeBranchId ?? undefined,
       })
@@ -381,9 +402,21 @@ export function SalesPage() {
 
   const paymentTotal = payingFromEdit ? totals.total : (payingHeld?.totalAmount ?? totals.total)
   const paymentLines = payingFromEdit
-    ? cart.map((l) => ({ productId: l.product.productId, quantity: l.quantity }))
-    : payingHeld?.saleItems.map((i) => ({ productId: i.productId, quantity: i.quantity })) ??
-      cart.map((l) => ({ productId: l.product.productId, quantity: l.quantity }))
+    ? cart.map((l) => ({
+        productId: l.product.productId,
+        quantity: l.quantity,
+        weight: isWeightAdjusted(l) ? l.weight : undefined,
+      }))
+    : payingHeld?.saleItems.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+        weight: i.weight,
+      })) ??
+      cart.map((l) => ({
+        productId: l.product.productId,
+        quantity: l.quantity,
+        weight: isWeightAdjusted(l) ? l.weight : undefined,
+      }))
   const paymentGrams21 = payingFromEdit
     ? grams21Of(cart)
     : payingHeld?.heldGrams ?? grams21Of(cart)
@@ -434,6 +467,7 @@ export function SalesPage() {
       totals,
       goldPrice: effectiveGold,
       onChangeQty: changeQty,
+      onChangeWeight: changeWeight,
       onRemove: removeLine,
       onClear: () => setCancelOpen(true),
       onDiscount: () => setDiscountOpen(true),

@@ -80,6 +80,7 @@ const cashTypeOrder: TransactionType[] = [
   'DayClose',
   'CardSale',
   'TransferSale',
+  'WeightAdjust',
 ]
 
 function cashTypeValue(type: TransactionType): number {

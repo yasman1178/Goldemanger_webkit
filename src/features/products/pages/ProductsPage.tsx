@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Gem,
   Package,
+  Pencil,
   Percent,
   Plus,
   Search,
@@ -20,6 +21,7 @@ import { ProductFormSheet } from '@/features/products/components/ProductFormShee
 import { salePerGram, cartLineMath } from '@/shared/lib/gold'
 import { getLatestGoldPrice } from '@/shared/lib/parties'
 import { useGoldStore } from '@/shared/stores/gold-store'
+import { useAuthStore } from '@/shared/stores/auth-store'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { formatEgp, formatNumber, cn } from '@/shared/lib/utils'
 import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
@@ -88,6 +90,8 @@ interface ShareState {
 export function ProductsPage() {
   const activeBranchId = useActiveBranchId()
   const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<Product | null>(null)
+  const isOwner = useAuthStore((s) => s.user?.roles?.includes('Owner') ?? false)
   const [share, setShare] = useState<ShareState | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
   const [shareStyle, setShareStyle] = useState<ShareImageStyleId>('royal-arch')
@@ -474,6 +478,19 @@ export function ProductsPage() {
                   <Share2 className="size-3" />
                   مشاركة
                 </Button>
+
+                {isOwner && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label={`تعديل ${p.productName}`}
+                    className="w-full gap-1.5 rounded-full h-8 text-[11px]"
+                    onClick={() => setEditing(p)}
+                  >
+                    <Pencil className="size-3" />
+                    تعديل
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
@@ -826,9 +843,15 @@ export function ProductsPage() {
       </Dialog>
 
       <ProductFormSheet
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        product={null}
+        key={editing?.productId ?? 'new'}
+        open={formOpen || editing !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setFormOpen(false)
+            setEditing(null)
+          }
+        }}
+        product={editing}
       />
 
       <Fab

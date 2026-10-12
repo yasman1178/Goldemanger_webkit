@@ -1,15 +1,24 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Info } from 'lucide-react'
+import { ImagePlus, Info, Loader2, Trash2 } from 'lucide-react'
 
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { JEWELRY_ITEM_NAMES } from '@/shared/lib/jewelryItems'
-import { createProduct, updateProduct } from '@/features/products/api'
+import { preparePiecePhoto } from '@/shared/lib/imageCompress'
+import { resolveProductImage } from '@/shared/lib/seo'
+import {
+  createProduct,
+  deleteProductImage,
+  getProduct,
+  updateProduct,
+  uploadProductImages,
+} from '@/features/products/api'
 import type {
   CreateProductPayload,
   Designgole,
   Product,
+  ProductImageRecord,
   Typegolde,
 } from '@/features/products/types'
 import { Input } from '@/shared/components/ui/input'
@@ -81,6 +90,47 @@ export function ProductFormSheet({ open, onOpenChange, product = null }: Props) 
   )
   const [notes, setNotes] = useState(product?.notes ?? '')
   const [isActive, setIsActive] = useState(product?.isActive ?? true)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [images, setImages] = useState<ProductImageRecord[]>(
+    product?.images ?? [],
+  )
+  const [imageBusy, setImageBusy] = useState(false)
+
+  async function handleImagesSelected(fileList: FileList | null) {
+    if (!product || !fileList || fileList.length === 0) return
+    setImageBusy(true)
+    try {
+      const prepared = await Promise.all(
+        Array.from(fileList).map((file) => preparePiecePhoto(file)),
+      )
+      await uploadProductImages(product.productId, prepared)
+      const fresh = await getProduct(product.productId)
+      setImages(fresh.images ?? [])
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast.success('تم رفع الصور بنجاح')
+    } catch {
+      toast.error('تعذّر رفع الصور. تأكد من الصلاحيات وحاول مرة أخرى.')
+    } finally {
+      setImageBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function handleDeleteImage(imageId: number) {
+    if (!product) return
+    setImageBusy(true)
+    try {
+      await deleteProductImage(imageId)
+      setImages((prev) => prev.filter((img) => img.productImageId !== imageId))
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast.success('تم حذف الصورة')
+    } catch {
+      toast.error('تعذّر حذف الصورة. تأكد من الصلاحيات وحاول مرة أخرى.')
+    } finally {
+      setImageBusy(false)
+    }
+  }
 
   const mutation = useMutation({
     mutationFn: (payload: CreateProductPayload) =>
@@ -167,6 +217,75 @@ export function ProductFormSheet({ open, onOpenChange, product = null }: Props) 
                   تعريف المنتج لا يدخل الجرد. سيُستخدم كمرجع لاحقاً في فاتورة الشراء
                   والبيع — الكمية تُحدَّد من سجلات الجرد فقط.
                 </span>
+              </div>
+            )}
+
+            {isEdit && (
+              <div className="space-y-3 rounded-2xl border border-black/10 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <ImagePlus className="size-4 text-primary" />
+                    <Label className="text-[15px] font-semibold">صور المنتج</Label>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handleImagesSelected(e.target.files)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={imageBusy}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-10 gap-1.5 rounded-full px-4 text-xs font-bold touch-target"
+                  >
+                    {imageBusy ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <ImagePlus className="size-3.5" />
+                    )}
+                    إضافة صور
+                  </Button>
+                </div>
+
+                {images.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">لا توجد صور بعد.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {images.map((img) => (
+                      <div
+                        key={img.productImageId}
+                        className="relative overflow-hidden rounded-[12px] border border-black/5 bg-secondary"
+                      >
+                        <img
+                          src={resolveProductImage(img.imageUrl)}
+                          alt="صورة المنتج"
+                          className="aspect-square w-full object-cover"
+                        />
+                        {img.isPrimary && (
+                          <span className="absolute start-1 top-1 rounded-full bg-primary px-1.5 py-px text-[9px] font-bold text-white">
+                            أساسية
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          aria-label="حذف الصورة"
+                          disabled={imageBusy}
+                          onClick={() => handleDeleteImage(img.productImageId)}
+                          className="absolute end-1 top-1 flex size-7 items-center justify-center rounded-full bg-black/55 text-white transition-colors hover:bg-error touch-target"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  تُضغط الصور تلقائياً ويُضاف شريط اسم المحل كعلامة مائية.
+                </p>
               </div>
             )}
 

@@ -68,6 +68,26 @@ export async function getProductKarats(branchId?: number): Promise<number[]> {
   return data
 }
 
+/** تقرير الرواكد: الأصناف المتاحة التي مضى على إضافتها ≥ minDays يوماً. */
+export async function getStagnantProducts(params: {
+  branchId?: number
+  minDays?: number
+}): Promise<Product[]> {
+  const { data } = await api.get<Product[]>(`${base}/Stagnant`, {
+    params: {
+      branchId: params.branchId ?? undefined,
+      minDays: params.minDays ?? undefined,
+    },
+  })
+  return data ?? []
+}
+
+/** جلب منتج واحد مع صوره (بالمعرّفات) — يُستخدم في محرر الصور. */
+export async function getProduct(id: number): Promise<Product> {
+  const { data } = await api.get<Product>(`${base}/${id}`)
+  return data
+}
+
 export async function createProduct(
   payload: CreateProductPayload,
 ): Promise<Product> {
@@ -85,4 +105,23 @@ export async function updateProduct(
 
 export async function deleteProduct(id: number): Promise<void> {
   await api.delete(`${base}/${id}`)
+}
+
+/** رفع صورة أو أكثر لمنتج (لصاحب المحل فقط — يُفرض على الخادم). */
+export async function uploadProductImages(
+  productId: number,
+  files: File[],
+): Promise<string[]> {
+  const form = new FormData()
+  files.forEach((file) => form.append('files', file))
+  const { data } = await api.post<{
+    uploadedUrls?: string[]
+    UploadedUrls?: string[]
+  }>(`${base}/${productId}/images`, form)
+  return data?.uploadedUrls ?? data?.UploadedUrls ?? []
+}
+
+/** حذف صورة منتج (لصاحب المحل فقط — يُفرض على الخادم). */
+export async function deleteProductImage(imageId: number): Promise<void> {
+  await api.delete(`${base}/images/${imageId}`)
 }

@@ -30,7 +30,7 @@ interface Props {
   onCustomerChange: (id: number) => void
   discount: number
   totals: { total: number }
-  lines: Array<{ productId: number; quantity: number }>
+  lines: Array<{ productId: number; quantity: number; weight?: number }>
   grams21?: number
   heldSaleId?: number | null
   onSuccess: (result: { saleId: number; paid: number; held?: boolean }) => void

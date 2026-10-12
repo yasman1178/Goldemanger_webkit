@@ -23,6 +23,7 @@ import {
   KeyRound,
   TrendingUp,
   Scale,
+  Recycle,
 } from 'lucide-react'
 
 import { useAuthStore } from '@/shared/stores/auth-store'
@@ -62,6 +63,7 @@ const navItems: NavItem[] = [
   { to: '/app/sales/history', label: 'سجلات المبيعات', icon: ReceiptText },
   { to: '/app/purchases', label: 'المشتريات', icon: Store },
   { to: '/app/products', label: 'المنتجات', icon: Package },
+  { to: '/app/products/stagnant', label: 'الأصناف الراكدة', icon: Recycle },
   { to: '/app/inventory', label: 'الجرد', icon: Boxes },
   { to: '/app/cash', label: 'الخزينة', icon: Banknote },
   { to: '/app/debts', label: 'المديونيات', icon: Wallet },

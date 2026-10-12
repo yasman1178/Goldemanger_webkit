@@ -40,6 +40,15 @@ export interface Product {
   storageId: number | null
   imageUrls: string[]
   primaryImageUrl: string | null
+  images?: ProductImageRecord[]
+  createdDate?: string
+  ageDays?: number
+}
+
+export interface ProductImageRecord {
+  productImageId: number
+  imageUrl: string
+  isPrimary: boolean
 }
 
 export interface PublicProduct {

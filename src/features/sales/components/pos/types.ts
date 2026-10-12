@@ -7,6 +7,16 @@ export interface CartLine {
   key: number
   product: Product
   quantity: number
+  /**
+   * وزن القطعة الفعلي في الفاتورة (جم). يبدأ بوزن المنتج ويمكن تعديله يدوياً
+   * بخطوة 0.01 جم — التعديل يخصّ الفاتورة ولا يغيّر وزن المنتج/المخزون.
+   */
+  weight: number
+}
+
+/** هل عُدّل وزن البند يدوياً عن وزن المنتج المسجَّل؟ */
+export function isWeightAdjusted(line: CartLine): boolean {
+  return line.weight !== line.product.weight
 }
 
 export interface CartTotals {

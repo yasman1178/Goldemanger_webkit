@@ -6,6 +6,7 @@ import { LandingPage } from '@/features/public-site/pages/LandingPage'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { ProductsPage } from '@/features/products/pages/ProductsPage'
+import { StagnantProductsPage } from '@/features/products/pages/StagnantProductsPage'
 import { PublicProductPage } from '@/features/products/pages/PublicProductPage'
 import { SalesPage } from '@/features/sales/pages/SalesPage'
 import { PurchasesPage } from '@/features/purchases/pages/PurchasesPage'
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <DashboardPage /> },
           { path: 'products', element: <ProductsPage /> },
+          { path: 'products/stagnant', element: <StagnantProductsPage /> },
           { path: 'sales', element: <SalesPage /> },
           { path: 'sales/history', element: <SalesHistoryPage /> },
           { path: 'purchases', element: <PurchasesPage /> },

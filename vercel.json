@@ -8,6 +8,10 @@
       "source": "/uploads/:path*",
       "destination": "https://goldmaster.runasp.net/uploads/:path*"
     },
+    {
+      "source": "/images/:path*",
+      "destination": "https://goldmaster.runasp.net/images/:path*"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

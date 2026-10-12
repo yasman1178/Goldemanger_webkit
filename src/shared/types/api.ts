@@ -43,6 +43,7 @@ export type TransactionType =
   | 'Withdrawal'
   | 'CardSale'
   | 'TransferSale'
+  | 'WeightAdjust'
 
 export interface CashRecord {
   cashId: number
@@ -77,4 +78,5 @@ export const transactionLabels: Record<TransactionType, string> = {
   Withdrawal: 'سحب رصيد',
   CardSale: 'بيع بالبطاقة',
   TransferSale: 'تحويل/محفظة إلكترونية',
+  WeightAdjust: 'تعديل وزن',
 }

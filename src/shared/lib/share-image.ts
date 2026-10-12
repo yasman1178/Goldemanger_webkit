@@ -7,7 +7,15 @@
  * 3. `1.91:1` (1200×630): قياس المنشورات الأفقية لفيسبوك ولينكدإن وبطاقات OpenGraph
  */
 
+import QRCode from 'qrcode'
+
 import { getApiBaseUrl } from '@/shared/lib/api-url'
+
+/** العلامة التجارية الموحدة الظاهرة في كل تصاميم المشاركة. */
+const BRAND_AR = 'جولد ماستر'
+const BRAND_EN = 'Gold Master'
+/** واتساب الدعم — يُشفَّر داخل رمز الاستجابة السريعة. */
+const SUPPORT_WHATSAPP = 'https://wa.me/201551702595'
 
 export type ShareImageStyleId =
   | 'royal-arch'
@@ -187,25 +195,75 @@ function fmtWeight(val: number): string {
   }).format(val)
 }
 
+/** مسارات وسائط الخادم التي تُخدَم نفس-الأصل (Vite proxy / Vercel rewrite). */
+function isServerMediaPath(pathname: string): boolean {
+  return pathname.startsWith('/uploads/') || pathname.startsWith('/images/')
+}
+
 function resolveImageUrl(raw: string): string {
   if (!raw) return ''
-  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
+  if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    // بعض الصور مخزّنة بروابط مطلقة على مضيف الـ API؛ نُسقط الأصل ونبقي
+    // المسار فقط ليُمرَّر عبر وسيط الواجهة فيصبح نفس-الأصل بلا CORS ولا تلويث للكانفس.
+    try {
+      const { pathname } = new URL(raw)
+      if (isServerMediaPath(pathname)) return pathname
+    } catch {
+      /* رابط غير صالح — نُبقيه كما هو */
+    }
     return raw
   }
-  const base = getApiBaseUrl()
   const clean = raw.startsWith('/') ? raw : `/${raw}`
+  // وسائط الخادم (/images, /uploads) تُخدَم نفس-الأصل عبر وسيط الواجهة
+  // (Vite proxy / Vercel rewrite) — فلا CORS ولا تلويث للكانفس.
+  if (isServerMediaPath(clean)) {
+    return clean
+  }
+  const base = getApiBaseUrl()
   return `${base}${clean}`
 }
 
-function loadImage(src: string): Promise<HTMLImageElement | null> {
+function loadImageElement(
+  src: string,
+  useCrossOrigin: boolean,
+): Promise<HTMLImageElement | null> {
   if (!src) return Promise.resolve(null)
   return new Promise((resolve) => {
     const img = new Image()
-    img.crossOrigin = 'anonymous'
+    if (useCrossOrigin) img.crossOrigin = 'anonymous'
     img.onload = () => resolve(img)
     img.onerror = () => resolve(null)
     img.src = src
   })
+}
+
+/**
+ * تحميل صورة القطعة بضمان رسمها داخل الكانفس:
+ * 1) سحبها كـ Blob ثم drawImage عبر ObjectURL — بلا تلويث ولا CORS.
+ * 2) عند التعذّر: تحميل مباشر مع crossOrigin ثم بدونه كحل أخير.
+ */
+async function loadImage(src: string): Promise<HTMLImageElement | null> {
+  if (!src) return null
+  if (src.startsWith('data:') || src.startsWith('blob:')) {
+    return loadImageElement(src, false)
+  }
+  try {
+    const res = await fetch(src, { credentials: 'omit' })
+    if (res.ok) {
+      const blob = await res.blob()
+      if (blob.type.startsWith('image/') && blob.size > 0) {
+        const objectUrl = URL.createObjectURL(blob)
+        const img = await loadImageElement(objectUrl, false)
+        if (img) return img
+      }
+    }
+  } catch {
+    /* المتابعة إلى الحل المباشر أدناه */
+  }
+  const anon = await loadImageElement(src, true)
+  if (anon) return anon
+  return loadImageElement(src, false)
 }
 
 function roundedRect(
@@ -475,7 +533,79 @@ function drawCommercialSpecsGrid(
 }
 
 /**
- * رسم شريط الاتصال والحجز الفوري السفلي
+ * توليد صورة رمز الاستجابة السريعة (QR) لرابط واتساب الدعم.
+ * تُعاد كـ HTMLImageElement جاهزة للرسم على الكانفس.
+ */
+async function buildWhatsAppQr(): Promise<HTMLImageElement | null> {
+  try {
+    const dataUrl = await QRCode.toDataURL(SUPPORT_WHATSAPP, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 512,
+      color: { dark: '#101010', light: '#ffffff' },
+    })
+    return await loadImageElement(dataUrl, false)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * رسم شارة QR مدمجة مع اسم العلامة التجارية في موضع مستقل.
+ * تُستخدم في التصاميم التي لا تعتمد شريط التواصل الموحّد (الأفقي).
+ */
+function drawBrandQrBadge(
+  ctx: CanvasRenderingContext2D,
+  qr: HTMLImageElement | null,
+  cx: number,
+  cy: number,
+  size: number,
+  isDark: boolean,
+  captionAbove = false,
+) {
+  ctx.save()
+  const plate = size + 24
+
+  // لوحة بيضاء مذهّبة تضمن وضوح الرمز فوق أي خلفية
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'
+  ctx.shadowBlur = 18
+  ctx.shadowOffsetY = 8
+  roundedRect(ctx, cx - plate / 2, cy - plate / 2, plate, plate, 18)
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
+  ctx.shadowBlur = 0
+  ctx.shadowOffsetY = 0
+  ctx.strokeStyle = '#d4af37'
+  ctx.lineWidth = 2
+  ctx.stroke()
+
+  if (qr && qr.width > 0) {
+    ctx.drawImage(qr, cx - size / 2, cy - size / 2, size, size)
+  } else {
+    ctx.fillStyle = '#1c1505'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = `900 ${Math.round(size * 0.4)}px ${FONT_FAMILY}`
+    ctx.fillText('📞', cx, cy)
+  }
+
+  ctx.direction = 'rtl'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  const captionY = captionAbove
+    ? cy - plate / 2 - 30
+    : cy + plate / 2 + 28
+  ctx.font = `900 18px ${FONT_FAMILY}`
+  ctx.fillStyle = isDark ? '#ffd700' : '#8c6b1b'
+  ctx.fillText(`${BRAND_AR} • ${BRAND_EN}`, cx, captionY)
+  ctx.font = `700 14px ${FONT_FAMILY}`
+  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.8)' : '#665533'
+  ctx.fillText('امسح للتواصل على واتساب', cx, captionY + 22)
+  ctx.restore()
+}
+
+/**
+ * رسم شريط الاتصال والحجز الفوري السفلي — مع العلامة التجارية ورمز QR للواتساب.
  */
 function drawContactFooter(
   ctx: CanvasRenderingContext2D,
@@ -486,6 +616,7 @@ function drawContactFooter(
   phone: string,
   storeCity: string,
   isDark: boolean,
+  qr: HTMLImageElement | null = null,
 ) {
   ctx.save()
   roundedRect(ctx, x, y, w, h, 20)
@@ -504,12 +635,33 @@ function drawContactFooter(
 
   ctx.font = `700 13px ${FONT_FAMILY}`
   ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : '#7a684b'
-  ctx.fillText(`فاتورة ضريبية مختومة • ضمان استبدال • فرع ${storeCity}`, x + w - 30, y + h / 2 + 18)
+  ctx.fillText(`${BRAND_AR} • ${BRAND_EN} • فرع ${storeCity}`, x + w - 30, y + h / 2 + 18)
+
+  // رمز واتساب (QR) على الطرف الأيسر داخل لوحة بيضاء واضحة
+  const qrSize = h - 28
+  const qrX = x + 16
+  const qrY = y + 14
+  roundedRect(ctx, qrX, qrY, qrSize, qrSize, 12)
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
+  ctx.strokeStyle = '#d4af37'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+  if (qr && qr.width > 0) {
+    ctx.drawImage(qr, qrX + 6, qrY + 6, qrSize - 12, qrSize - 12)
+  } else {
+    ctx.fillStyle = '#1c1505'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = `900 ${Math.round(qrSize * 0.42)}px ${FONT_FAMILY}`
+    ctx.fillText('📞', qrX + qrSize / 2, qrY + qrSize / 2)
+    ctx.textBaseline = 'alphabetic'
+  }
 
   if (phone && phone !== '—') {
-    const btnW = 260
+    const btnW = 200
     const btnH = h - 24
-    const btnX = x + 16
+    const btnX = qrX + qrSize + 12
     const btnY = y + 12
     roundedRect(ctx, btnX, btnY, btnW, btnH, btnH / 2)
     ctx.fillStyle = '#d4af37'
@@ -517,7 +669,7 @@ function drawContactFooter(
 
     ctx.direction = 'ltr'
     ctx.textAlign = 'center'
-    ctx.font = `900 18px ${FONT_FAMILY}`
+    ctx.font = `900 16px ${FONT_FAMILY}`
     ctx.fillStyle = '#1c1505'
     ctx.fillText(`📞 ${phone}`, btnX + btnW / 2, btnY + btnH / 2 + 6)
   }
@@ -560,11 +712,14 @@ export async function buildProductShareImage(
   const styleId = canonicalStyle(spec.style)
   const isLight = styleId === 'assay-cert' || styleId === 'studio-minimal'
 
-  // تحميل صورة المنتج الحقيقية
-  const img = spec.imageUrl ? await loadImage(resolveImageUrl(spec.imageUrl)) : null
+  // تحميل صورة المنتج الحقيقية + رمز واتساب الدعم
+  const [img, qrImg] = await Promise.all([
+    spec.imageUrl ? loadImage(resolveImageUrl(spec.imageUrl)) : Promise.resolve(null),
+    buildWhatsAppQr(),
+  ])
 
   // تجهيز وحساب البيانات التجارية الحقيقية
-  const storeName = (spec.storeName ?? '').trim() || 'دار الصاغة للمجوهرات'
+  const storeName = (spec.storeName ?? '').trim() || BRAND_AR
   const storeCity = (spec.storeCity ?? '').trim() || 'الصاغة'
   const phone = (spec.phoneDisplay ?? '').trim() || '—'
   const discountPercent = Math.max(0, Math.min(100, Number(spec.makingDiscountPercent ?? 0) || 0))
@@ -728,7 +883,7 @@ export async function buildProductShareImage(
       ctx.restore()
 
       // شريط التواصل السفلي
-      drawContactFooter(ctx, 70, 1720, W - 140, 130, phone, storeCity, true)
+      drawContactFooter(ctx, 70, 1720, W - 140, 130, phone, storeCity, true, qrImg)
     } else if (isSquare) {
       // 1:1 مربع (1080×1080)
       // ترويسة أنيقة
@@ -822,6 +977,7 @@ export async function buildProductShareImage(
       ctx.fillText(`للحجز الفوري بالفرع: 📞 ${phone}`, W - 80, footY + 95)
 
       drawBarcodeBadge(ctx, 80, footY + 30, 220, 75, barcode, true)
+      drawBrandQrBadge(ctx, qrImg, 520, footY + 67, 86, true)
       ctx.restore()
     } else {
       // 1.91:1 أفقي (1200×630)
@@ -892,6 +1048,7 @@ export async function buildProductShareImage(
       ctx.fillText(`📞 للتواصل والحجز: ${phone}`, rx - 30, H - 65)
 
       drawBarcodeBadge(ctx, 580, H - 100, 180, 55, barcode, true)
+      drawBrandQrBadge(ctx, qrImg, W - 210, H - 195, 92, true)
       ctx.restore()
     }
   }
@@ -1000,7 +1157,7 @@ export async function buildProductShareImage(
       ctx.fillText(totalPriceStr, W - 240, footY + 100)
       ctx.restore()
 
-      drawContactFooter(ctx, 200, 1710, W - 280, 120, phone, storeCity, true)
+      drawContactFooter(ctx, 200, 1710, W - 280, 120, phone, storeCity, true, qrImg)
     } else if (isSquare) {
       // 1:1
       ctx.save()
@@ -1057,7 +1214,7 @@ export async function buildProductShareImage(
         true,
       )
 
-      drawContactFooter(ctx, 60, 895, W - 120, 135, phone, storeCity, true)
+      drawContactFooter(ctx, 60, 895, W - 120, 135, phone, storeCity, true, qrImg)
     } else {
       // 1.91:1
       const pX = 50
@@ -1111,6 +1268,7 @@ export async function buildProductShareImage(
       ctx.font = `900 22px ${FONT_FAMILY}`
       ctx.fillStyle = '#0a0a0c'
       ctx.fillText(`للحجز والطلب: 📞 ${phone}`, rx - 30, H - 65)
+      drawBrandQrBadge(ctx, qrImg, W - 210, H - 195, 92, true)
       ctx.restore()
     }
   }
@@ -1201,7 +1359,7 @@ export async function buildProductShareImage(
         ctx.stroke()
       }
 
-      drawContactFooter(ctx, 100, 1680, W - 200, 140, phone, storeCity, false)
+      drawContactFooter(ctx, 100, 1680, W - 200, 140, phone, storeCity, false, qrImg)
     } else if (isSquare) {
       // 1:1
       ctx.save()
@@ -1242,7 +1400,7 @@ export async function buildProductShareImage(
         false,
       )
 
-      drawContactFooter(ctx, 50, 790, W - 100, 130, phone, storeCity, false)
+      drawContactFooter(ctx, 50, 790, W - 100, 130, phone, storeCity, false, qrImg)
       drawBarcodeBadge(ctx, W / 2 - 120, 935, 240, 65, barcode, false)
     } else {
       // 1.91:1
@@ -1300,6 +1458,7 @@ export async function buildProductShareImage(
       ctx.font = `900 22px ${FONT_FAMILY}`
       ctx.fillStyle = '#2d2212'
       ctx.fillText(`📞 للاستفسار والحجز: ${phone}`, rx - 30, H - 65)
+      drawBrandQrBadge(ctx, qrImg, W - 210, H - 195, 92, false)
       ctx.restore()
     }
   }
@@ -1399,7 +1558,7 @@ export async function buildProductShareImage(
       drawBarcodeBadge(ctx, 110, pY + 35, 230, 70, barcode, true)
       ctx.restore()
 
-      drawContactFooter(ctx, 70, 1720, W - 140, 130, phone, storeCity, true)
+      drawContactFooter(ctx, 70, 1720, W - 140, 130, phone, storeCity, true, qrImg)
     } else if (isSquare) {
       // 1:1
       ctx.save()
@@ -1451,7 +1610,7 @@ export async function buildProductShareImage(
         true,
       )
 
-      drawContactFooter(ctx, 50, 895, W - 100, 135, phone, storeCity, true)
+      drawContactFooter(ctx, 50, 895, W - 100, 135, phone, storeCity, true, qrImg)
     } else {
       // 1.91:1
       const sX = 50
@@ -1510,6 +1669,7 @@ export async function buildProductShareImage(
       ctx.fillText(`📞 للحجز والشراء: ${phone}`, rx - 30, H - 65)
 
       drawBarcodeBadge(ctx, 580, H - 100, 180, 55, barcode, true)
+      drawBrandQrBadge(ctx, qrImg, W - 210, H - 195, 92, true)
       ctx.restore()
     }
   }
@@ -1759,6 +1919,7 @@ export async function buildProductShareImage(
       ctx.fillText(`📞 للتواصل والحجز: ${phone}`, rx - 30, H - 65)
 
       drawBarcodeBadge(ctx, 580, H - 100, 180, 55, barcode, dark)
+      drawBrandQrBadge(ctx, qrImg, W - 210, H - 195, 92, dark)
       ctx.restore()
     }
   }

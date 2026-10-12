@@ -29,6 +29,11 @@ export interface Sale {
 export interface CreateSaleLine {
   productId: number
   quantity: number
+  /**
+   * وزن القطعة الفعلي بعد تعديل الوزن (جم) — يُرسل فقط عند خلافه عن وزن المنتج.
+   * يخصّ الفاتورة وحدها؛ وزن المنتج/المخزون لا يتغيّر.
+   */
+  weight?: number
 }
 
 export interface CreateSalePayload {

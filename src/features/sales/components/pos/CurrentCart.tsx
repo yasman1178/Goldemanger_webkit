@@ -1,10 +1,10 @@
-import { Minus, Plus, Trash2, ShoppingCart, Tag, Save } from 'lucide-react'
+import { Minus, Plus, Trash2, ShoppingCart, Tag, Save, Scale } from 'lucide-react'
 
 import { TAX_AND_STAMP_RATE, cartLineMath } from '@/shared/lib/gold'
 import { cn, currencySymbol, formatNumber } from '@/shared/lib/utils'
 import { useCurrencyStore } from '@/shared/stores/currency-store'
 import type { CartLine, CartTotals } from './types'
-import { karatLabel } from './types'
+import { isWeightAdjusted, karatLabel } from './types'
 import { typeLabels } from '@/features/products/types'
 import { FormatEg } from './Money'
 
@@ -13,6 +13,7 @@ interface Props {
   totals: CartTotals
   goldPrice: number
   onChangeQty: (key: number, delta: number) => void
+  onChangeWeight: (key: number, delta: number) => void
   onRemove: (key: number) => void
   onClear: () => void
   onCheckout: () => void
@@ -27,6 +28,7 @@ export function CurrentCart({
   totals,
   goldPrice,
   onChangeQty,
+  onChangeWeight,
   onRemove,
   onClear,
   onCheckout,
@@ -74,6 +76,7 @@ export function CurrentCart({
                 line={line}
                 goldPrice={goldPrice}
                 onChangeQty={onChangeQty}
+                onChangeWeight={onChangeWeight}
                 onRemove={onRemove}
               />
             ))}
@@ -169,17 +172,19 @@ function CartItemRow({
   line,
   goldPrice,
   onChangeQty,
+  onChangeWeight,
   onRemove,
 }: {
   line: CartLine
   goldPrice: number
   onChangeQty: (key: number, delta: number) => void
+  onChangeWeight: (key: number, delta: number) => void
   onRemove: (key: number) => void
 }) {
   const m = cartLineMath(
     goldPrice,
     line.product.karat,
-    line.product.weight * line.quantity,
+    line.weight * line.quantity,
     line.product.factoryForSale || line.product.factory,
   )
   const stock = line.product.quantity ?? 0
@@ -194,7 +199,7 @@ function CartItemRow({
           </p>
           <p className="mt-0.5 break-words text-[11px] leading-snug text-muted-foreground">
             {typeLabels[line.product.typegolde as keyof typeof typeLabels] ?? '—'} •{' '}
-            {karatLabel(line.product.karat)} • {formatNumber(line.product.weight)} جم
+            {karatLabel(line.product.karat)}
           </p>
         </div>
         <button
@@ -205,6 +210,40 @@ function CartItemRow({
         >
           <Trash2 className="size-4" />
         </button>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between rounded-lg bg-black/[0.03] px-2 py-1">
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+          <Scale className="size-3.5" />
+          الوزن
+          {isWeightAdjusted(line) && (
+            <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-warning">
+              معدَّل
+            </span>
+          )}
+        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            aria-label="إنقاص الوزن ٠٫٠١ جم"
+            disabled={line.weight <= 0.01}
+            onClick={() => onChangeWeight(line.key, -0.01)}
+            className="flex size-9 touch-target items-center justify-center rounded-full bg-secondary text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Minus className="size-4" />
+          </button>
+          <span className="w-16 text-center tabular-nums text-[14px] font-bold text-foreground">
+            {formatNumber(line.weight)} جم
+          </span>
+          <button
+            type="button"
+            aria-label="زيادة الوزن ٠٫٠١ جم"
+            onClick={() => onChangeWeight(line.key, 0.01)}
+            className="flex size-9 touch-target items-center justify-center rounded-full bg-secondary text-foreground"
+          >
+            <Plus className="size-4" />
+          </button>
+        </div>
       </div>
 
       <div className="mt-2 flex items-center justify-between">

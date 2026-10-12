@@ -143,6 +143,26 @@ function ProductDetail({
                 : '—'}
             </span>
           </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">تاريخ الإضافة</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {product?.createdDate
+                ? new Intl.DateTimeFormat('ar-EG', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  }).format(new Date(product.createdDate))
+                : '—'}
+            </span>
+          </div>
+          {typeof product?.ageDays === 'number' && (
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">عمر الصنف</span>
+              <span className="font-semibold tabular-nums text-foreground">
+                {formatNumber(product.ageDays)} يوم
+              </span>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
