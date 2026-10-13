@@ -54,6 +54,8 @@ export interface ShareImageSpec {
   style?: ShareImageStyleId
   aspectRatio?: ShareImageAspectRatio
   makingDiscountPercent?: number
+  imageZoom?: number
+  imageOffsetY?: number
   // بيانات الذهب والتسعير التجاري الحقيقية
   gold21Price?: number
   pricePerGram?: number
@@ -436,7 +438,7 @@ function drawBarcodeBadge(
 }
 
 /**
- * رسم صورة قطعة الذهب باحترافية وتوسيط كامل بدون أي تشويه أو قص للأطراف (Contain-fit)
+ * رسم صورة قطعة الذهب باحترافية وتوسيط كامل مع دعم التكبير البؤري وقص الحواف
  */
 function drawJewelryShowcase(
   ctx: CanvasRenderingContext2D,
@@ -445,20 +447,29 @@ function drawJewelryShowcase(
   cy: number,
   maxW: number,
   maxH: number,
+  zoom = 1.25,
+  offsetY = 0,
 ) {
   ctx.save()
   if (img && img.width > 0 && img.height > 0) {
-    // استخدام Math.min لضمان ظهور كامل القطعة دون قص
-    const scale = Math.min((maxW * 0.92) / img.width, (maxH * 0.92) / img.height)
+    const effectiveZoom = Math.max(0.8, Math.min(3, zoom || 1.25))
+    const baseScale = Math.min((maxW * 0.92) / img.width, (maxH * 0.92) / img.height)
+    const scale = baseScale * effectiveZoom
     const dw = img.width * scale
     const dh = img.height * scale
+
+    // قص المنطقة بحواف مستديرة ناعمة لمنع تداخل الصورة مع النصوص عند التكبير
+    ctx.save()
+    roundedRect(ctx, cx - maxW / 2, cy - maxH / 2, maxW, maxH, 24)
+    ctx.clip()
 
     // ظل القطعة الواقعي
     ctx.shadowColor = 'rgba(0,0,0,0.6)'
     ctx.shadowBlur = 35
     ctx.shadowOffsetY = 18
 
-    ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh)
+    ctx.drawImage(img, cx - dw / 2, cy + offsetY - dh / 2, dw, dh)
+    ctx.restore()
   } else {
     // أيقونة بديلة راقية في حال عدم توفر صورة
     ctx.shadowColor = 'rgba(212,175,55,0.5)'
@@ -467,7 +478,7 @@ function drawJewelryShowcase(
     ctx.font = `900 ${Math.round(Math.min(maxW, maxH) * 0.32)}px ${FONT_FAMILY}`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('💎', cx, cy)
+    ctx.fillText('💎', cx, cy + offsetY)
   }
   ctx.restore()
 }
@@ -749,6 +760,9 @@ export async function buildProductShareImage(
     : Math.round((gramPriceVal + makingFee) * weightVal)
   const savingsAmount = originalCalc > totalCalc ? originalCalc - totalCalc : 0
 
+  const imageZoom = spec.imageZoom && spec.imageZoom > 0 ? spec.imageZoom : 1.25
+  const imageOffsetY = spec.imageOffsetY ?? 0
+
   // ══════════════════════════════════════════════════════════════════════
   // النمط 1: royal-arch — القوس الأندلسي الملكي ومنصة الرخام
   // ══════════════════════════════════════════════════════════════════════
@@ -812,7 +826,7 @@ export async function buildProductShareImage(
       ctx.clip()
 
       // صورة القطعة
-      drawJewelryShowcase(ctx, img, W / 2, archY + archR + 20, archW - 40, archH - 60)
+      drawJewelryShowcase(ctx, img, W / 2, archY + archR + 20, archW - 40, archH - 60, imageZoom, imageOffsetY)
       ctx.restore()
 
       // شارة الخصم
@@ -924,7 +938,7 @@ export async function buildProductShareImage(
       ctx.stroke()
       ctx.clip()
 
-      drawJewelryShowcase(ctx, img, W / 2, archY + archH / 2 + 10, archW - 30, archH - 40)
+      drawJewelryShowcase(ctx, img, W / 2, archY + archH / 2 + 10, archW - 30, archH - 40, imageZoom, imageOffsetY)
       ctx.restore()
 
       if (discountPercent > 0) {
@@ -1001,7 +1015,7 @@ export async function buildProductShareImage(
       ctx.stroke()
       ctx.clip()
 
-      drawJewelryShowcase(ctx, img, archX + archR, archY + archH / 2, archW - 20, archH - 30)
+      drawJewelryShowcase(ctx, img, archX + archR, archY + archH / 2, archW - 20, archH - 30, imageZoom, imageOffsetY)
       ctx.restore()
 
       if (discountPercent > 0) {

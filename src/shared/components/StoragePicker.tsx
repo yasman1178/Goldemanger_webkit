@@ -68,8 +68,17 @@ export function StoragePicker({
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [search, setSearch] = useState('')
 
   const visibleStorages = storages.filter((s) => !excludeIds.includes(s.id))
+  const filteredStorages = visibleStorages.filter((s) => {
+    if (!search.trim()) return true
+    const q = search.trim().toLowerCase()
+    const idStr = String(s.id)
+    const label = storageLabel(s).toLowerCase()
+    return idStr.includes(q) || label.includes(q)
+  })
+
   const selected = storages.find((s) => String(s.id) === value)
 
   const triggerLabel =
@@ -100,6 +109,14 @@ export function StoragePicker({
     }
   }
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setSearch('')
+      setShowCreate(false)
+    }
+    setOpen(nextOpen)
+  }
+
   return (
     <>
       <button
@@ -117,20 +134,46 @@ export function StoragePicker({
         <span className="min-w-0 truncate">{triggerLabel}</span>
       </button>
 
-      <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-[18px]">
-              <Boxes className="size-5 text-primary" />
-              اختيار المخزن
-            </DialogTitle>
-            <DialogDescription>
-              اعرض قطع مخزن واحد بالضغط على رقمه
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-md max-h-[85dvh] flex flex-col p-0 overflow-hidden rounded-[20px] gap-0 sm:max-w-md">
+          <DialogHeader className="p-3.5 sm:p-5 border-b border-black/5 bg-secondary/30 shrink-0 space-y-2">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2 text-[16px] sm:text-[17px] font-bold">
+                <Boxes className="size-5 text-primary" />
+                اختيار المخزن
+              </DialogTitle>
+              <span className="text-[11px] font-bold text-muted-foreground bg-black/5 px-2.5 py-0.5 rounded-full tabular-nums">
+                {visibleStorages.length} مخزن
+              </span>
+            </div>
+            <DialogDescription className="text-[12px] text-muted-foreground">
+              اختر مخزناً واحداً لعرض قطعه، أو اختر «كل المخازن»
             </DialogDescription>
+
+            {visibleStorages.length > 2 && (
+              <div className="relative pt-1">
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="ابحث برقم أو اسم المخزن..."
+                  className="h-10 text-[13px] rounded-xl pr-3.5 pl-8 bg-white border-black/10 focus-visible:ring-primary touch-target"
+                />
+                {search ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    aria-label="مسح البحث"
+                    className="absolute left-2.5 top-[calc(50%+2px)] -translate-y-1/2 text-muted-foreground hover:text-foreground text-[12px] p-1.5"
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
+            )}
           </DialogHeader>
 
-          <div className="p-5 sm:p-6 space-y-3">
-            {allowAll && (
+          <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-2.5 min-h-0">
+            {allowAll && (!search.trim() || 'كل المخازن'.includes(search.trim())) && (
               <button
                 type="button"
                 onClick={() => {
@@ -138,7 +181,7 @@ export function StoragePicker({
                   setOpen(false)
                 }}
                 className={cn(
-                  'flex h-14 w-full touch-target items-center gap-3 rounded-2xl border-2 px-4 text-start transition-colors',
+                  'flex h-13 sm:h-14 w-full touch-target items-center gap-3 rounded-2xl border-2 px-3.5 sm:px-4 text-start transition-colors',
                   value === 'all'
                     ? 'border-primary bg-primary/10'
                     : 'border-black/10 bg-white hover:border-primary/50',
@@ -148,7 +191,7 @@ export function StoragePicker({
                   {visibleStorages.length}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[14px] font-bold text-foreground">
+                  <span className="block text-[13.5px] sm:text-[14px] font-bold text-foreground">
                     {allLabel}
                   </span>
                   <span className="block text-[11px] text-muted-foreground">
@@ -158,9 +201,9 @@ export function StoragePicker({
               </button>
             )}
 
-            {visibleStorages.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2.5">
-                {visibleStorages.map((s) => {
+            {filteredStorages.length > 0 ? (
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-2 sm:gap-2.5">
+                {filteredStorages.map((s) => {
                   const active = value === String(s.id)
                   return (
                     <button
@@ -171,7 +214,7 @@ export function StoragePicker({
                         setOpen(false)
                       }}
                       className={cn(
-                        'flex h-16 touch-target items-center gap-3 rounded-2xl border-2 px-3 text-start transition-colors',
+                        'flex min-h-[54px] sm:h-15 touch-target items-center gap-2.5 rounded-2xl border-2 px-3 py-2 text-start transition-colors',
                         active
                           ? 'border-primary bg-primary/10'
                           : 'border-black/10 bg-white hover:border-primary/50',
@@ -181,13 +224,13 @@ export function StoragePicker({
                         className={cn(
                           'flex size-9 shrink-0 items-center justify-center rounded-xl text-[13px] font-bold tabular-nums',
                           active
-                            ? 'bg-primary text-white'
+                            ? 'bg-primary text-white shadow-sm'
                             : 'bg-primary/10 text-primary',
                         )}
                       >
                         {s.id}
                       </span>
-                      <span className="min-w-0">
+                      <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-bold text-foreground">
                           {storageLabel(s)}
                         </span>
@@ -200,13 +243,15 @@ export function StoragePicker({
                 })}
               </div>
             ) : (
-              <p className="py-2 text-center text-[13px] text-muted-foreground">
-                لا توجد مخازن حالياً، يمكنك إنشاء مخزن جديد بالأسفل.
+              <p className="py-6 text-center text-[13px] text-muted-foreground">
+                {search.trim()
+                  ? `لا توجد نتائج مطابقة لـ "${search}"`
+                  : 'لا توجد مخازن حالياً، يمكنك إنشاء مخزن جديد بالأسفل.'}
               </p>
             )}
 
             {allowCreate && (
-              <div className="border-t border-black/10 pt-3">
+              <div className="border-t border-black/10 pt-3 mt-2">
                 {!showCreate ? (
                   <button
                     type="button"
@@ -246,11 +291,11 @@ export function StoragePicker({
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="p-3 border-t border-black/5 bg-secondary/30 shrink-0">
             <Button
               type="button"
               onClick={() => setOpen(false)}
-              className="h-11 flex-1 rounded-full touch-target"
+              className="h-11 w-full rounded-full touch-target"
             >
               إغلاق
             </Button>

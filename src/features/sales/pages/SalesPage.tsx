@@ -8,6 +8,8 @@ import { getProducts } from '@/features/products/api'
 import { invalidateAfterSale } from '@/shared/lib/invalidateShop'
 import type { Product } from '@/features/products/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { useAuthStore } from '@/shared/stores/auth-store'
+import { getOverview } from '@/features/settings/api'
 import { getLatestGoldPrice, getStorages, saveGoldPrice } from '@/shared/lib/parties'
 import type { StorageLocation } from '@/shared/types/api'
 import { useGoldStore } from '@/shared/stores/gold-store'
@@ -80,6 +82,22 @@ export function SalesPage() {
   const setGold21Buy = useGoldStore((s) => s.setGold21Buy)
   const freezeGold = useGoldStore((s) => s.freezeGold)
   const setFreezeGold = useGoldStore((s) => s.setFreezeGold)
+
+  const roles = useAuthStore((s) => s.user?.roles ?? [])
+  const isOwner = roles.includes('Owner')
+  const setSelectedBranchId = useAuthStore((s) => s.setSelectedBranchId)
+
+  const { data: overview } = useQuery({
+    queryKey: ['overview'],
+    queryFn: getOverview,
+    enabled: isOwner && !activeBranchId,
+  })
+
+  useEffect(() => {
+    if (isOwner && !activeBranchId && overview?.branches && overview.branches.length > 0) {
+      setSelectedBranchId(overview.branches[0].branchId)
+    }
+  }, [isOwner, activeBranchId, overview, setSelectedBranchId])
 
   useEffect(() => {
     setFreezeGold(true)

@@ -13,6 +13,7 @@ import {
   Share2,
   Wand2,
   X,
+  ZoomIn,
 } from 'lucide-react'
 
 import { getProductKarats, getProductsPage } from '@/features/products/api'
@@ -99,6 +100,8 @@ export function ProductsPage() {
   const [shareRatio, setShareRatio] = useState<ShareImageAspectRatio>('9:16')
   const [pendingRatio, setPendingRatio] = useState<ShareImageAspectRatio>('9:16')
   const [makingDiscount, setMakingDiscount] = useState('')
+  const [imageZoom, setImageZoom] = useState(1.25)
+  const [imageOffsetY, setImageOffsetY] = useState(0)
   const [query, setQuery] = useState('')
   const [karatFilter, setKaratFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -171,6 +174,8 @@ export function ProductsPage() {
     setPendingStyle(shareStyle)
     setPendingRatio(shareRatio)
     setMakingDiscount('')
+    setImageZoom(1.25)
+    setImageOffsetY(0)
     setShareBusy(true)
 
     const lineMath = cartLineMath(effectiveGold, p.karat, p.weight, p.factoryForSale)
@@ -188,6 +193,8 @@ export function ProductsPage() {
         style: shareStyle,
         aspectRatio: shareRatio,
         makingDiscountPercent: 0,
+        imageZoom: 1.25,
+        imageOffsetY: 0,
         gold21Price: effectiveGold,
         pricePerGram: salePerGram(effectiveGold, p.karat),
         makingFeePerGram: p.factoryForSale,
@@ -240,6 +247,8 @@ export function ProductsPage() {
         style: pendingStyle,
         aspectRatio: pendingRatio,
         makingDiscountPercent: discountValue,
+        imageZoom,
+        imageOffsetY,
         gold21Price: effectiveGold,
         pricePerGram: salePerGram(effectiveGold, share.product.karat),
         makingFeePerGram: share.product.factoryForSale,
@@ -717,6 +726,94 @@ export function ProductsPage() {
                               </button>
                             )
                           })}
+                        </div>
+                      </div>
+
+                      {/* التحكم في تكبير وموضع صورة القطعة */}
+                      <div className="rounded-[14px] border border-border bg-secondary/50 p-3.5 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label className="flex items-center gap-1.5 text-[12px] font-bold text-foreground">
+                            <ZoomIn className="size-3.5 text-primary" />
+                            تكبير وتوسيط صورة القطعة
+                          </Label>
+                          <span className="text-[11px] font-bold text-primary tabular-nums">
+                            {Math.round(imageZoom * 100)}%
+                          </span>
+                        </div>
+
+                        {/* شريط التكبير السريع */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={0.8}
+                              max={2.5}
+                              step={0.05}
+                              value={imageZoom}
+                              onChange={(e) => setImageZoom(parseFloat(e.target.value))}
+                              disabled={shareBusy}
+                              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-black/10 accent-primary"
+                            />
+                          </div>
+                          <div className="flex justify-between gap-1">
+                            {[1.0, 1.25, 1.5, 1.75, 2.0].map((z) => (
+                              <button
+                                key={z}
+                                type="button"
+                                onClick={() => setImageZoom(z)}
+                                disabled={shareBusy}
+                                className={cn(
+                                  'h-7 px-2 rounded-md text-[10.5px] font-bold tabular-nums transition-colors cursor-pointer',
+                                  Math.abs(imageZoom - z) < 0.04
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-background text-foreground border border-border hover:border-primary/40',
+                                )}
+                              >
+                                {Math.round(z * 100)}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* إزاحة وتوسيط رأسي */}
+                        <div className="space-y-1.5 border-t border-border/60 pt-2.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted-foreground font-semibold">إزاحة المركز الرأسي:</span>
+                            <span className="text-muted-foreground tabular-nums">
+                              {imageOffsetY === 0 ? 'توسيط' : `${imageOffsetY > 0 ? '+' : ''}${imageOffsetY}px`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setImageOffsetY((prev) => Math.max(-80, prev - 20))}
+                              disabled={shareBusy}
+                              className="h-7 flex-1 rounded-md text-[11px] font-bold bg-background border border-border hover:border-primary/40 text-foreground cursor-pointer"
+                            >
+                              ⬆️ رفع لأعلى
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setImageOffsetY(0)}
+                              disabled={shareBusy}
+                              className={cn(
+                                'h-7 px-3 rounded-md text-[11px] font-bold cursor-pointer',
+                                imageOffsetY === 0
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-background border border-border text-foreground hover:border-primary/40',
+                              )}
+                            >
+                              توسيط
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setImageOffsetY((prev) => Math.min(80, prev + 20))}
+                              disabled={shareBusy}
+                              className="h-7 flex-1 rounded-md text-[11px] font-bold bg-background border border-border hover:border-primary/40 text-foreground cursor-pointer"
+                            >
+                              ⬇️ خفض لأسفل
+                            </button>
+                          </div>
                         </div>
                       </div>
 

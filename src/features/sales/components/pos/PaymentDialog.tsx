@@ -4,8 +4,11 @@ import { toast } from 'sonner'
 import { Plus, User, Loader2, CheckCircle2, Zap, Clock } from 'lucide-react'
 
 import { completeHeldSale, createSale } from '@/features/sales/api'
+import { getOverview } from '@/features/settings/api'
 import { invalidateAfterSale } from '@/shared/lib/invalidateShop'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { useAuthStore } from '@/shared/stores/auth-store'
+import { extractServerMessage } from '@/shared/lib/serverError'
 import type { PaymentMethod } from './types'
 import { createCustomer, getCustomers } from '@/shared/lib/parties'
 import { amountToNumber } from '@/shared/lib/gold'
@@ -100,13 +103,36 @@ export function PaymentDialog({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!customerId) throw new Error('لا يوجد عميل')
+      if (!customerId) throw new Error('يرجى تحديد العميل أولاً')
 
       if (isCompletion) {
         return completeHeldSale(heldSaleId!, {
           paidAmount: isCash ? paidValue : effectivePaid,
           paymentMethod: method as 'cash' | 'card' | 'transfer',
         })
+      }
+
+      // حساب رقم الفرع بدقة حتى للمالك في حال لم يكن محدداً في القائمة الفاعلة
+      const authState = useAuthStore.getState()
+      let resolvedBranchId =
+        activeBranchId && activeBranchId > 0
+          ? activeBranchId
+          : authState.selectedBranchId && authState.selectedBranchId > 0
+            ? authState.selectedBranchId
+            : authState.branchId && authState.branchId > 0
+              ? authState.branchId
+              : undefined
+
+      if (!resolvedBranchId && authState.user?.roles.includes('Owner')) {
+        try {
+          const ov = await getOverview()
+          if (ov?.branches && ov.branches.length > 0) {
+            resolvedBranchId = ov.branches[0].branchId
+            authState.setSelectedBranchId(resolvedBranchId)
+          }
+        } catch {
+          // ignore
+        }
       }
 
       return createSale({
@@ -118,7 +144,7 @@ export function PaymentDialog({
         amountOwed: isHold ? 0 : isCash ? Math.max(0, totals.total - paidValue) : 0,
         paymentMethod: method,
         saleItems: lines,
-        branchId: activeBranchId ?? undefined,
+        branchId: resolvedBranchId,
         isHold,
       })
     },
@@ -138,15 +164,14 @@ export function PaymentDialog({
         held: isHold,
       })
     },
-    onError: (error: { response?: { data?: { message?: string } } }) => {
-      toast.error(
-        error.response?.data?.message ??
-          (isHold
-            ? 'تعذّر تعليق الفاتورة.'
-            : isCompletion
-              ? 'تعذّر إتمام البيع المعلّق.'
-              : 'تعذّر إتمام البيع.'),
-      )
+    onError: (error: unknown) => {
+      const fallback = isHold
+        ? 'تعذّر تعليق الفاتورة. تأكد من تحديد عميل حقيقي وفرع فاعل.'
+        : isCompletion
+          ? 'تعذّر إتمام البيع المعلّق.'
+          : 'تعذّر إتمام البيع.'
+      const message = extractServerMessage(error, fallback)
+      toast.error(message)
     },
   })
 
@@ -221,10 +246,21 @@ export function PaymentDialog({
           ) : null}
 
           {holdRequiresRealCustomer ? (
-            <p className="flex items-center gap-2 rounded-xl bg-warning/10 px-3 py-2 text-[12px] font-semibold text-warning">
-              <Clock className="size-4 shrink-0" />
-              لا يمكن تعليق فاتورة على «عميل نقدي» — اختر عميلاً حقيقياً لتُنزَل عليه المديونية الذهبية.
-            </p>
+            <div className="flex flex-col gap-2 rounded-xl bg-warning/10 p-3 text-[12px] font-semibold text-warning">
+              <div className="flex items-center gap-2">
+                <Clock className="size-4 shrink-0" />
+                <span>لا يمكن تعليق فاتورة على «عميل نقدي» — اختر عميلاً حقيقياً لتُنزَل عليه المديونية الذهبية.</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCustomer(true)}
+                className="h-9 w-full rounded-xl border-warning/30 bg-white text-warning hover:bg-warning/10 text-xs font-bold"
+              >
+                اختيار أو إضافة عميل بالاسم
+              </Button>
+            </div>
           ) : null}
         </div>
 
@@ -328,9 +364,32 @@ export function PaymentDialog({
           </Button>
           <Button
             type="button"
-            disabled={!canConfirm || mutation.isPending}
-            onClick={() => mutation.mutate()}
-            className="h-11 rounded-full px-6 touch-target"
+            disabled={mutation.isPending}
+            onClick={() => {
+              if (isHold && (!customerId || holdRequiresRealCustomer)) {
+                toast.error('تعليق الفاتورة يتطلب اختيار عميل حقيقي لتسجيل المديونية الذهبية عليه.')
+                setShowCustomer(true)
+                return
+              }
+              if (!customerId) {
+                toast.error('يرجى تحديد العميل أولاً.')
+                setShowCustomer(true)
+                return
+              }
+              if (lines.length === 0) {
+                toast.error('السلة فارغة.')
+                return
+              }
+              if (method === 'cash' && paidValue <= 0) {
+                toast.error('يرجى إدخال المبلغ المدفوع نقداً.')
+                return
+              }
+              mutation.mutate()
+            }}
+            className={cn(
+              'h-11 rounded-full px-6 touch-target',
+              !canConfirm && 'opacity-75',
+            )}
           >
             {mutation.isPending ? (
               <Loader2 className="size-4 animate-spin" />
