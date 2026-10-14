@@ -42,15 +42,21 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog'
 import { StoragePicker } from '@/shared/components/StoragePicker'
+import {
+  WeightFilterDialog,
+  type WeightRange,
+} from '@/shared/components/WeightFilterDialog'
 
 const categories = [
   { key: 'all', label: 'الكل', icon: LayoutGrid },
-  { key: 'ring', label: 'خواتم', icon: Gem },
-  { key: 'chain', label: 'سلاسل', icon: Link2 },
-  { key: 'bracelet', label: 'أساور', icon: CircleDashed },
+  { key: 'ring', label: 'خواتم ودبل', icon: Gem },
+  { key: 'twin', label: 'توينز ومحابس', icon: Sparkles },
+  { key: 'chain', label: 'سلاسل وعقود', icon: Link2 },
+  { key: 'pendant', label: 'دلايات', icon: Gem },
+  { key: 'bracelet', label: 'أساور وغوايش', icon: CircleDashed },
   { key: 'earring', label: 'حلق', icon: Ear },
   { key: 'set', label: 'أطقم', icon: Layers },
-  { key: 'bar', label: 'سبائك', icon: Package },
+  { key: 'bar', label: 'سبائك وجنيهات', icon: Package },
   { key: 'new', label: 'جديد', icon: Sparkles },
   { key: 'renewed', label: 'مجدّد', icon: RefreshCw },
   { key: 'break', label: 'كسر', icon: Recycle },
@@ -63,13 +69,59 @@ function matchCategory(product: Product, key: string): boolean {
   if (key === 'break') return product.typegolde === 3
   const name = `${product.productName} ${product.productType ?? ''}`.toLowerCase()
   const map: Record<string, string[]> = {
-    ring: ['خاتم', 'ring'],
-    chain: ['سلسلة', 'chai'],
-    bracelet: ['سوار', 'bracelet', 'أسورة'],
+    ring: ['خاتم', 'دبلة', 'دبله', 'ring', 'band'],
+    twin: ['توينز', 'توين', 'محبس', 'twin'],
+    chain: ['سلسلة', 'سلسال', 'عقد', 'كوليه', 'chai', 'necklace'],
+    pendant: [
+      'دلاية',
+      'دلايه',
+      'ميدالية',
+      'ميداليه',
+      'تعليقة',
+      'تعليقه',
+      'علّاقة',
+      'علاقة',
+      'pendant',
+      'charm',
+    ],
+    bracelet: [
+      'سوار',
+      'bracelet',
+      'أسورة',
+      'اسورة',
+      'غويشة',
+      'غويشه',
+      'غوايش',
+      'انسيال',
+    ],
     earring: ['حلق', 'earr', 'قرط'],
     set: ['طقم', 'set'],
-    bar: ['سبيكة', 'سبائك', 'bar', 'جنيه'],
+    bar: ['سبيكة', 'سبيكه', 'سبائك', 'bar', 'جنيه', 'اونصة'],
   }
+
+  if (key === 'ring') {
+    const isTwin = ['توينز', 'توين', 'محبس', 'twin'].some((t) => name.includes(t))
+    if (isTwin) return false
+    return (map.ring ?? []).some((s) => name.includes(s))
+  }
+
+  if (key === 'chain') {
+    const isPendant = [
+      'دلاية',
+      'دلايه',
+      'ميدالية',
+      'ميداليه',
+      'تعليقة',
+      'تعليقه',
+      'علّاقة',
+      'علاقة',
+      'pendant',
+      'charm',
+    ].some((p) => name.includes(p))
+    if (isPendant) return false
+    return (map.chain ?? []).some((s) => name.includes(s))
+  }
+
   return (map[key] ?? []).some((s) => name.includes(s))
 }
 
@@ -118,6 +170,8 @@ export function ProductGrid({
   const [storageFilter, setStorageFilter] = useState('all')
   const [preview, setPreview] = useState<Product | null>(null)
   const [categoryOpen, setCategoryOpen] = useState(false)
+  const [weightDialogOpen, setWeightDialogOpen] = useState(false)
+  const [weightRange, setWeightRange] = useState<WeightRange>({ min: null, max: null })
   const [barcodeStatus, setBarcodeStatus] = useState<
     'idle' | 'notfound' | 'found'
   >('idle')
@@ -134,6 +188,10 @@ export function ProductGrid({
       if (!matchCategory(p, category)) return false
       if (storageFilter !== 'all' && String(p.storageId) !== storageFilter)
         return false
+      if (weightRange.min != null && (p.weight ?? 0) < weightRange.min)
+        return false
+      if (weightRange.max != null && (p.weight ?? 0) > weightRange.max)
+        return false
       if (!q) return true
       return (
         p.productName.toLowerCase().includes(q) ||
@@ -141,7 +199,7 @@ export function ProductGrid({
         (p.barcode ?? '').toLowerCase().includes(q)
       )
     })
-  }, [products, query, category, storageFilter])
+  }, [products, query, category, storageFilter, weightRange])
 
   function handleBarcodeSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -311,6 +369,37 @@ export function ProductGrid({
                 : 'border-dashed border-black/25 bg-white text-muted-foreground hover:border-primary/60 hover:text-primary'
             }
           />
+
+          {/* فلتر الوزن (ديالوج متكامل مع المخزن) */}
+          {weightRange.min != null || weightRange.max != null ? (
+            <div className="flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50/95 px-3 text-[12px] font-bold text-amber-900 shadow-xs">
+              <Scale className="size-3.5 text-amber-600" />
+              <button
+                type="button"
+                onClick={() => setWeightDialogOpen(true)}
+                className="hover:underline cursor-pointer"
+              >
+                {weightRange.min ?? 0} - {weightRange.max ? `${weightRange.max} جم` : 'الكل'}
+              </button>
+              <button
+                type="button"
+                aria-label="مسح فلتر الوزن"
+                onClick={() => setWeightRange({ min: null, max: null })}
+                className="ms-0.5 flex size-4 items-center justify-center rounded-full bg-amber-200 text-amber-800 hover:bg-amber-300 cursor-pointer"
+              >
+                <X className="size-2.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setWeightDialogOpen(true)}
+              className="flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border border-dashed border-black/25 bg-white px-3 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-primary/60 hover:text-primary cursor-pointer"
+            >
+              <Scale className="size-3.5 text-muted-foreground" />
+              <span>فلتر بالوزن</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -323,11 +412,11 @@ export function ProductGrid({
               لا توجد قطع تطابق البحث
             </p>
             <p className="text-sm text-muted-foreground">
-              جرّب تصنيفاً آخر أو ابحث باسم مختلف
+              جرّب تعديل نطاق الوزن أو التصنيف أو المخزن
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 md:grid-cols-6 lg:grid-cols-6 xl:grid-cols-8">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
             {filtered.map((product) => {
               const available =
                 product.isActive && product.quantity > 0 && product.productId != null
@@ -347,10 +436,13 @@ export function ProductGrid({
                     }
                   }}
                   className={cn(
-                    'group relative flex touch-target flex-col gap-1.5 rounded-[14px] border border-black/5 bg-white p-1.5 text-start elevation-card transition-transform active:scale-[0.98]',
-                    available ? 'cursor-pointer hover:border-amber-200' : 'cursor-not-allowed opacity-50',
+                    'group relative flex touch-target flex-col gap-1.5 rounded-[16px] border border-black/8 bg-white p-2 text-start elevation-card transition-all duration-150 active:scale-[0.98]',
+                    available
+                      ? 'cursor-pointer hover:border-amber-400 hover:shadow-md'
+                      : 'cursor-not-allowed opacity-45',
                   )}
                 >
+                  {/* زر المعاينة السريعة */}
                   <button
                     type="button"
                     aria-label={`عرض تفاصيل ${product.productName}`}
@@ -358,31 +450,42 @@ export function ProductGrid({
                       e.stopPropagation()
                       setPreview(product)
                     }}
-                    className="absolute end-1 top-1 z-10 flex size-6 items-center justify-center rounded-full bg-black/5 text-muted-foreground transition-colors hover:bg-black/10 hover:text-foreground"
+                    className="absolute end-2 top-2 z-10 flex size-7 items-center justify-center rounded-full bg-white/90 backdrop-blur-xs text-muted-foreground shadow-xs transition-colors hover:bg-white hover:text-foreground cursor-pointer"
                   >
-                    <Eye className="size-3" />
+                    <Eye className="size-3.5" />
                   </button>
 
-                  <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-[10px] bg-secondary">
+                  {/* إشارة السلة أعلى الصورة */}
+                  {inCart > 0 && (
+                    <span className="absolute start-2 top-2 z-10 flex items-center gap-0.5 rounded-full bg-primary px-2 py-0.5 text-[10px] font-black text-white shadow-xs">
+                      +{inCart}
+                    </span>
+                  )}
+
+                  {/* حاوية الصورة مع تدرج مجوهرات دافئ */}
+                  <div className="relative aspect-square w-full overflow-hidden rounded-[12px] border border-black/5 bg-gradient-to-b from-amber-50/20 via-neutral-50 to-neutral-100 flex items-center justify-center">
                     {product.primaryImageUrl ? (
                       <img
                         src={product.primaryImageUrl}
                         alt={product.productName}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
                       />
                     ) : (
-                      <span className="text-[10px] font-semibold text-muted-foreground">
-                        {product.weight} جم
-                      </span>
+                      <div className="flex flex-col items-center justify-center gap-1 text-center p-2">
+                        <Gem className="size-6 text-amber-500/70" />
+                        <span className="text-[10px] font-bold text-muted-foreground tabular-nums">
+                          {formatNumber(product.weight)} جم
+                        </span>
+                      </div>
                     )}
                   </div>
 
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] font-semibold leading-[1.35] text-foreground">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-bold leading-[1.3] text-foreground">
                       {product.productName}
                     </p>
-                    <p className="mt-0.5 truncate text-[9px] font-semibold">
+                    <p className="mt-0.5 truncate text-[10px] font-semibold">
                       {available ? (
                         product.quantity === 1 ? (
                           <span className="inline-flex items-center gap-1 text-warning">
@@ -390,26 +493,26 @@ export function ProductGrid({
                             متبقي {product.quantity}
                           </span>
                         ) : (
-                          <span className="text-success">متاح للبيع</span>
+                          <span className="text-emerald-600">متاح</span>
                         )
                       ) : (
-                        <span className="text-error">غير متاح</span>
+                        <span className="text-destructive">غير متوفر</span>
                       )}
                     </p>
 
-                    {/* العيار (ذهبي) + الوزن (محايد) — ألوان مميزة للقراءة الفورية */}
+                    {/* شارات العيار والوزن البارزة بأرقام ثابتة */}
                     <div className="mt-1 flex flex-wrap items-center gap-1">
-                      <span className="inline-flex items-center rounded-[6px] bg-amber-100 px-1.5 py-px text-[9px] font-black leading-[1.5] text-amber-700">
+                      <span className="inline-flex items-center rounded-md bg-amber-100/90 border border-amber-300/60 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-900 tabular-nums">
                         {karatText}
                       </span>
-                      <span className="inline-flex items-center gap-0.5 rounded-[6px] bg-black/5 px-1.5 py-px text-[9px] font-bold leading-[1.5] text-foreground">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 border border-black/5 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-foreground tabular-nums">
                         <Scale className="size-2.5 text-muted-foreground" />
                         {formatNumber(product.weight)} جم
                       </span>
                       {product.typegolde >= 1 && product.typegolde <= 3 && (
                         <span
                           className={cn(
-                            'inline-flex items-center rounded-[6px] px-1.5 py-px text-[9px] font-black leading-[1.5]',
+                            'inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-black leading-none',
                             typeBadgeClasses[product.typegolde] ??
                               'bg-black/5 text-foreground',
                           )}
@@ -422,27 +525,27 @@ export function ProductGrid({
                     {(product.sku || product.barcode) && (
                       <p
                         dir="ltr"
-                        className="mt-0.5 truncate text-end text-[8px] tabular-nums text-muted-foreground"
+                        className="mt-1 truncate text-end text-[8px] font-mono tabular-nums text-muted-foreground"
                       >
-                        {product.sku ? `SKU ${product.sku}` : ''}
+                        {product.sku ? `SKU: ${product.sku}` : ''}
                         {product.sku && product.barcode ? ' • ' : ''}
                         {product.barcode ? product.barcode : ''}
                       </p>
                     )}
                   </div>
 
-                  {/* السعر بارز */}
-                  <div className="mt-auto flex items-center justify-between border-t border-black/5 pt-1">
+                  {/* السعر الإجمالي بارز في الأسفل */}
+                  <div className="mt-auto flex items-center justify-between border-t border-black/6 pt-1.5">
                     <span className="tabular-nums text-[13px] font-black text-primary">
                       <FormatEg value={salePriceFor(product, goldPrice)} />
                       <span className="ms-0.5 text-[9px] font-bold text-amber-600">
                         ج.م
                       </span>
                     </span>
-                    {inCart > 0 && (
-                      <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white shadow-xs">
-                        {inCart}
-                      </span>
+                    {available && (
+                      <div className="flex size-6 items-center justify-center rounded-full bg-secondary text-muted-foreground group-hover:bg-primary group-hover:text-white transition-colors">
+                        <Plus className="size-3.5" />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -461,6 +564,17 @@ export function ProductGrid({
           setCategory(key)
           setCategoryOpen(false)
         }}
+      />
+
+      {/* ديالوج فلترة الوزن المتكامل مع المخزن */}
+      <WeightFilterDialog
+        open={weightDialogOpen}
+        onOpenChange={setWeightDialogOpen}
+        range={weightRange}
+        onApply={setWeightRange}
+        items={products}
+        currentStorageId={storageFilter}
+        storageName={selectedStorage?.name || selectedStorage?.location || 'كل المخازن'}
       />
 
       <ProductQuickView

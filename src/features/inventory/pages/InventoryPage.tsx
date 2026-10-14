@@ -32,6 +32,10 @@ import { PaginationBar } from '@/shared/components/ui/pagination'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { StoragePicker } from '@/shared/components/StoragePicker'
+import {
+  WeightFilterDialog,
+  type WeightRange,
+} from '@/shared/components/WeightFilterDialog'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
@@ -60,10 +64,12 @@ import {
 
 const INVENTORY_CATEGORIES = [
   { key: 'all', label: 'كل الأصناف' },
-  { key: 'earring', label: 'حلقان' },
-  { key: 'bracelet', label: 'غوايش وأساور' },
   { key: 'ring', label: 'خواتم ودبل' },
+  { key: 'twin', label: 'توينز ومحابس' },
   { key: 'chain', label: 'سلاسل وعقود' },
+  { key: 'pendant', label: 'دلايات وميداليات' },
+  { key: 'bracelet', label: 'غوايش وأساور' },
+  { key: 'earring', label: 'حلقان' },
   { key: 'set', label: 'أطقم' },
   { key: 'bar', label: 'سبائك وجنيهات' },
   { key: 'new', label: 'جديد' },
@@ -78,13 +84,62 @@ function matchInventoryCategory(product: Product, key: string): boolean {
   if (key === 'break') return product.typegolde === 3
   const name = `${product.productName} ${product.productType ?? ''}`.toLowerCase()
   const map: Record<string, string[]> = {
-    ring: ['خاتم', 'دبلة', 'محبس', 'ring'],
-    chain: ['سلسلة', 'سلسال', 'عقد', 'دلاية', 'ميدالية', 'chai'],
-    bracelet: ['غويشة', 'غوايش', 'سوار', 'أسورة', 'انسيال', 'bracelet'],
+    ring: ['خاتم', 'دبلة', 'دبله', 'ring', 'band'],
+    twin: ['توينز', 'توين', 'محبس', 'twin'],
+    chain: ['سلسلة', 'سلسال', 'عقد', 'كوليه', 'chai', 'necklace'],
+    pendant: [
+      'دلاية',
+      'دلايه',
+      'ميدالية',
+      'ميداليه',
+      'تعليقة',
+      'تعليقه',
+      'علّاقة',
+      'علاقة',
+      'pendant',
+      'charm',
+    ],
+    bracelet: [
+      'غويشة',
+      'غويشه',
+      'غوايش',
+      'سوار',
+      'أسورة',
+      'اسورة',
+      'انسيال',
+      'bracelet',
+      'bangle',
+    ],
     earring: ['حلق', 'قرط', 'earr'],
     set: ['طقم', 'نصف طقم', 'set'],
-    bar: ['سبيكة', 'سبائك', 'bar', 'جنيه'],
+    bar: ['سبيكة', 'سبيكه', 'سبائك', 'bar', 'جنيه', 'اونصة'],
   }
+
+  // فصل الخواتم عن التوينز والمحابس
+  if (key === 'ring') {
+    const isTwin = ['توينز', 'توين', 'محبس', 'twin'].some((t) => name.includes(t))
+    if (isTwin) return false
+    return (map.ring ?? []).some((s) => name.includes(s))
+  }
+
+  // فصل السلاسل عن الدلايات والميداليات
+  if (key === 'chain') {
+    const isPendant = [
+      'دلاية',
+      'دلايه',
+      'ميدالية',
+      'ميداليه',
+      'تعليقة',
+      'تعليقه',
+      'علّاقة',
+      'علاقة',
+      'pendant',
+      'charm',
+    ].some((p) => name.includes(p))
+    if (isPendant) return false
+    return (map.chain ?? []).some((s) => name.includes(s))
+  }
+
   return (map[key] ?? []).some((s) => name.includes(s))
 }
 
@@ -220,6 +275,8 @@ export function InventoryPage() {
   const [printUnit, setPrintUnit] = useState<InventoryUnitRecord | null>(null)
   const [printInventory, setPrintInventory] = useState(false)
   const [page, setPage] = useState(1)
+  const [weightRange, setWeightRange] = useState<WeightRange>({ min: null, max: null })
+  const [weightDialogOpen, setWeightDialogOpen] = useState(false)
 
   const { data: products = [], isLoading, isError } = useQuery({
     queryKey: ['products', activeBranchId],
@@ -295,11 +352,15 @@ export function InventoryPage() {
     return availableProducts
       .filter((p) => {
         if (!matchInventoryCategory(p, categoryFilter)) return false
+        if (weightRange.min != null && (p.weight ?? 0) < weightRange.min)
+          return false
+        if (weightRange.max != null && (p.weight ?? 0) > weightRange.max)
+          return false
         if (!q) return true
         return p.productName.toLowerCase().includes(q)
       })
       .sort((a, b) => b.productId - a.productId)
-  }, [availableProducts, query, categoryFilter])
+  }, [availableProducts, query, categoryFilter, weightRange])
 
   const storages = useMemo(() => {
     const map = new Map<number, { id: number; name: string; location: string; branchId?: number }>()
@@ -349,12 +410,86 @@ export function InventoryPage() {
   /** تجميعة فئات الأصناف المجمعة (حلقان، غوايش وأساور، خواتم، سلاسل، سبائك...) */
   const categoryGroups = useMemo(() => {
     const definitions = [
-      { key: 'earring', label: 'حلقان', keywords: ['حلق', 'قرط', 'earr'] },
-      { key: 'bracelet', label: 'غوايش وأساور', keywords: ['غويشة', 'غوايش', 'سوار', 'أسورة', 'انسيال', 'bracelet'] },
-      { key: 'ring', label: 'خواتم ودبل', keywords: ['خاتم', 'دبلة', 'محبس', 'ring'] },
-      { key: 'chain', label: 'سلاسل وعقود', keywords: ['سلسلة', 'سلسال', 'عقد', 'دلاية', 'ميدالية', 'chai'] },
-      { key: 'set', label: 'أطقم', keywords: ['طقم', 'نصف طقم', 'set'] },
-      { key: 'bar', label: 'سبائك وجنيهات', keywords: ['سبيكة', 'سبائك', 'bar', 'جنيه'] },
+      {
+        key: 'ring',
+        label: 'خواتم ودبل',
+        keywords: ['خاتم', 'دبلة', 'دبله', 'ring', 'band'],
+        exclude: ['توينز', 'توين', 'محبس', 'twin'],
+      },
+      {
+        key: 'twin',
+        label: 'توينز ومحابس',
+        keywords: ['توينز', 'توين', 'محبس', 'twin'],
+        exclude: [],
+      },
+      {
+        key: 'chain',
+        label: 'سلاسل وعقود',
+        keywords: ['سلسلة', 'سلسال', 'عقد', 'كوليه', 'chai', 'necklace'],
+        exclude: [
+          'دلاية',
+          'دلايه',
+          'ميدالية',
+          'ميداليه',
+          'تعليقة',
+          'تعليقه',
+          'علّاقة',
+          'علاقة',
+          'pendant',
+          'charm',
+        ],
+      },
+      {
+        key: 'pendant',
+        label: 'دلايات وميداليات',
+        keywords: [
+          'دلاية',
+          'دلايه',
+          'ميدالية',
+          'ميداليه',
+          'تعليقة',
+          'تعليقه',
+          'علّاقة',
+          'علاقة',
+          'pendant',
+          'charm',
+        ],
+        exclude: [],
+      },
+      {
+        key: 'bracelet',
+        label: 'غوايش وأساور',
+        keywords: [
+          'غويشة',
+          'غويشه',
+          'غوايش',
+          'سوار',
+          'أسورة',
+          'اسورة',
+          'انسيال',
+          'bracelet',
+          'bangle',
+        ],
+        exclude: [],
+      },
+      {
+        key: 'earring',
+        label: 'حلقان',
+        keywords: ['حلق', 'قرط', 'earr'],
+        exclude: [],
+      },
+      {
+        key: 'set',
+        label: 'أطقم',
+        keywords: ['طقم', 'نصف طقم', 'set'],
+        exclude: [],
+      },
+      {
+        key: 'bar',
+        label: 'سبائك وجنيهات',
+        keywords: ['سبيكة', 'سبيكه', 'سبائك', 'bar', 'جنيه', 'اونصة'],
+        exclude: [],
+      },
     ]
 
     const groups = definitions.map((def) => {
@@ -365,7 +500,8 @@ export function InventoryPage() {
 
       for (const p of availableProducts) {
         const name = `${p.productName} ${p.productType ?? ''}`.toLowerCase()
-        if (def.keywords.some((kw) => name.includes(kw))) {
+        const isExcluded = (def.exclude ?? []).some((ex) => name.includes(ex))
+        if (!isExcluded && def.keywords.some((kw) => name.includes(kw))) {
           const qty = p.quantity ?? 0
           const w = (p.weight ?? 0) * qty
           const k = p.karat || 21
@@ -393,7 +529,10 @@ export function InventoryPage() {
 
     for (const p of availableProducts) {
       const name = `${p.productName} ${p.productType ?? ''}`.toLowerCase()
-      const matchedAny = definitions.some((d) => d.keywords.some((kw) => name.includes(kw)))
+      const matchedAny = definitions.some((d) => {
+        const isExcluded = (d.exclude ?? []).some((ex) => name.includes(ex))
+        return !isExcluded && d.keywords.some((kw) => name.includes(kw))
+      })
       if (!matchedAny) {
         const qty = p.quantity ?? 0
         const w = (p.weight ?? 0) * qty
@@ -876,6 +1015,40 @@ export function InventoryPage() {
           }}
           triggerClassName="flex h-11 w-full items-center gap-2 rounded-full border border-black/10 bg-white px-4 text-[13px] font-medium text-foreground sm:w-48"
         />
+
+        {/* فلتر الوزن التفاعلي في الجرد */}
+        {weightRange.min != null || weightRange.max != null ? (
+          <div className="flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3.5 text-[13px] font-bold text-amber-900 shadow-xs">
+            <Scale className="size-4 text-amber-600" />
+            <button
+              type="button"
+              onClick={() => setWeightDialogOpen(true)}
+              className="hover:underline cursor-pointer"
+            >
+              {weightRange.min ?? 0} - {weightRange.max ? `${weightRange.max} جم` : 'الكل'}
+            </button>
+            <button
+              type="button"
+              aria-label="مسح فلتر الوزن"
+              onClick={() => {
+                reset()
+                setWeightRange({ min: null, max: null })
+              }}
+              className="ms-1 flex size-5 items-center justify-center rounded-full bg-amber-200 text-amber-800 hover:bg-amber-300 cursor-pointer"
+            >
+              <X className="size-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setWeightDialogOpen(true)}
+            className="flex h-11 shrink-0 items-center gap-2 rounded-full border border-dashed border-black/25 bg-white px-4 text-[13px] font-semibold text-muted-foreground transition-colors hover:border-primary/60 hover:text-primary cursor-pointer touch-target"
+          >
+            <Scale className="size-4 text-muted-foreground" />
+            <span>فلتر بالوزن</span>
+          </button>
+        )}
       </div>
       </div>
 
@@ -900,7 +1073,7 @@ export function InventoryPage() {
             لا نتائج مطابقة
           </p>
           <p className="text-sm text-muted-foreground">
-            جرّب تعديل البحث أو الفلتر.
+            جرّب تعديل البحث أو الفلتر أو نطاق الوزن.
           </p>
         </div>
       ) : (
@@ -908,7 +1081,8 @@ export function InventoryPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-black/[0.03]">
-                <TableHead>المنتج</TableHead>
+                <TableHead>المنتج والمخزن</TableHead>
+                <TableHead>موقع المخزن</TableHead>
                 <TableHead className="text-end">العدد</TableHead>
                 <TableHead className="text-end">وزن القطعة</TableHead>
                 <TableHead className="text-end">الوزن الكلي</TableHead>
@@ -920,6 +1094,7 @@ export function InventoryPage() {
               {filteredProducts.map((p) => {
                 const totalW = (p.quantity ?? 0) * (p.weight ?? 0)
                 const g21 = totalW * ((p.karat || 21) / 21)
+                const sName = storageNameOf(p.storageId)
                 return (
                   <TableRow
                     key={p.productId}
@@ -927,12 +1102,34 @@ export function InventoryPage() {
                     onClick={() => setSelected(p)}
                   >
                     <TableCell>
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        <p className="truncate font-semibold text-foreground">
-                          {p.productName}
-                        </p>
-                        <RenewedBadge typegolde={p.typegolde} />
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="truncate font-bold text-foreground">
+                            {p.productName}
+                          </p>
+                          <RenewedBadge typegolde={p.typegolde} />
+                        </div>
+                        {/* شارة بارزة ومصممة بأناقة توضح رقم واسم المخزن بجانب اسم القطعة */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-800">
+                            <MapPin className="size-3 text-sky-600" />
+                            {p.storageId != null ? `مخزن #${p.storageId} · ${sName}` : 'بدون مخزن'}
+                          </span>
+                          {p.sku && (
+                            <span className="text-[11px] font-mono text-muted-foreground">
+                              كود: {p.sku}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-foreground text-[13px] block">
+                        {p.storageId != null ? `مخزن #${p.storageId}` : '—'}
+                      </span>
+                      <p className="text-[11px] text-muted-foreground truncate max-w-[140px]">
+                        {sName}
+                      </p>
                     </TableCell>
                     <TableCell className="text-end font-semibold tabular-nums text-foreground">
                       {formatNumber(p.quantity ?? 0)}
@@ -1086,6 +1283,19 @@ export function InventoryPage() {
         />
         </>
       )}
+
+      <WeightFilterDialog
+        open={weightDialogOpen}
+        onOpenChange={setWeightDialogOpen}
+        range={weightRange}
+        onApply={(r) => {
+          reset()
+          setWeightRange(r)
+        }}
+        items={availableProducts}
+        currentStorageId={storageFilter}
+        storageName={selectedStorageName}
+      />
 
       <ProductDetail product={selected} onClose={() => setSelected(null)} />
       <InventoryUnitLabelPrint unit={printUnit} onClose={() => setPrintUnit(null)} />
