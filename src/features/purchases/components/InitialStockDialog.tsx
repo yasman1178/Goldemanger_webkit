@@ -80,8 +80,8 @@ export function InitialStockDialog({ open, onOpenChange }: InitialStockDialogPro
   const [pieceDialogOpen, setPieceDialogOpen] = useState(false)
 
   const { data: storages = [] } = useQuery({
-    queryKey: ['storages'],
-    queryFn: getStorages,
+    queryKey: ['storages', activeBranchId],
+    queryFn: () => getStorages(activeBranchId ?? undefined),
     enabled: open && isUnlocked,
   })
 

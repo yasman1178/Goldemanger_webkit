@@ -36,7 +36,7 @@ export function InventoryUnitActions({ unit, onPrint }: Props) {
 
   const { data: storages = [] } = useQuery({
     queryKey: ['storages'],
-    queryFn: getStorages,
+    queryFn: () => getStorages(),
   })
 
   const targetOptions = storages.filter((s) => s.id !== unit.storageId)

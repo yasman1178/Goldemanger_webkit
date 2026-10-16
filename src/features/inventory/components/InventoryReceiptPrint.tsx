@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Printer, Filter } from 'lucide-react'
+import { Printer } from 'lucide-react'
 
 import type { Product } from '@/features/products/types'
 import { typeLabels } from '@/features/products/types'

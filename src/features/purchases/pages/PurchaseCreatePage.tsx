@@ -172,8 +172,8 @@ export function PurchaseCreatePage() {
   })
 
   const { data: storages = [] } = useQuery({
-    queryKey: ['storages'],
-    queryFn: getStorages,
+    queryKey: ['storages', activeBranchId],
+    queryFn: () => getStorages(activeBranchId ?? undefined),
   })
 
   const storeGold21 = useGoldStore((s) => s.gold21)
