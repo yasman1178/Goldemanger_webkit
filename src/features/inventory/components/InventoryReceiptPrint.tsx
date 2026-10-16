@@ -53,6 +53,15 @@ export function InventoryReceiptPrint({
   const totalPieces = groups.reduce((sum, g) => sum + g.pieces, 0)
   const totalWeight = groups.reduce((sum, g) => sum + g.weight, 0)
 
+  const totalGrams21 = useMemo(() => {
+    return products.reduce((sum, p) => {
+      const qty = p.quantity ?? 0
+      const w = (p.weight ?? 0) * qty
+      const k = p.karat || 21
+      return sum + w * (k / 21)
+    }, 0)
+  }, [products])
+
   const karatTotals = useMemo(() => {
     const map = new Map<number, { pieces: number; weight: number }>()
     for (const p of products) {
@@ -87,8 +96,12 @@ export function InventoryReceiptPrint({
               <span>{formatNumber(totalPieces)} قطعة</span>
             </div>
             <div className="flex justify-between text-[11px] font-bold">
-              <span>إجمالي الوزن</span>
+              <span>إجمالي الوزن الفعلي</span>
               <span>{formatNumber(totalWeight)} جم</span>
+            </div>
+            <div className="flex justify-between text-[11px] font-bold text-amber-900">
+              <span>معادل عيار 21</span>
+              <span>{formatNumber(totalGrams21)} جم/21</span>
             </div>
             {multiStorage && (
               <>

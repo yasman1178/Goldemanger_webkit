@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -25,11 +25,13 @@ import {
   updateEmployee,
   updateEmployeeRoles,
   disableEmployee,
+  getKeyValues,
   upsertKeyValue,
 } from '@/features/settings/api'
 import type {
   BranchSummary,
   EmployeeItem,
+  KeyValueItem,
   StoreProfile,
 } from '@/features/settings/types'
 import { cn, formatEgp } from '@/shared/lib/utils'
@@ -346,12 +348,24 @@ function StoreSection() {
     queryKey: ['settings-store'],
     queryFn: getStoreProfile,
   })
+  const { data: keyValues } = useQuery<KeyValueItem[]>({
+    queryKey: ['settings-keyvalues'],
+    queryFn: getKeyValues,
+  })
   const [form, setForm] = useState<Partial<StoreProfile> | null>(null)
   const current = form ?? data ?? {}
 
   const stampAndTaxRate = useTaxStore((s) => s.stampAndTaxRate)
   const setStampAndTaxRate = useTaxStore((s) => s.setStampAndTaxRate)
-  const [taxRateInput, setTaxRateInput] = useState(() => (stampAndTaxRate * 100).toString())
+
+  const serverTaxRateStr = useMemo(() => {
+    if (!Array.isArray(keyValues)) return null
+    const found = keyValues.find((it) => it.key === 'saleTaxAndStampRate')
+    return found?.value != null && found.value.trim() !== '' ? found.value : null
+  }, [keyValues])
+
+  const [taxRateDraft, setTaxRateDraft] = useState<string | null>(null)
+  const taxRateInput = taxRateDraft ?? serverTaxRateStr ?? (stampAndTaxRate * 100).toString()
 
   const mutation = useMutation({
     mutationFn: updateStoreProfile,
@@ -423,7 +437,7 @@ function StoreSection() {
         <div className="flex flex-wrap items-center gap-2">
           <Input
             value={taxRateInput}
-            onChange={(e) => setTaxRateInput(e.target.value)}
+            onChange={(e) => setTaxRateDraft(e.target.value)}
             type="number"
             step="0.05"
             min="0"
@@ -439,7 +453,7 @@ function StoreSection() {
                 variant={taxRateInput === preset ? 'default' : 'outline'}
                 size="sm"
                 className="h-9 rounded-full px-3 text-[12px] font-bold touch-target"
-                onClick={() => setTaxRateInput(preset)}
+                onClick={() => setTaxRateDraft(preset)}
               >
                 {preset}%
               </Button>
@@ -451,11 +465,17 @@ function StoreSection() {
       <div className="sm:col-span-2 flex justify-end">
         <Button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             const parsed = parseFloat(taxRateInput)
             if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 100) {
               setStampAndTaxRate(parsed / 100)
-              void upsertKeyValue({ key: 'saleTaxAndStampRate', value: taxRateInput }).catch(() => {})
+              try {
+                await upsertKeyValue({ key: 'saleTaxAndStampRate', value: taxRateInput })
+                queryClient.invalidateQueries({ queryKey: ['server-tax-rate'] })
+                queryClient.invalidateQueries({ queryKey: ['settings-keyvalues'] })
+              } catch (err) {
+                console.warn('Failed to upsert saleTaxAndStampRate', err)
+              }
             }
             mutation.mutate(current)
           }}

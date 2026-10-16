@@ -28,7 +28,8 @@ import {
 
 import { useAuthStore } from '@/shared/stores/auth-store'
 import { useCurrencyStore } from '@/shared/stores/currency-store'
-import { getOverview } from '@/features/settings/api'
+import { useTaxStore, SALE_TAX_RATE_KEY } from '@/shared/stores/tax-store'
+import { getOverview, getKeyValues } from '@/features/settings/api'
 import { BranchSelector } from '@/shared/components/BranchSelector'
 import { ConnectionBadge } from '@/shared/components/ConnectionBadge'
 import { SidebarInstallButton } from '@/features/public-site/components/InstallAppButton'
@@ -337,6 +338,30 @@ export function AppLayout() {
     queryFn: getOverview,
     enabled: isOwner && hasBranch,
     retry: false,
+  })
+
+  const setStampAndTaxRate = useTaxStore((s) => s.setStampAndTaxRate)
+
+  // مزامنة نسبة الدمغة والضريبة من السيرفر لجميع الأجهزة تلقائياً
+  useQuery({
+    queryKey: ['server-tax-rate', branchId],
+    queryFn: async () => {
+      try {
+        const items = await getKeyValues()
+        const found = items.find((it) => it.key === SALE_TAX_RATE_KEY)
+        if (found && found.value != null && found.value.trim() !== '') {
+          const parsed = parseFloat(found.value)
+          if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+            setStampAndTaxRate(parsed / 100)
+          }
+        }
+        return items
+      } catch {
+        return null
+      }
+    },
+    enabled: hasBranch,
+    staleTime: 60 * 1000,
   })
 
   useEffect(() => {

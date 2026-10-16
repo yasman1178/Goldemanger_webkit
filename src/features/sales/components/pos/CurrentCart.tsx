@@ -1,6 +1,6 @@
 import { Minus, Plus, Trash2, ShoppingCart, Tag, Save, Scale } from 'lucide-react'
 
-import { TAX_AND_STAMP_RATE, cartLineMath } from '@/shared/lib/gold'
+import { cartLineMath } from '@/shared/lib/gold'
 import { cn, currencySymbol, formatNumber } from '@/shared/lib/utils'
 import { useCurrencyStore } from '@/shared/stores/currency-store'
 import { useTaxStore, formatTaxRatePercent } from '@/shared/stores/tax-store'

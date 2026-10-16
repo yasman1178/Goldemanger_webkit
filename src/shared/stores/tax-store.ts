@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 const STORAGE_KEY = 'goldmaster_sale_tax_rate'
+export const SALE_TAX_RATE_KEY = 'saleTaxAndStampRate'
 
 interface TaxState {
   /** نسبة الدمغة والضريبة (مثلاً 0.01 تعني 1%، و 0.015 تعني 1.5%) */
