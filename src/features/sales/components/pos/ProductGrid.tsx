@@ -45,7 +45,6 @@ import type { StorageLocation } from '@/shared/types/api'
 import type { CartLine } from './types'
 import { karatLabel } from './types'
 import { FormatEg } from './Money'
-import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
@@ -155,29 +154,41 @@ const typeBadgeClasses: Record<number, string> = {
   3: 'bg-amber-50 text-amber-800 border border-amber-300/80',
 }
 
+export function resolveProductImageUrl(raw?: string | null): string {
+  if (!raw || !raw.trim()) return ''
+  let trimmed = raw.trim().replace(/\\/g, '/')
+  if (
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://')
+  ) {
+    return trimmed
+  }
+  if (!trimmed.startsWith('/')) {
+    trimmed = `/${trimmed}`
+  }
+  return trimmed
+}
+
 export function getProductDisplayImages(product: Product | null): string[] {
   if (!product) return []
   const list: string[] = []
-  if (product.primaryImageUrl?.trim()) {
-    list.push(product.primaryImageUrl.trim())
-  }
-  if (Array.isArray(product.imageUrls)) {
-    for (const url of product.imageUrls) {
-      if (url?.trim() && !list.includes(url.trim())) {
-        list.push(url.trim())
-      }
+  const add = (url?: string | null) => {
+    const resolved = resolveProductImageUrl(url)
+    if (resolved && !list.includes(resolved)) {
+      list.push(resolved)
     }
+  }
+
+  add(product.primaryImageUrl)
+  if (Array.isArray(product.imageUrls)) {
+    for (const url of product.imageUrls) add(url)
   }
   if (Array.isArray(product.images)) {
-    for (const img of product.images) {
-      if (img?.imageUrl?.trim() && !list.includes(img.imageUrl.trim())) {
-        list.push(img.imageUrl.trim())
-      }
-    }
+    for (const img of product.images) add(img?.imageUrl)
   }
-  if (product.imageLink?.trim() && !list.includes(product.imageLink.trim())) {
-    list.push(product.imageLink.trim())
-  }
+  add(product.imageLink)
   return list
 }
 
@@ -261,7 +272,7 @@ export function ProductGrid({
     const q = query.trim().toLowerCase()
     return products.filter((p) => {
       if (!p.isActive || !p.productId || (p.quantity ?? 0) <= 0) return false
-      if (karatFilter !== 'all' && Math.round(p.karat) !== Number(karatFilter))
+      if (karatFilter !== 'all' && (p.karat == null || Math.round(p.karat) !== Number(karatFilter)))
         return false
       if (goldTypeFilter !== 'all' && String(p.typegolde) !== goldTypeFilter)
         return false
@@ -772,13 +783,13 @@ export function ProductGrid({
                     </span>
                   )}
 
-                  {/* حاوية الصورة مع تدرج مجوهرات دافئ */}
-                  <div className="relative aspect-square w-full overflow-hidden rounded-[12px] border border-black/5 bg-gradient-to-b from-amber-50/20 via-neutral-50 to-neutral-100 flex items-center justify-center">
+                  {/* حاوية الصورة مع تدرج مجوهرات دافئ تمنع اقتصاص القطعة */}
+                  <div className="relative aspect-square w-full overflow-hidden rounded-[12px] border border-black/5 bg-gradient-to-b from-amber-50/20 via-neutral-50 to-neutral-100 flex items-center justify-center p-1">
                     {displayImage ? (
                       <img
                         src={displayImage}
                         alt={product.productName}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
                       />
                     ) : (
@@ -1255,11 +1266,11 @@ function ProductQuickView({
             {/* حاوية الصورة الكاملة مع زر التكبير والألبومات المتعددة */}
             {currentImage ? (
               <div className="space-y-2">
-                <div className="relative flex max-h-[38vh] min-h-[220px] w-full items-center justify-center overflow-hidden rounded-2xl border border-black/8 bg-gradient-to-b from-neutral-50 via-slate-50 to-neutral-100 p-2 group shadow-2xs">
+                <div className="relative flex min-h-[260px] sm:min-h-[300px] max-h-[50vh] sm:max-h-[55vh] w-full items-center justify-center rounded-2xl border border-black/8 bg-gradient-to-b from-neutral-50 via-slate-50 to-neutral-100 p-3 group shadow-2xs">
                   <img
                     src={currentImage}
                     alt={product?.productName}
-                    className="max-h-[35vh] w-auto max-w-full object-contain drop-shadow-md select-none transition-transform duration-300 group-hover:scale-102 cursor-zoom-in"
+                    className="h-auto max-h-[46vh] sm:max-h-[50vh] w-auto max-w-full object-contain drop-shadow-md select-none transition-transform duration-200 group-hover:scale-[1.02] cursor-zoom-in"
                     onClick={() => setLightboxOpen(true)}
                   />
 
@@ -1267,7 +1278,7 @@ function ProductQuickView({
                   <button
                     type="button"
                     onClick={() => setLightboxOpen(true)}
-                    className="absolute end-3 bottom-3 flex items-center gap-1.5 rounded-full bg-white/95 backdrop-blur-md px-3 py-1.5 text-[11px] font-bold text-foreground shadow-md transition-all hover:bg-white hover:text-primary cursor-pointer border border-black/5"
+                    className="absolute end-3 bottom-3 flex items-center gap-1.5 rounded-full bg-white/95 backdrop-blur-md px-3 py-1.5 text-[11px] font-bold text-foreground shadow-md transition-all hover:bg-white hover:text-primary cursor-pointer border border-black/5 touch-target"
                     title="تكبير الصورة ملء الشاشة لمعاينة التفاصيل والدمغة"
                   >
                     <Maximize2 className="size-3.5 text-primary" />
