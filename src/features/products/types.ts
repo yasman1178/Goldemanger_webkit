@@ -38,6 +38,7 @@ export interface Product {
   notes: string
   branchId: number
   storageId: number | null
+  storageName?: string | null
   imageUrls: string[]
   primaryImageUrl: string | null
   images?: ProductImageRecord[]

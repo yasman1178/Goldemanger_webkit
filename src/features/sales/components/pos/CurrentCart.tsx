@@ -183,11 +183,18 @@ function CartItemRow({
   onChangeWeight: (key: number, delta: number) => void
   onRemove: (key: number) => void
 }) {
+  const effectiveMaking = useTaxStore
+    .getState()
+    .getEffectiveMakingFee(
+      line.product.karat,
+      line.product.factoryForSale || line.product.factory,
+    )
   const m = cartLineMath(
     goldPrice,
     line.product.karat,
     line.weight * line.quantity,
-    line.product.factoryForSale || line.product.factory,
+    effectiveMaking,
+    useTaxStore.getState().stampAndTaxRate,
   )
   const stock = line.product.quantity ?? 0
   const atStock = line.quantity >= stock

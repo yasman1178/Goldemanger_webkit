@@ -133,11 +133,34 @@ const typeBadgeClasses: Record<number, string> = {
   3: 'bg-black/5 text-warning',
 }
 
+export function getProductStorageName(
+  product: { storageId?: number | null; storageName?: string | null },
+  storages: StorageLocation[] = [],
+): string {
+  if (product.storageName && product.storageName.trim() !== '') {
+    return product.storageName.trim()
+  }
+  if (product.storageId != null) {
+    const sId = String(product.storageId)
+    const match = storages.find(
+      (s) => String(s.id) === sId || (s.branchId != null && String(s.branchId) === sId),
+    )
+    if (match?.name?.trim()) return match.name.trim()
+    if (match?.location?.trim()) return match.location.trim()
+  }
+  if (storages.length > 0 && storages[0]?.name?.trim()) {
+    return storages[0].name.trim()
+  }
+  return 'المخزن الرئيسي'
+}
+
 function salePriceFor(product: Product, goldPrice: number, taxRate = 0.01): number {
   const perGram = salePerGram(goldPrice, product.karat)
   const metal = perGram
   const taxAndStamp = metal * (taxRate >= 0 ? taxRate : 0.01)
-  const making = product.factoryForSale || product.factory
+  const making = useTaxStore
+    .getState()
+    .getEffectiveMakingFee(product.karat, product.factoryForSale || product.factory)
   return Math.round((metal + taxAndStamp + making) * product.weight)
 }
 
@@ -512,19 +535,19 @@ export function ProductGrid({
                         <Scale className="size-2.5 text-muted-foreground" />
                         {formatNumber(product.weight)} جم
                       </span>
-                      {/* شارة رقم واسم المخزن للقطعة */}
-                      <span
-                        className="inline-flex items-center gap-1 rounded-md bg-sky-50 border border-sky-300/80 px-1.5 py-0.5 text-[9.5px] font-bold text-sky-900 tabular-nums shadow-2xs"
-                        title={
-                          storages.find((s) => s.id === product.storageId)?.name ||
-                          (product.storageId != null ? `مخزن #${product.storageId}` : 'بدون مخزن')
-                        }
-                      >
-                        <MapPin className="size-2.5 text-sky-600 shrink-0" />
-                        <span>
-                          {product.storageId != null ? `مخزن #${product.storageId}` : 'بدون مخزن'}
-                        </span>
-                      </span>
+                      {/* شارة اسم المخزن الفعلي للقطعة */}
+                      {(() => {
+                        const sName = getProductStorageName(product, storages)
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md bg-sky-50 border border-sky-300/80 px-1.5 py-0.5 text-[9.5px] font-bold text-sky-900 tabular-nums shadow-2xs max-w-[130px]"
+                            title={sName}
+                          >
+                            <MapPin className="size-2.5 text-sky-600 shrink-0" />
+                            <span className="truncate">{sName}</span>
+                          </span>
+                        )
+                      })()}
                       {product.typegolde >= 1 && product.typegolde <= 3 && (
                         <span
                           className={cn(
@@ -596,6 +619,7 @@ export function ProductGrid({
       <ProductQuickView
         product={preview}
         goldPrice={goldPrice}
+        storages={storages}
         onClose={() => setPreview(null)}
         onAdd={(p) => {
           onAdd(p)
@@ -681,17 +705,27 @@ function CategoryDialog({
 function ProductQuickView({
   product,
   goldPrice,
+  storages = [],
   onClose,
   onAdd,
 }: {
   product: Product | null
   goldPrice: number
+  storages?: StorageLocation[]
   onClose: () => void
   onAdd: (p: Product) => void
 }) {
   const available = Boolean(
     product && product.isActive && product.quantity > 0 && product.productId != null,
   )
+
+  const effectiveMaking = product
+    ? useTaxStore
+        .getState()
+        .getEffectiveMakingFee(product.karat, product.factoryForSale || product.factory)
+    : 0
+
+  const storageName = product ? getProductStorageName(product, storages) : 'بدون مخزن'
 
   return (
     <Dialog open={Boolean(product)} onOpenChange={(o) => !o && onClose()}>
@@ -721,11 +755,11 @@ function ProductQuickView({
           <div className="grid grid-cols-2 gap-2.5">
             <QuickViewRow label="العيار" value={`${product?.karat ?? 0}k`} />
             <QuickViewRow label="الوزن" value={`${formatNumber(product?.weight ?? 0)} جم`} />
-            <QuickViewRow label="المصنعية" value={formatNumber(product?.factory ?? 0)} />
             <QuickViewRow
-              label="المخزن"
-              value={product?.storageId != null ? `مخزن #${product.storageId}` : 'بدون مخزن'}
+              label="المصنعية"
+              value={`${formatNumber(effectiveMaking)} ج.م/جم`}
             />
+            <QuickViewRow label="المخزن" value={storageName} />
             <QuickViewRow
               label="سعر البيع"
               value={

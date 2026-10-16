@@ -112,8 +112,8 @@ export function SalesPage() {
   })
 
   const { data: storages = [] } = useQuery<StorageLocation[]>({
-    queryKey: ['storages'],
-    queryFn: getStorages,
+    queryKey: ['storages', activeBranchId],
+    queryFn: () => getStorages(activeBranchId ?? undefined),
   })
 
   const { data: heldSales = [] } = useQuery({
@@ -178,6 +178,8 @@ export function SalesPage() {
     )
   }
 
+  const karatMakingFees = useTaxStore((s) => s.karatMakingFees)
+
   function removeLine(key: number) {
     setCart((prev) => prev.filter((l) => l.key !== key))
   }
@@ -185,11 +187,17 @@ export function SalesPage() {
   const totals: CartTotals = useMemo(() => {
     const acc = { grams: 0, metal: 0, margin: 0, making: 0, taxAndStamp: 0, gross: 0 }
     for (const l of cart) {
+      const effectiveMaking = useTaxStore
+        .getState()
+        .getEffectiveMakingFee(
+          l.product.karat,
+          l.product.factoryForSale || l.product.factory,
+        )
       const m = cartLineMath(
         effectiveGold,
         l.product.karat,
         l.weight * l.quantity,
-        l.product.factoryForSale || l.product.factory,
+        effectiveMaking,
         stampAndTaxRate,
       )
       acc.grams += m.grams
@@ -211,7 +219,7 @@ export function SalesPage() {
       discount: discountCap,
       total: Math.round(acc.gross - discountCap),
     }
-  }, [cart, effectiveGold, discount, stampAndTaxRate])
+  }, [cart, effectiveGold, discount, stampAndTaxRate, karatMakingFees])
 
   function grams21Of(list: CartLine[]): number {
     const total = list.reduce(

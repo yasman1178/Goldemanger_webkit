@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Boxes,
+  Eye,
   Layers,
   MapPin,
   Package,
@@ -25,6 +26,7 @@ import { getProducts } from '@/features/products/api'
 import type { Product } from '@/features/products/types'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { getStorages } from '@/shared/lib/parties'
+import { useTaxStore } from '@/shared/stores/tax-store'
 import { typeLabels } from '@/features/products/types'
 import { formatNumber, cn } from '@/shared/lib/utils'
 import { PAGE_SIZE, usePaginablePage } from '@/shared/lib/pagination'
@@ -270,6 +272,8 @@ export function InventoryPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [storageFilter, setStorageFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<InventoryUnitStatus | 'all'>('AVAILABLE')
+  const [viewMode, setViewMode] = useState<'grouped' | 'units'>('grouped')
+  const [groupedPage, setGroupedPage] = useState(1)
   const [selected, setSelected] = useState<Product | null>(null)
   const [printUnit, setPrintUnit] = useState<InventoryUnitRecord | null>(null)
   const [printInventory, setPrintInventory] = useState(false)
@@ -284,7 +288,7 @@ export function InventoryPage() {
 
   const { data: branchStorages = [] } = useQuery({
     queryKey: ['storages', activeBranchId],
-    queryFn: getStorages,
+    queryFn: () => getStorages(activeBranchId ?? undefined),
     select: (list) =>
       activeBranchId
         ? list.filter((s) => s.branchId === activeBranchId)
@@ -360,6 +364,13 @@ export function InventoryPage() {
       })
       .sort((a, b) => b.productId - a.productId)
   }, [availableProducts, query, categoryFilter, weightRange])
+
+  const paginatedGroupedProducts = useMemo(() => {
+    const start = (groupedPage - 1) * PAGE_SIZE
+    return filteredProducts.slice(start, start + PAGE_SIZE)
+  }, [filteredProducts, groupedPage])
+
+  const groupedPageCount = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE))
 
   const storages = useMemo(() => {
     const map = new Map<number, { id: number; name: string; location: string; branchId?: number }>()
@@ -598,10 +609,20 @@ export function InventoryPage() {
         'المخزن'
 
   const storageNameOf = useCallback(
-    (storageId: number | null) => {
-      if (storageId == null) return 'بدون مخزن'
-      const found = storages.find((s) => s.id === storageId)
-      return found?.name || found?.location || `مخزن #${storageId}`
+    (storageId: number | null, fallbackName?: string | null) => {
+      if (fallbackName && fallbackName.trim() !== '') return fallbackName.trim()
+      if (storageId != null) {
+        const sId = String(storageId)
+        const found = storages.find(
+          (s) => String(s.id) === sId || (s.branchId != null && String(s.branchId) === sId),
+        )
+        if (found?.name?.trim()) return found.name.trim()
+        if (found?.location?.trim()) return found.location.trim()
+      }
+      if (storages.length > 0 && storages[0]?.name?.trim()) {
+        return storages[0].name.trim()
+      }
+      return 'المخزن الرئيسي'
     },
     [storages],
   )
@@ -1085,160 +1106,366 @@ export function InventoryPage() {
 
       {/* رأس قسم جدول الجرد الموحد وأزرار التصفية والطباعة */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-        <div className="flex items-center gap-2">
-          <Package className="size-5 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">سجل جرد القطع المخزنية</h2>
-          <Badge variant="outline" className="font-bold tabular-nums">
-            {formatNumber(unitsPage?.totalCount ?? 0)} قطعة
-          </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* زر التبديل التفاعلي بين العرض المجمع لكل صنف وعرض القطع الفردية */}
+          <div className="flex items-center gap-1 rounded-full border border-black/10 bg-secondary/80 p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('grouped')}
+              className={cn(
+                'flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition-all cursor-pointer touch-target',
+                viewMode === 'grouped'
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Boxes className="size-4" />
+              <span>عرض مجمّع بالأصناف</span>
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.2 text-[10.5px] font-black tabular-nums',
+                  viewMode === 'grouped' ? 'bg-white/25 text-white' : 'bg-black/5 text-foreground',
+                )}
+              >
+                {formatNumber(filteredProducts.length)}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('units')}
+              className={cn(
+                'flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition-all cursor-pointer touch-target',
+                viewMode === 'units'
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Package className="size-4" />
+              <span>عرض القطع الفردية</span>
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.2 text-[10.5px] font-black tabular-nums',
+                  viewMode === 'units' ? 'bg-white/25 text-white' : 'bg-black/5 text-foreground',
+                )}
+              >
+                {formatNumber(unitsPage?.totalCount ?? 0)}
+              </span>
+            </button>
+          </div>
         </div>
+
         <div className="flex items-center gap-2">
-          <Select
-            value={statusFilter}
-            onValueChange={(v) => {
-              reset()
-              setStatusFilter(v as InventoryUnitStatus | 'all')
-            }}
-          >
-            <SelectTrigger className="w-36 h-10 rounded-full border-black/10 bg-white text-[12px] font-semibold">
-              <SelectValue placeholder="الحالة" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">كل الحالات</SelectItem>
-              {(Object.keys(inventoryUnitStatusLabels) as InventoryUnitStatus[]).map((s) => (
-                <SelectItem key={s} value={s}>
-                  {inventoryUnitStatusLabels[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {viewMode === 'units' && (
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => {
+                reset()
+                setStatusFilter(v as InventoryUnitStatus | 'all')
+              }}
+            >
+              <SelectTrigger className="w-36 h-10 rounded-full border-black/10 bg-white text-[12px] font-semibold">
+                <SelectValue placeholder="الحالة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">كل الحالات</SelectItem>
+                {(Object.keys(inventoryUnitStatusLabels) as InventoryUnitStatus[]).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {inventoryUnitStatusLabels[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button
             type="button"
             variant="outline"
             onClick={() => setPrintInventory(true)}
             disabled={filteredProducts.length === 0}
-            className="h-10 gap-2 rounded-full font-bold touch-target"
+            className="h-10 gap-2 rounded-full font-bold touch-target shadow-2xs"
           >
-            <Printer className="size-4" />
+            <Printer className="size-4 text-primary" />
             طباعة كشف الجرد
           </Button>
         </div>
       </div>
+
       <p className="text-[13px] text-muted-foreground">
-        {selectedStorageName} — {filterSummaryTitle} ({formatNumber(totals.pieces)} قطعة إجمالية متاحة، بوزن {formatNumber(totals.weight)} جم)
+        {selectedStorageName} — {filterSummaryTitle} ({formatNumber(totals.pieces)} قطعة إجمالية متاحة، بوزن {formatNumber(totals.weight)} جم، معادل 21: {formatNumber(totalGrams21All)} جم)
       </p>
 
-      {unitsLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <Skeleton className="h-12" />
-              </CardContent>
+      {/* 1. جدول العرض المجمع لكل صنف */}
+      {viewMode === 'grouped' ? (
+        isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <Skeleton className="h-12" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-20 text-center">
+            <Boxes className="size-12 text-muted-foreground" />
+            <p className="text-[17px] font-semibold text-foreground">
+              لا توجد أصناف مطابقة للبحث أو الفلتر
+            </p>
+            <p className="text-sm text-muted-foreground">
+              جرّب تغيير التصنيف أو المخزن أو تفريغ خيارات التصفية.
+            </p>
+          </div>
+        ) : (
+          <>
+            <Card className="overflow-hidden elevation-card">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-black/[0.03] text-[13px]">
+                    <TableHead>الصنف والمواصفات</TableHead>
+                    <TableHead className="text-center font-bold">عدد القطع</TableHead>
+                    <TableHead>المخزن</TableHead>
+                    <TableHead className="text-center">العيار</TableHead>
+                    <TableHead className="text-end">الوزن الفعلي</TableHead>
+                    <TableHead className="text-end text-amber-800 bg-amber-500/10 font-bold">معادل عيار 21</TableHead>
+                    <TableHead className="text-end font-bold">الأجرات (المصنعية)</TableHead>
+                    <TableHead className="text-center">الحالة</TableHead>
+                    <TableHead className="text-end">الإجراءات</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedGroupedProducts.map((p) => {
+                    const qty = p.quantity ?? 0
+                    const totalW = qty * (p.weight ?? 0)
+                    const g21 = totalW * ((p.karat || 21) / 21)
+                    const sName = storageNameOf(p.storageId, p.storageName)
+                    const makingPerGram = useTaxStore
+                      .getState()
+                      .getEffectiveMakingFee(p.karat, p.factoryForSale || p.factory)
+                    const totalMaking = makingPerGram * totalW
+                    return (
+                      <TableRow key={p.productId} className="hover:bg-black/[0.015]">
+                        <TableCell>
+                          <div
+                            className="min-w-0 cursor-pointer group"
+                            onClick={() => setSelected(p)}
+                            title="انقر لعرض تفاصيل الصنف"
+                          >
+                            <p className="truncate font-bold text-foreground group-hover:text-primary transition-colors text-[13.5px]">
+                              {p.productName}
+                            </p>
+                            {p.sku ? (
+                              <p className="text-[11px] font-mono text-muted-foreground">
+                                SKU: {p.sku}
+                              </p>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center rounded-md bg-neutral-100 px-2 py-0.5 text-[12px] font-extrabold tabular-nums text-foreground border border-black/5">
+                            {formatNumber(qty)} قطعة
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-800">
+                            <MapPin className="size-3 text-sky-600 shrink-0" />
+                            <span className="truncate max-w-[130px]">{sName}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center font-bold text-muted-foreground tabular-nums">
+                          {p.karat}k
+                        </TableCell>
+                        <TableCell className="text-end font-bold tabular-nums text-foreground">
+                          {formatNumber(totalW)} جم
+                        </TableCell>
+                        <TableCell className="text-end font-extrabold tabular-nums text-amber-700 bg-amber-500/5">
+                          {formatNumber(g21)} جم
+                        </TableCell>
+                        <TableCell className="text-end tabular-nums">
+                          <span className="font-bold text-foreground">
+                            {formatNumber(makingPerGram)} ج.م/جم
+                          </span>
+                          {totalW > 0 && makingPerGram > 0 && (
+                            <span className="block text-[10.5px] text-muted-foreground font-medium">
+                              إجمالي: {formatNumber(totalMaking)} ج.م
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <GoldTypeBadge typegolde={p.typegolde} />
+                        </TableCell>
+                        <TableCell className="text-end">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelected(p)}
+                              className="h-8 gap-1 rounded-lg text-[11px] font-bold touch-target"
+                            >
+                              <Eye className="size-3.5" />
+                              التفاصيل
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setQuery(p.productName)
+                                setViewMode('units')
+                              }}
+                              className="h-8 text-primary hover:bg-primary/10 rounded-lg text-[11px] font-bold touch-target"
+                            >
+                              عرض القطع
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </Card>
-          ))}
-        </div>
-      ) : isError ? (
-        <div className="flex items-center justify-center py-16 text-error">
-          تعذّر تحميل بيانات الجرد.
-        </div>
-      ) : displayedUnits.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-20 text-center">
-          <Package className="size-12 text-muted-foreground" />
-          <p className="text-[17px] font-semibold text-foreground">
-            لا توجد قطع مخزنية مطابقة
-          </p>
-          <p className="text-sm text-muted-foreground">
-            جرّب تعديل البحث أو الفلتر أو نطاق الوزن أو تفريغ خيارات التصفية.
-          </p>
-        </div>
+
+            <PaginationBar
+              page={groupedPage}
+              pageCount={groupedPageCount}
+              onChange={setGroupedPage}
+              totalCount={filteredProducts.length}
+            />
+          </>
+        )
       ) : (
-        <>
-          <Card className="overflow-hidden elevation-card">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-black/[0.03] text-[13px]">
-                  <TableHead>رقم القطعة / الباركود</TableHead>
-                  <TableHead>المنتج والمواصفات</TableHead>
-                  <TableHead>المخزن</TableHead>
-                  <TableHead className="text-end">الوزن الفعلي</TableHead>
-                  <TableHead className="text-end">العيار</TableHead>
-                  <TableHead className="text-end text-amber-800 bg-amber-500/10 font-bold">معادل عيار 21</TableHead>
-                  <TableHead className="text-center">الحالة</TableHead>
-                  <TableHead className="text-end">إجراءات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {displayedUnits.map((u) => {
-                  const g21 = (u.weight ?? 0) * ((u.karat || 21) / 21)
-                  const sName = storageNameOf(u.storageId)
-                  return (
-                    <TableRow key={u.inventoryUnitId} className="hover:bg-black/[0.015]">
-                      <TableCell>
-                        <span
-                          dir="ltr"
-                          className="font-mono font-bold text-foreground text-[13px]"
-                        >
-                          {u.inventoryNumber}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div
-                          className="min-w-0 cursor-pointer group"
-                          onClick={() => u.products && setSelected(u.products)}
-                          title={u.products ? 'انقر لعرض تفاصيل الصنف' : undefined}
-                        >
-                          <div className="flex items-center gap-1.5">
+        /* 2. جدول عرض القطع الفردية مع الباركود والمخزن */
+        unitsLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <Skeleton className="h-12" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : isError ? (
+          <div className="flex items-center justify-center py-16 text-error">
+            تعذّر تحميل بيانات الجرد.
+          </div>
+        ) : displayedUnits.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-black/10 bg-white py-20 text-center">
+            <Package className="size-12 text-muted-foreground" />
+            <p className="text-[17px] font-semibold text-foreground">
+              لا توجد قطع مخزنية مطابقة
+            </p>
+            <p className="text-sm text-muted-foreground">
+              جرّب تعديل البحث أو الفلتر أو نطاق الوزن أو تفريغ خيارات التصفية.
+            </p>
+          </div>
+        ) : (
+          <>
+            <Card className="overflow-hidden elevation-card">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-black/[0.03] text-[13px]">
+                    <TableHead>رقم القطعة / الباركود</TableHead>
+                    <TableHead>المنتج والمواصفات</TableHead>
+                    <TableHead>المخزن</TableHead>
+                    <TableHead className="text-center">العيار</TableHead>
+                    <TableHead className="text-end">الوزن الفعلي</TableHead>
+                    <TableHead className="text-end text-amber-800 bg-amber-500/10 font-bold">معادل عيار 21</TableHead>
+                    <TableHead className="text-end font-bold">الأجرات (المصنعية)</TableHead>
+                    <TableHead className="text-center">الحالة</TableHead>
+                    <TableHead className="text-end">إجراءات</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {displayedUnits.map((u) => {
+                    const g21 = (u.weight ?? 0) * ((u.karat || 21) / 21)
+                    const sName = storageNameOf(u.storageId, u.products?.storageName)
+                    const makingPerGram = useTaxStore
+                      .getState()
+                      .getEffectiveMakingFee(
+                        u.karat || 21,
+                        u.products?.factoryForSale || u.products?.factory || 0,
+                      )
+                    const totalMaking = makingPerGram * (u.weight ?? 0)
+                    return (
+                      <TableRow key={u.inventoryUnitId} className="hover:bg-black/[0.015]">
+                        <TableCell>
+                          <span
+                            dir="ltr"
+                            className="font-mono font-bold text-foreground text-[13px]"
+                          >
+                            {u.inventoryNumber}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div
+                            className="min-w-0 cursor-pointer group"
+                            onClick={() => u.products && setSelected(u.products)}
+                            title={u.products ? 'انقر لعرض تفاصيل الصنف' : undefined}
+                          >
                             <p className="truncate font-bold text-foreground group-hover:text-primary transition-colors">
                               {u.products?.productName ?? `منتج #${u.productId}`}
                             </p>
-                            <RenewedBadge typegolde={u.products?.typegolde} />
+                            {u.products?.sku ? (
+                              <p className="text-[11px] font-mono text-muted-foreground">
+                                SKU: {u.products.sku}
+                              </p>
+                            ) : null}
                           </div>
-                          {u.products?.sku ? (
-                            <p className="text-[11px] font-mono text-muted-foreground">
-                              SKU: {u.products.sku}
-                            </p>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-800">
-                          <MapPin className="size-3 text-sky-600" />
-                          {u.storageId != null ? `مخزن #${u.storageId} · ${sName}` : 'بدون مخزن'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-end font-bold tabular-nums text-foreground">
-                        {formatNumber(u.weight)} جم
-                      </TableCell>
-                      <TableCell className="text-end font-semibold text-muted-foreground">
-                        {u.karat}k
-                      </TableCell>
-                      <TableCell className="text-end font-extrabold tabular-nums text-amber-700 bg-amber-500/5">
-                        {formatNumber(g21)} جم
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <StatusBadge status={u.status} />
-                      </TableCell>
-                      <TableCell className="text-end">
-                        <InventoryUnitActions
-                          unit={u}
-                          onPrint={setPrintUnit}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </Card>
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-800">
+                            <MapPin className="size-3 text-sky-600 shrink-0" />
+                            <span className="truncate max-w-[130px]">{sName}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center font-semibold text-muted-foreground tabular-nums">
+                          {u.karat}k
+                        </TableCell>
+                        <TableCell className="text-end font-bold tabular-nums text-foreground">
+                          {formatNumber(u.weight)} جم
+                        </TableCell>
+                        <TableCell className="text-end font-extrabold tabular-nums text-amber-700 bg-amber-500/5">
+                          {formatNumber(g21)} جم
+                        </TableCell>
+                        <TableCell className="text-end tabular-nums">
+                          <span className="font-bold text-foreground">
+                            {formatNumber(makingPerGram)} ج.م/جم
+                          </span>
+                          {makingPerGram > 0 && (
+                            <span className="block text-[10.5px] text-muted-foreground font-medium">
+                              {formatNumber(totalMaking)} ج.م
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <GoldTypeBadge typegolde={u.products?.typegolde} />
+                            <StatusBadge status={u.status} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-end">
+                          <InventoryUnitActions
+                            unit={u}
+                            onPrint={setPrintUnit}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </Card>
 
-          <PaginationBar
-            page={safePage}
-            pageCount={pageCount}
-            onChange={goToPage}
-            totalCount={unitsPage?.totalCount ?? 0}
-          />
-        </>
+            <PaginationBar
+              page={safePage}
+              pageCount={pageCount}
+              onChange={goToPage}
+              totalCount={unitsPage?.totalCount ?? 0}
+            />
+          </>
+        )
       )}
 
       <WeightFilterDialog
@@ -1267,12 +1494,32 @@ export function InventoryPage() {
   )
 }
 
-function RenewedBadge({ typegolde }: { typegolde?: number }) {
-  if (typegolde !== 2) return null
+function GoldTypeBadge({ typegolde }: { typegolde?: number }) {
+  if (typegolde === 2) {
+    return (
+      <span className="inline-flex items-center rounded-md bg-sky-50 border border-sky-300 px-2 py-0.5 text-[10.5px] font-bold text-sky-800">
+        مجدّد
+      </span>
+    )
+  }
+  if (typegolde === 3) {
+    return (
+      <span className="inline-flex items-center rounded-md bg-amber-50 border border-amber-300 px-2 py-0.5 text-[10.5px] font-bold text-amber-800">
+        كسر
+      </span>
+    )
+  }
+  if (typegolde === 4) {
+    return (
+      <span className="inline-flex items-center rounded-md bg-slate-100 border border-slate-300 px-2 py-0.5 text-[10.5px] font-bold text-slate-800">
+        فضة
+      </span>
+    )
+  }
   return (
-    <Badge className="h-5 shrink-0 bg-black/5 px-1.5 text-[10px] text-primary">
-      مجدّد
-    </Badge>
+    <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-300 px-2 py-0.5 text-[10.5px] font-bold text-emerald-800">
+      جديد
+    </span>
   )
 }
 

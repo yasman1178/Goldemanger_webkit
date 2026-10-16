@@ -19,9 +19,12 @@ export async function getSuppliers(): Promise<SupplierCustomer[]> {
   return data
 }
 
-export async function getStorages(): Promise<StorageLocation[]> {
+export async function getStorages(branchId?: number): Promise<StorageLocation[]> {
   const { data } = await api.get<StorageLocation[]>(
     '/api/Storage/GetStoragesByBranch',
+    {
+      params: branchId ? { branchId } : undefined,
+    },
   )
   return data
 }

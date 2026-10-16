@@ -28,7 +28,12 @@ import {
 
 import { useAuthStore } from '@/shared/stores/auth-store'
 import { useCurrencyStore } from '@/shared/stores/currency-store'
-import { useTaxStore, SALE_TAX_RATE_KEY } from '@/shared/stores/tax-store'
+import {
+  useTaxStore,
+  SALE_TAX_RATE_KEY,
+  KARAT_MAKING_KEYS,
+  type KaratMakingFees,
+} from '@/shared/stores/tax-store'
 import { getOverview, getKeyValues } from '@/features/settings/api'
 import { BranchSelector } from '@/shared/components/BranchSelector'
 import { ConnectionBadge } from '@/shared/components/ConnectionBadge'
@@ -341,8 +346,9 @@ export function AppLayout() {
   })
 
   const setStampAndTaxRate = useTaxStore((s) => s.setStampAndTaxRate)
+  const setKaratMakingFees = useTaxStore((s) => s.setKaratMakingFees)
 
-  // مزامنة نسبة الدمغة والضريبة من السيرفر لجميع الأجهزة تلقائياً
+  // مزامنة نسبة الدمغة والضريبة ومصنعيات العيارات من السيرفر لجميع الأجهزة تلقائياً
   useQuery({
     queryKey: ['server-tax-rate', branchId],
     queryFn: async () => {
@@ -355,6 +361,19 @@ export function AppLayout() {
             setStampAndTaxRate(parsed / 100)
           }
         }
+
+        const fee14 = items.find((it) => it.key === KARAT_MAKING_KEYS[14])?.value
+        const fee18 = items.find((it) => it.key === KARAT_MAKING_KEYS[18])?.value
+        const fee21 = items.find((it) => it.key === KARAT_MAKING_KEYS[21])?.value
+        const fee24 = items.find((it) => it.key === KARAT_MAKING_KEYS[24])?.value
+
+        const parsedFees: Partial<KaratMakingFees> = {}
+        if (fee14 != null && fee14.trim() !== '') parsedFees[14] = parseFloat(fee14) || 0
+        if (fee18 != null && fee18.trim() !== '') parsedFees[18] = parseFloat(fee18) || 0
+        if (fee21 != null && fee21.trim() !== '') parsedFees[21] = parseFloat(fee21) || 0
+        if (fee24 != null && fee24.trim() !== '') parsedFees[24] = parseFloat(fee24) || 0
+        setKaratMakingFees(parsedFees)
+
         return items
       } catch {
         return null

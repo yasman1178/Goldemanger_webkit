@@ -56,7 +56,10 @@ export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Pr
   }, 0)
   const makingSubtotal = items.reduce((sum, i) => {
     const grams = (i.weight ?? 0) * (i.quantity ?? 0)
-    return sum + (i.factory ?? 0) * grams
+    const effectiveFee = useTaxStore
+      .getState()
+      .getEffectiveMakingFee(i.karat ?? 21, i.factory ?? 0)
+    return sum + effectiveFee * grams
   }, 0)
   const taxSubtotal = goldSubtotal * effectiveTaxRate
   const rounded = Math.round(data.totalAmount ?? 0)
@@ -116,7 +119,9 @@ export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Pr
           items.map((i, idx) => {
             const grams = (i.weight ?? 0) * (i.quantity ?? 0)
             const goldUnit = purchasePerGram(gold21, i.karat ?? 21)
-            const makingUnit = i.factory ?? 0
+            const makingUnit = useTaxStore
+              .getState()
+              .getEffectiveMakingFee(i.karat ?? 21, i.factory ?? 0)
             const makingPiece = makingUnit * grams
             const taxPiece = goldUnit * grams * effectiveTaxRate
             const lineTotal = (goldUnit + makingUnit) * grams

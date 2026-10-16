@@ -23,6 +23,11 @@ import {
 } from 'lucide-react'
 
 import { useAuthStore } from '@/shared/stores/auth-store'
+import {
+  useTaxStore,
+  SALE_TAX_RATE_KEY,
+  KARAT_MAKING_KEYS,
+} from '@/shared/stores/tax-store'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { invalidateShopData } from '@/shared/lib/invalidateShop'
 import { depositCash, withdrawCash } from '@/features/cash/api'
@@ -349,7 +354,8 @@ export function SettingsPage() {
           <TabsContent value="employees" className="m-0 focus-visible:outline-hidden">
             <EmployeesSection />
           </TabsContent>
-          <TabsContent value="settings" className="m-0 focus-visible:outline-hidden">
+          <TabsContent value="settings" className="m-0 focus-visible:outline-hidden space-y-6">
+            <BranchPricingAndTaxCard />
             <KeyValuesSection />
           </TabsContent>
           <TabsContent value="onboarding" className="m-0 focus-visible:outline-hidden">
@@ -683,6 +689,9 @@ function BranchesSection() {
           </div>
         </div>
       </div>
+
+      {/* كارت إعدادات الضريبة ومصنعيات العيارات في البيع */}
+      <BranchPricingAndTaxCard />
 
       {/* Branches Network Section */}
       <div className="rounded-[20px] border border-black/5 bg-white p-5 shadow-xs sm:p-6 space-y-4">
@@ -1421,6 +1430,272 @@ function EmployeeDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function BranchPricingAndTaxCard() {
+  const queryClient = useQueryClient()
+  const { data: keyValues, isLoading } = useQuery({
+    queryKey: ['settings-keyvalues'],
+    queryFn: getKeyValues,
+  })
+
+  const stampAndTaxRate = useTaxStore((s) => s.stampAndTaxRate)
+  const setStampAndTaxRate = useTaxStore((s) => s.setStampAndTaxRate)
+  const karatMakingFees = useTaxStore((s) => s.karatMakingFees)
+  const setKaratMakingFees = useTaxStore((s) => s.setKaratMakingFees)
+
+  // قراءة القيم المسجلة من السيرفر كأولوية
+  const serverTaxRate = useMemo(() => {
+    if (!Array.isArray(keyValues)) return null
+    const found = keyValues.find((it) => it.key === SALE_TAX_RATE_KEY)
+    return found?.value != null && found.value.trim() !== '' ? found.value : null
+  }, [keyValues])
+
+  const serverFee14 = useMemo(() => {
+    if (!Array.isArray(keyValues)) return null
+    return keyValues.find((it) => it.key === KARAT_MAKING_KEYS[14])?.value ?? null
+  }, [keyValues])
+  const serverFee18 = useMemo(() => {
+    if (!Array.isArray(keyValues)) return null
+    return keyValues.find((it) => it.key === KARAT_MAKING_KEYS[18])?.value ?? null
+  }, [keyValues])
+  const serverFee21 = useMemo(() => {
+    if (!Array.isArray(keyValues)) return null
+    return keyValues.find((it) => it.key === KARAT_MAKING_KEYS[21])?.value ?? null
+  }, [keyValues])
+  const serverFee24 = useMemo(() => {
+    if (!Array.isArray(keyValues)) return null
+    return keyValues.find((it) => it.key === KARAT_MAKING_KEYS[24])?.value ?? null
+  }, [keyValues])
+
+  const [taxRateDraft, setTaxRateDraft] = useState<string | null>(null)
+  const [fee14Draft, setFee14Draft] = useState<string | null>(null)
+  const [fee18Draft, setFee18Draft] = useState<string | null>(null)
+  const [fee21Draft, setFee21Draft] = useState<string | null>(null)
+  const [fee24Draft, setFee24Draft] = useState<string | null>(null)
+
+  const taxInput = taxRateDraft ?? serverTaxRate ?? (stampAndTaxRate * 100).toString()
+  const fee14Input = fee14Draft ?? serverFee14 ?? (karatMakingFees[14] || 0).toString()
+  const fee18Input = fee18Draft ?? serverFee18 ?? (karatMakingFees[18] || 0).toString()
+  const fee21Input = fee21Draft ?? serverFee21 ?? (karatMakingFees[21] || 0).toString()
+  const fee24Input = fee24Draft ?? serverFee24 ?? (karatMakingFees[24] || 0).toString()
+
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const parsedTax = Math.max(0, Math.min(100, parseFloat(taxInput) || 0))
+      const f14 = Math.max(0, parseFloat(fee14Input) || 0)
+      const f18 = Math.max(0, parseFloat(fee18Input) || 0)
+      const f21 = Math.max(0, parseFloat(fee21Input) || 0)
+      const f24 = Math.max(0, parseFloat(fee24Input) || 0)
+
+      // حفظ القيم في السيرفر لجميع الأجهزة والتابلت
+      await Promise.all([
+        upsertKeyValue({ key: SALE_TAX_RATE_KEY, value: parsedTax.toString() }),
+        upsertKeyValue({ key: KARAT_MAKING_KEYS[14], value: f14.toString() }),
+        upsertKeyValue({ key: KARAT_MAKING_KEYS[18], value: f18.toString() }),
+        upsertKeyValue({ key: KARAT_MAKING_KEYS[21], value: f21.toString() }),
+        upsertKeyValue({ key: KARAT_MAKING_KEYS[24], value: f24.toString() }),
+      ])
+
+      // تحديث المتجر المحلي فوراً
+      setStampAndTaxRate(parsedTax / 100)
+      setKaratMakingFees({ 14: f14, 18: f18, 21: f21, 24: f24 })
+
+      toast.success('تم حفظ وتطبيق نسبة الضريبة ومصنعيات العيارات في البيع بنجاح!')
+      queryClient.invalidateQueries({ queryKey: ['settings-keyvalues'] })
+      queryClient.invalidateQueries({ queryKey: ['server-tax-rate'] })
+    } catch {
+      toast.error('تعذّر حفظ الإعدادات، يرجى المحاولة ثانية')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card className="w-full max-w-4xl elevation-card border-black/5 bg-white mb-6">
+      <CardHeader className="border-b border-black/5 bg-amber-500/[0.04]">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-9 items-center justify-center rounded-[12px] bg-amber-500/15 text-amber-700">
+              <Banknote className="size-5" />
+            </div>
+            <div>
+              <CardTitle className="text-[16px] font-bold text-foreground">
+                إعدادات الضريبة والدمغة ومصنعيات العيارات في البيع
+              </CardTitle>
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                تحديد نسبة الدمغة والضريبة ومصنعية الجرام لكل عيار وتطبيقها إلزامياً في فواتير ونقاط البيع
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full bg-amber-100 border border-amber-300/80 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+            تطبيق إلزامي في الـ POS
+          </span>
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-5 sm:p-6 space-y-6">
+        {isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </div>
+        ) : (
+          <>
+            {/* 1. نسبة الدمغة والضريبة */}
+            <div className="rounded-2xl border border-amber-300/60 bg-amber-50/50 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <Label className="text-[14px] font-bold text-foreground">
+                    نسبة الدمغة والضريبة على فاتورة البيع (%)
+                  </Label>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
+                    النسبة المئوية التي تُحتسب على قيمة الذهب في فواتير البيع (الافتراضي 1%، أو 1.5% أو 2%).
+                  </p>
+                </div>
+                <span className="rounded-full bg-amber-100 border border-amber-300 px-3 py-1 text-[13px] font-black text-amber-900 tabular-nums">
+                  النسبة: {taxInput || '1'}%
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  value={taxInput}
+                  onChange={(e) => setTaxRateDraft(e.target.value)}
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  max="100"
+                  className="h-11 w-32 rounded-[14px] bg-white text-center font-bold tabular-nums text-foreground touch-target"
+                  placeholder="1.0"
+                />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {['0', '0.5', '1', '1.25', '1.5', '2'].map((preset) => (
+                    <Button
+                      key={preset}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTaxRateDraft(preset)}
+                      className={cn(
+                        'h-9 rounded-full text-[12px] font-bold tabular-nums touch-target',
+                        taxInput === preset && 'bg-primary text-white border-primary shadow-xs',
+                      )}
+                    >
+                      {preset}%
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. مصنعيات العيارات الافتراضية */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-[14px] font-bold text-foreground">
+                    أسعار المصنعية للعيارات في البيع (ج.م / جرام)
+                  </Label>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
+                    تُطبق هذه المصنعية إلزامياً على المشغولات حسب العيار عند البيع وفي كروت المعروضات
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border border-black/8 bg-secondary/30 p-3 space-y-1.5">
+                  <span className="text-[12px] font-bold text-foreground">مصنعية عيار 14</span>
+                  <div className="relative">
+                    <Input
+                      value={fee14Input}
+                      onChange={(e) => setFee14Draft(e.target.value)}
+                      type="number"
+                      min="0"
+                      step="5"
+                      className="h-10 pe-9 bg-white text-center font-bold tabular-nums touch-target"
+                      placeholder="0"
+                    />
+                    <span className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold">
+                      ج.م
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-black/8 bg-secondary/30 p-3 space-y-1.5">
+                  <span className="text-[12px] font-bold text-foreground">مصنعية عيار 18</span>
+                  <div className="relative">
+                    <Input
+                      value={fee18Input}
+                      onChange={(e) => setFee18Draft(e.target.value)}
+                      type="number"
+                      min="0"
+                      step="5"
+                      className="h-10 pe-9 bg-white text-center font-bold tabular-nums touch-target"
+                      placeholder="0"
+                    />
+                    <span className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold">
+                      ج.م
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-black/8 bg-secondary/30 p-3 space-y-1.5 ring-1 ring-amber-400/40">
+                  <span className="text-[12px] font-black text-amber-900">مصنعية عيار 21</span>
+                  <div className="relative">
+                    <Input
+                      value={fee21Input}
+                      onChange={(e) => setFee21Draft(e.target.value)}
+                      type="number"
+                      min="0"
+                      step="5"
+                      className="h-10 pe-9 bg-white text-center font-bold tabular-nums touch-target border-amber-300"
+                      placeholder="0"
+                    />
+                    <span className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[10px] text-amber-800 font-bold">
+                      ج.م
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-black/8 bg-secondary/30 p-3 space-y-1.5">
+                  <span className="text-[12px] font-bold text-foreground">مصنعية عيار 24</span>
+                  <div className="relative">
+                    <Input
+                      value={fee24Input}
+                      onChange={(e) => setFee24Draft(e.target.value)}
+                      type="number"
+                      min="0"
+                      step="5"
+                      className="h-10 pe-9 bg-white text-center font-bold tabular-nums touch-target"
+                      placeholder="0"
+                    />
+                    <span className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold">
+                      ج.م
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* زر الحفظ والتطبيق */}
+            <div className="pt-2 flex justify-end">
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="h-11 px-8 rounded-full font-bold bg-primary hover:bg-primary/90 text-white gap-2 touch-target shadow-xs"
+              >
+                {saving ? 'جارٍ الحفظ...' : 'حفظ وتطبيق فوراً على فواتير البيع'}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
