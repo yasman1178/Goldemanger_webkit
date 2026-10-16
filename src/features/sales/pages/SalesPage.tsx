@@ -187,12 +187,10 @@ export function SalesPage() {
   const totals: CartTotals = useMemo(() => {
     const acc = { grams: 0, metal: 0, margin: 0, making: 0, taxAndStamp: 0, gross: 0 }
     for (const l of cart) {
-      const effectiveMaking = useTaxStore
-        .getState()
-        .getEffectiveMakingFee(
-          l.product.karat,
-          l.product.factoryForSale || l.product.factory,
-        )
+      const k = Math.round(l.product.karat) as 14 | 18 | 21 | 24
+      const branchFee = karatMakingFees[k]
+      const fallbackFee = l.product.factoryForSale || l.product.factory || 0
+      const effectiveMaking = branchFee && branchFee > 0 ? branchFee : fallbackFee
       const m = cartLineMath(
         effectiveGold,
         l.product.karat,

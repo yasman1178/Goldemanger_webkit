@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Banknote, Eye, Plus, Minus, ReceiptText } from 'lucide-react'
+import { Banknote, Eye, Plus, Minus, ReceiptText, FileSpreadsheet } from 'lucide-react'
 import { useAuthStore } from '@/shared/stores/auth-store'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
+import { CashDayStatementDialog } from '@/features/cash/components/CashDayStatementDialog'
 import {
   depositCash,
   withdrawCash,
@@ -101,6 +102,7 @@ export function CashPage() {
   const [filterDate, setFilterDate] = useState('')
   const [filterType, setFilterType] = useState('all')
   const [page, setPage] = useState(1)
+  const [statementOpen, setStatementOpen] = useState(false)
 
   const { data: overview } = useQuery({
     queryKey: ['overview'],
@@ -183,11 +185,21 @@ export function CashPage() {
 
   return (
     <div className="space-y-6 pb-20">
-      <div>
-        <h1 className="text-[34px] font-bold leading-[1.2] text-foreground">
-          الخزينة
-        </h1>
-        <p className="text-muted-foreground">حركات الخزينة والرصيد الحالي</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-[34px] font-bold leading-[1.2] text-foreground">
+            الخزينة
+          </h1>
+          <p className="text-muted-foreground">حركات الخزينة والرصيد الحالي</p>
+        </div>
+        <Button
+          type="button"
+          onClick={() => setStatementOpen(true)}
+          className="h-11 gap-2 rounded-full px-5 text-[13px] font-bold shadow-xs touch-target"
+        >
+          <FileSpreadsheet className="size-4" />
+          كشف حركة الخزينة اليومي
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
@@ -420,6 +432,12 @@ export function CashPage() {
         }
         branches={branches}
         defaultBranchId={activeBranchId}
+      />
+
+      <CashDayStatementDialog
+        open={statementOpen}
+        onClose={() => setStatementOpen(false)}
+        date={filterDate}
       />
     </div>
   )

@@ -31,10 +31,6 @@ interface Props {
 }
 
 export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Props) {
-  const effectiveTaxRate = taxRate != null && taxRate >= 0
-    ? taxRate
-    : useTaxStore.getState().stampAndTaxRate ?? TAX_AND_STAMP_RATE
-
   const shopName = shop?.name?.trim() || 'محل الذهب'
   const address = [
     shop?.location?.trim(),
@@ -44,25 +40,56 @@ export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Pr
     .join('، ')
 
   const items = data.saleItems ?? []
+  const isHistorical = Boolean(data.saleId && data.saleId > 0)
   const gold21 = data.gold21Price ?? 0
   const pieceCount = items.reduce((sum, i) => sum + (i.quantity ?? 0), 0)
   const totalWeight = items.reduce(
     (sum, i) => sum + (i.weight ?? 0) * (i.quantity ?? 0),
     0,
   )
+
   const goldSubtotal = items.reduce((sum, i) => {
     const grams = (i.weight ?? 0) * (i.quantity ?? 0)
     return sum + purchasePerGram(gold21, i.karat ?? 21) * grams
   }, 0)
-  const makingSubtotal = items.reduce((sum, i) => {
-    const grams = (i.weight ?? 0) * (i.quantity ?? 0)
-    const effectiveFee = useTaxStore
+
+  const getItemMakingUnit = (i: { karat?: number; factory?: number }) => {
+    // في الفواتير المحفوظة بالسيرفر: نعتمد حصراً المصنعية المسجلة تاريخياً بالقطعة (i.factory)
+    // لمنع تغيير قيم وسند الفاتورة القانوني عند تغيير إعدادات مصنعية الفرع لاحقاً.
+    if (isHistorical) {
+      return i.factory ?? 0
+    }
+    return useTaxStore
       .getState()
       .getEffectiveMakingFee(i.karat ?? 21, i.factory ?? 0)
-    return sum + effectiveFee * grams
+  }
+
+  const makingSubtotal = items.reduce((sum, i) => {
+    const grams = (i.weight ?? 0) * (i.quantity ?? 0)
+    return sum + getItemMakingUnit(i) * grams
   }, 0)
-  const taxSubtotal = goldSubtotal * effectiveTaxRate
+
   const rounded = Math.round(data.totalAmount ?? 0)
+  const discount = data.discount ?? 0
+  const grossBeforeTax = goldSubtotal + makingSubtotal - discount
+
+  // حساب قيمة الضريبة والدمغة المحفوظة بالفاتورة تاريخياً
+  const calculatedTaxFromTotal = Math.max(0, rounded - Math.round(grossBeforeTax))
+  const fallbackTaxRate =
+    taxRate != null && taxRate >= 0
+      ? taxRate
+      : useTaxStore.getState().stampAndTaxRate ?? TAX_AND_STAMP_RATE
+
+  const effectiveTaxRate =
+    isHistorical && goldSubtotal > 0 && calculatedTaxFromTotal > 0
+      ? calculatedTaxFromTotal / goldSubtotal
+      : fallbackTaxRate
+
+  const taxSubtotal =
+    isHistorical && calculatedTaxFromTotal > 0
+      ? calculatedTaxFromTotal
+      : goldSubtotal * effectiveTaxRate
+
   const paid = Math.round(data.paid ?? 0)
   const remaining = Math.round(data.amountOwed ?? 0)
 
@@ -119,9 +146,7 @@ export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Pr
           items.map((i, idx) => {
             const grams = (i.weight ?? 0) * (i.quantity ?? 0)
             const goldUnit = purchasePerGram(gold21, i.karat ?? 21)
-            const makingUnit = useTaxStore
-              .getState()
-              .getEffectiveMakingFee(i.karat ?? 21, i.factory ?? 0)
+            const makingUnit = getItemMakingUnit(i)
             const makingPiece = makingUnit * grams
             const taxPiece = goldUnit * grams * effectiveTaxRate
             const lineTotal = (goldUnit + makingUnit) * grams
