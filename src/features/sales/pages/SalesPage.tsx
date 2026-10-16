@@ -136,16 +136,17 @@ export function SalesPage() {
   function addToCart(product: Product) {
     setCart((prev) => {
       const stock = product.quantity ?? 0
-      if (stock <= 0) return prev
+      if (stock <= 0) {
+        toast.error(`القطعة "${product.productName}" غير متوفرة في المخزن`)
+        return prev
+      }
       const existing = prev.find((l) => l.product.productId === product.productId)
       if (existing) {
-        if (existing.quantity >= stock) return prev
-        return prev.map((l) =>
-          l.product.productId === product.productId
-            ? { ...l, quantity: l.quantity + 1 }
-            : l,
-        )
+        // عند الضغط على منتج محدد بالفعل يتم إلغاء التحديد وحذفه من السلة فوراً
+        toast.info(`تم إلغاء تحديد "${product.productName}" وحذفها من الفاتورة`)
+        return prev.filter((l) => l.product.productId !== product.productId)
       }
+      toast.success(`تمت إضافة "${product.productName}" إلى الفاتورة`)
       return [
         ...prev,
         { key: nextKey.current++, product, quantity: 1, weight: product.weight },

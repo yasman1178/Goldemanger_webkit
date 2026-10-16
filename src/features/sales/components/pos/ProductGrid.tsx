@@ -19,10 +19,22 @@ import {
   ChevronDown,
   Clock,
   Sparkles,
-  RefreshCw,
-  Recycle,
   MapPin,
+  Check,
+  SlidersHorizontal,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Maximize2,
 } from 'lucide-react'
+
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/shared/components/ui/dropdown-menu'
 
 import type { Product } from '@/features/products/types'
 import { typeLabels } from '@/features/products/types'
@@ -37,6 +49,7 @@ import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -49,26 +62,35 @@ import {
   type WeightRange,
 } from '@/shared/components/WeightFilterDialog'
 
-const categories = [
-  { key: 'all', label: 'الكل', icon: LayoutGrid },
+export const categories = [
+  { key: 'all', label: 'كل التصنيفات', icon: LayoutGrid },
   { key: 'ring', label: 'خواتم ودبل', icon: Gem },
   { key: 'twin', label: 'توينز ومحابس', icon: Sparkles },
   { key: 'chain', label: 'سلاسل وعقود', icon: Link2 },
   { key: 'pendant', label: 'دلايات', icon: Gem },
   { key: 'bracelet', label: 'أساور وغوايش', icon: CircleDashed },
-  { key: 'earring', label: 'حلق', icon: Ear },
+  { key: 'earring', label: 'حلقان', icon: Ear },
   { key: 'set', label: 'أطقم', icon: Layers },
   { key: 'bar', label: 'سبائك وجنيهات', icon: Package },
-  { key: 'new', label: 'جديد', icon: Sparkles },
-  { key: 'renewed', label: 'مجدّد', icon: RefreshCw },
-  { key: 'break', label: 'كسر', icon: Recycle },
 ]
 
-function matchCategory(product: Product, key: string): boolean {
+export const goldConditions = [
+  { key: 'all', label: 'كل الحالات' },
+  { key: '1', label: 'جديد' },
+  { key: '2', label: 'مجدّد' },
+  { key: '3', label: 'كسر' },
+] as const
+
+export const karatOptions = [
+  { key: 'all', label: 'كل العيارات' },
+  { key: '24', label: 'عيار 24' },
+  { key: '21', label: 'عيار 21' },
+  { key: '18', label: 'عيار 18' },
+  { key: '14', label: 'عيار 14' },
+] as const
+
+export function matchCategory(product: Product, key: string): boolean {
   if (key === 'all') return true
-  if (key === 'new') return product.typegolde === 1
-  if (key === 'renewed') return product.typegolde === 2
-  if (key === 'break') return product.typegolde === 3
   const name = `${product.productName} ${product.productType ?? ''}`.toLowerCase()
   const map: Record<string, string[]> = {
     ring: ['خاتم', 'دبلة', 'دبله', 'ring', 'band'],
@@ -128,9 +150,35 @@ function matchCategory(product: Product, key: string): boolean {
 }
 
 const typeBadgeClasses: Record<number, string> = {
-  1: 'bg-black/5 text-success',
-  2: 'bg-black/5 text-primary',
-  3: 'bg-black/5 text-warning',
+  1: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
+  2: 'bg-primary/10 text-primary border border-primary/20',
+  3: 'bg-amber-50 text-amber-800 border border-amber-300/80',
+}
+
+export function getProductDisplayImages(product: Product | null): string[] {
+  if (!product) return []
+  const list: string[] = []
+  if (product.primaryImageUrl?.trim()) {
+    list.push(product.primaryImageUrl.trim())
+  }
+  if (Array.isArray(product.imageUrls)) {
+    for (const url of product.imageUrls) {
+      if (url?.trim() && !list.includes(url.trim())) {
+        list.push(url.trim())
+      }
+    }
+  }
+  if (Array.isArray(product.images)) {
+    for (const img of product.images) {
+      if (img?.imageUrl?.trim() && !list.includes(img.imageUrl.trim())) {
+        list.push(img.imageUrl.trim())
+      }
+    }
+  }
+  if (product.imageLink?.trim() && !list.includes(product.imageLink.trim())) {
+    list.push(product.imageLink.trim())
+  }
+  return list
 }
 
 export function getProductStorageName(
@@ -192,9 +240,11 @@ export function ProductGrid({
   const [query, setQuery] = useState('')
   const [barcode, setBarcode] = useState('')
   const [category, setCategory] = useState('all')
+  const [goldTypeFilter, setGoldTypeFilter] = useState('all')
+  const [karatFilter, setKaratFilter] = useState('all')
   const [storageFilter, setStorageFilter] = useState('all')
   const [preview, setPreview] = useState<Product | null>(null)
-  const [categoryOpen, setCategoryOpen] = useState(false)
+  const [combinedFiltersOpen, setCombinedFiltersOpen] = useState(false)
   const [weightDialogOpen, setWeightDialogOpen] = useState(false)
   const [weightRange, setWeightRange] = useState<WeightRange>({ min: null, max: null })
   const [barcodeStatus, setBarcodeStatus] = useState<
@@ -211,6 +261,10 @@ export function ProductGrid({
     const q = query.trim().toLowerCase()
     return products.filter((p) => {
       if (!p.isActive || !p.productId || (p.quantity ?? 0) <= 0) return false
+      if (karatFilter !== 'all' && Math.round(p.karat) !== Number(karatFilter))
+        return false
+      if (goldTypeFilter !== 'all' && String(p.typegolde) !== goldTypeFilter)
+        return false
       if (!matchCategory(p, category)) return false
       if (storageFilter !== 'all' && String(p.storageId) !== storageFilter)
         return false
@@ -225,7 +279,7 @@ export function ProductGrid({
         (p.barcode ?? '').toLowerCase().includes(q)
       )
     })
-  }, [products, query, category, storageFilter, weightRange])
+  }, [products, query, category, goldTypeFilter, karatFilter, storageFilter, weightRange])
 
   function handleBarcodeSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -255,9 +309,28 @@ export function ProductGrid({
   const ActiveCategoryIcon = activeCategory?.icon ?? LayoutGrid
   const isFreezed = freezeGold
 
+  // عدد الفلاتر النشطة لحساب شارة الفلاتر المدمجة
+  const activeFiltersCount = useMemo(() => {
+    let count = 0
+    if (category !== 'all') count++
+    if (goldTypeFilter !== 'all') count++
+    if (karatFilter !== 'all') count++
+    if (storageFilter !== 'all') count++
+    if (weightRange.min != null || weightRange.max != null) count++
+    return count
+  }, [category, goldTypeFilter, karatFilter, storageFilter, weightRange])
+
+  function resetAllFilters() {
+    setCategory('all')
+    setGoldTypeFilter('all')
+    setKaratFilter('all')
+    setStorageFilter('all')
+    setWeightRange({ min: null, max: null })
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {/* شريط واحد مدمج: كل أدوات POS في سطر واحد لتوفير المساحة */}
+      {/* شريط واحد مدمج: كل أدوات POS في سطر واحد لتوفير المساحة على التابلت */}
       <div className="-mx-1 overflow-x-auto px-1 pb-1">
         <div className="flex min-w-max items-center gap-1.5">
           {/* تبديل الشاشة (شاشة البيع / المعلقات) */}
@@ -267,7 +340,7 @@ export function ProductGrid({
                 type="button"
                 onClick={() => onViewChange('pos')}
                 className={cn(
-                  'h-10 touch-target rounded-full px-3.5 text-[12px] font-bold transition-colors',
+                  'h-10 touch-target rounded-full px-3.5 text-[12px] font-bold transition-colors cursor-pointer',
                   view === 'pos'
                     ? 'bg-primary text-white shadow-xs'
                     : 'text-foreground/70 hover:text-foreground',
@@ -279,7 +352,7 @@ export function ProductGrid({
                 type="button"
                 onClick={() => onViewChange('held')}
                 className={cn(
-                  'flex h-10 touch-target items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition-colors',
+                  'flex h-10 touch-target items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition-colors cursor-pointer',
                   view === 'held'
                     ? 'bg-warning text-white shadow-xs'
                     : 'text-foreground/70 hover:text-foreground',
@@ -311,7 +384,7 @@ export function ProductGrid({
             onClick={onToggleFreezeGold}
             aria-pressed={isFreezed}
             className={cn(
-              'flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold transition-colors',
+              'flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold transition-colors cursor-pointer',
               isFreezed
                 ? 'border-amber-300 bg-amber-50 text-amber-700'
                 : 'border-black/10 bg-white text-muted-foreground hover:border-amber-300/60 hover:text-amber-700',
@@ -321,13 +394,13 @@ export function ProductGrid({
             {isFreezed ? 'مثبّت' : 'تثبيت السعر'}
           </button>
 
-          {/* البحث */}
+          {/* البحث بالاسم أو SKU أو الباركود */}
           <div className="relative w-[min(24vw,220px)] min-w-[160px] shrink-0">
             <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="ابحث باسم القطعة أو SKU أو الباركود"
+              placeholder="ابحث بالاسم، SKU، الباركود"
               className="h-10 w-full touch-target rounded-full border border-input bg-white ps-9 pe-9 text-[12px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
             />
             {query && (
@@ -335,7 +408,7 @@ export function ProductGrid({
                 type="button"
                 aria-label="مسح البحث"
                 onClick={() => setQuery('')}
-                className="absolute end-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/5 text-muted-foreground touch-target"
+                className="absolute end-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/5 text-muted-foreground touch-target cursor-pointer hover:bg-black/10"
               >
                 <X className="size-3.5" />
               </button>
@@ -368,19 +441,190 @@ export function ProductGrid({
             />
           </form>
 
-          {/* التصنيفات (في ديالوج لتوفير المساحة) */}
-          <button
-            type="button"
-            onClick={() => setCategoryOpen(true)}
-            className="flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition-colors hover:border-primary/50 hover:text-primary"
-            aria-haspopup="dialog"
-          >
-            <ActiveCategoryIcon className="size-4 text-amber-500" />
-            <span className={category === 'all' ? 'text-muted-foreground' : 'text-foreground'}>
-              {activeCategory?.label ?? 'التصنيفات'}
-            </span>
-            <ChevronDown className="size-3.5 text-muted-foreground" />
-          </button>
+          {/* زر منسدل سريع: التصنيف */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition-colors cursor-pointer',
+                  category !== 'all'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-black/10 bg-white text-muted-foreground hover:border-primary/50 hover:text-primary',
+                )}
+              >
+                <ActiveCategoryIcon className="size-4 text-amber-500" />
+                <span>
+                  {category === 'all' ? 'التصنيف' : activeCategory?.label ?? 'التصنيف'}
+                </span>
+                {category !== 'all' ? (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="مسح فلتر التصنيف"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCategory('all')
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation()
+                        setCategory('all')
+                      }
+                    }}
+                    className="ms-0.5 flex size-4 items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30"
+                  >
+                    <X className="size-2.5" />
+                  </span>
+                ) : (
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48 rounded-2xl p-1.5 shadow-lg">
+              {categories.map((c) => {
+                const Icon = c.icon
+                return (
+                  <DropdownMenuItem
+                    key={c.key}
+                    onClick={() => setCategory(c.key)}
+                    className={cn(
+                      'flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-[12px] font-bold',
+                      category === c.key && 'bg-primary/10 text-primary',
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon className="size-3.5 text-amber-500" />
+                      {c.label}
+                    </span>
+                    {category === c.key && <Check className="size-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                )
+              })}
+              <DropdownMenuSeparator className="my-1" />
+              <DropdownMenuItem
+                onClick={() => setCombinedFiltersOpen(true)}
+                className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-bold text-muted-foreground hover:text-foreground"
+              >
+                <SlidersHorizontal className="size-3.5 text-primary" />
+                <span>فتح الديالوج المدمج...</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* زر منسدل سريع: فلتر حالة الذهب (مفصول تماماً عن التصنيفات) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition-colors cursor-pointer',
+                  goldTypeFilter !== 'all'
+                    ? 'border-primary bg-primary/10 text-primary shadow-2xs'
+                    : 'border-dashed border-black/25 bg-white text-muted-foreground hover:border-primary/60 hover:text-primary',
+                )}
+              >
+                <Sparkles className="size-3.5 text-amber-500" />
+                <span>
+                  {goldTypeFilter === 'all'
+                    ? 'حالة الذهب'
+                    : goldConditions.find((c) => c.key === goldTypeFilter)?.label ?? 'حالة الذهب'}
+                </span>
+                {goldTypeFilter !== 'all' ? (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="مسح فلتر حالة الذهب"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setGoldTypeFilter('all')
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation()
+                        setGoldTypeFilter('all')
+                      }
+                    }}
+                    className="ms-0.5 flex size-4 items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30"
+                  >
+                    <X className="size-2.5" />
+                  </span>
+                ) : (
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-40 rounded-2xl p-1.5 shadow-lg">
+              {goldConditions.map((opt) => (
+                <DropdownMenuItem
+                  key={opt.key}
+                  onClick={() => setGoldTypeFilter(opt.key)}
+                  className={cn(
+                    'flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-[12px] font-bold',
+                    goldTypeFilter === opt.key && 'bg-primary/10 text-primary',
+                  )}
+                >
+                  <span>{opt.label}</span>
+                  {goldTypeFilter === opt.key && <Check className="size-3.5 text-primary" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* زر منسدل سريع: فلتر العيار */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition-colors cursor-pointer',
+                  karatFilter !== 'all'
+                    ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-2xs font-extrabold'
+                    : 'border-dashed border-black/25 bg-white text-muted-foreground hover:border-amber-400/60 hover:text-amber-800',
+                )}
+              >
+                <Gem className="size-3.5 text-amber-500" />
+                <span>{karatFilter === 'all' ? 'العيار' : `عيار ${karatFilter}`}</span>
+                {karatFilter !== 'all' ? (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="مسح فلتر العيار"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setKaratFilter('all')
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation()
+                        setKaratFilter('all')
+                      }
+                    }}
+                    className="ms-0.5 flex size-4 items-center justify-center rounded-full bg-amber-200 text-amber-900 hover:bg-amber-300"
+                  >
+                    <X className="size-2.5" />
+                  </span>
+                ) : (
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-36 rounded-2xl p-1.5 shadow-lg">
+              {karatOptions.map((opt) => (
+                <DropdownMenuItem
+                  key={opt.key}
+                  onClick={() => setKaratFilter(opt.key)}
+                  className={cn(
+                    'flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-[12px] font-bold',
+                    karatFilter === opt.key && 'bg-amber-50 text-amber-900',
+                  )}
+                >
+                  <span>{opt.label}</span>
+                  {karatFilter === opt.key && <Check className="size-3.5 text-amber-600" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* المخزن (في ديالوج) */}
           <StoragePicker
@@ -396,7 +640,7 @@ export function ProductGrid({
             }
           />
 
-          {/* فلتر الوزن (ديالوج متكامل مع المخزن) */}
+          {/* فلتر الوزن */}
           {weightRange.min != null || weightRange.max != null ? (
             <div className="flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50/95 px-3 text-[12px] font-bold text-amber-900 shadow-xs">
               <Scale className="size-3.5 text-amber-600" />
@@ -426,6 +670,27 @@ export function ProductGrid({
               <span>فلتر بالوزن</span>
             </button>
           )}
+
+          {/* زر الديالوج المدمج الشامل: كل الفلاتر والتصنيفات في مكان واحد */}
+          <button
+            type="button"
+            onClick={() => setCombinedFiltersOpen(true)}
+            className={cn(
+              'flex h-10 shrink-0 touch-target items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition-all cursor-pointer',
+              activeFiltersCount > 0
+                ? 'border-primary bg-primary text-white shadow-xs'
+                : 'border-black/10 bg-white text-foreground hover:border-primary/50',
+            )}
+            title="فتح نافذة الفلاتر والتصنيفات المدمجة"
+          >
+            <SlidersHorizontal className="size-3.5" />
+            <span>فلاتر القطع</span>
+            {activeFiltersCount > 0 && (
+              <span className="flex size-5 items-center justify-center rounded-full bg-white text-[11px] font-black text-primary leading-none">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -438,8 +703,17 @@ export function ProductGrid({
               لا توجد قطع تطابق البحث
             </p>
             <p className="text-sm text-muted-foreground">
-              جرّب تعديل نطاق الوزن أو التصنيف أو المخزن
+              جرّب تعديل العيار أو حالة الذهب أو التصنيف أو المخزن
             </p>
+            {activeFiltersCount > 0 && (
+              <Button
+                variant="outline"
+                onClick={resetAllFilters}
+                className="mt-2 rounded-full h-10 px-4 text-xs font-bold"
+              >
+                إلغاء تفعيل كل الفلاتر ({activeFiltersCount})
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
@@ -448,6 +722,9 @@ export function ProductGrid({
                 product.isActive && product.quantity > 0 && product.productId != null
               const inCart = available ? (cartCount.get(product.productId!) ?? 0) : 0
               const karatText = karatLabel(product.karat)
+              const images = getProductDisplayImages(product)
+              const displayImage = images[0]
+
               return (
                 <div
                   key={product.productId}
@@ -462,37 +739,44 @@ export function ProductGrid({
                     }
                   }}
                   className={cn(
-                    'group relative flex touch-target flex-col gap-1.5 rounded-[16px] border border-black/8 bg-white p-2 text-start elevation-card transition-all duration-150 active:scale-[0.98]',
-                    available
-                      ? 'cursor-pointer hover:border-amber-400 hover:shadow-md'
-                      : 'cursor-not-allowed opacity-45',
+                    'group relative flex touch-target flex-col gap-1.5 rounded-[16px] border p-2 text-start elevation-card transition-all duration-150 active:scale-[0.98]',
+                    inCart > 0
+                      ? 'border-primary bg-primary/[0.04] ring-2 ring-primary/40 shadow-xs cursor-pointer'
+                      : available
+                        ? 'border-black/8 bg-white hover:border-amber-400 hover:shadow-md cursor-pointer'
+                        : 'border-black/8 bg-white cursor-not-allowed opacity-45',
                   )}
                 >
-                  {/* زر المعاينة السريعة */}
+                  {/* زر المعاينة السريعة للصورة وتفاصيل القطعة */}
                   <button
                     type="button"
-                    aria-label={`عرض تفاصيل ${product.productName}`}
+                    aria-label={`عرض صورة وتفاصيل ${product.productName}`}
+                    title="معاينة الصورة والبيانات بالكامل"
                     onClick={(e) => {
                       e.stopPropagation()
                       setPreview(product)
                     }}
-                    className="absolute end-2 top-2 z-10 flex size-7 items-center justify-center rounded-full bg-white/90 backdrop-blur-xs text-muted-foreground shadow-xs transition-colors hover:bg-white hover:text-foreground cursor-pointer"
+                    className="absolute end-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-white/95 backdrop-blur-md text-muted-foreground shadow-sm transition-all hover:bg-white hover:text-primary hover:scale-110 cursor-pointer border border-black/5"
                   >
-                    <Eye className="size-3.5" />
+                    <Eye className="size-4" />
                   </button>
 
-                  {/* إشارة السلة أعلى الصورة */}
+                  {/* إشارة السلة أعلى الصورة: توضح إمكانية إلغاء التحديد فوراً عند الضغط */}
                   {inCart > 0 && (
-                    <span className="absolute start-2 top-2 z-10 flex items-center gap-0.5 rounded-full bg-primary px-2 py-0.5 text-[10px] font-black text-white shadow-xs">
-                      +{inCart}
+                    <span
+                      className="absolute start-2 top-2 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[9.5px] font-black text-white shadow-xs"
+                      title="اضغط لإلغاء التحديد وحذف القطعة من الفاتورة"
+                    >
+                      <Check className="size-2.5" />
+                      محدد
                     </span>
                   )}
 
                   {/* حاوية الصورة مع تدرج مجوهرات دافئ */}
                   <div className="relative aspect-square w-full overflow-hidden rounded-[12px] border border-black/5 bg-gradient-to-b from-amber-50/20 via-neutral-50 to-neutral-100 flex items-center justify-center">
-                    {product.primaryImageUrl ? (
+                    {displayImage ? (
                       <img
-                        src={product.primaryImageUrl}
+                        src={displayImage}
                         alt={product.productName}
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
@@ -573,7 +857,7 @@ export function ProductGrid({
                     )}
                   </div>
 
-                  {/* السعر الإجمالي بارز في الأسفل */}
+                  {/* السعر الإجمالي وزر الإضافة/الحذف السريع */}
                   <div className="mt-auto flex items-center justify-between border-t border-black/6 pt-1.5">
                     <span className="tabular-nums text-[13px] font-black text-primary">
                       <FormatEg value={salePriceFor(product, goldPrice, stampAndTaxRate)} />
@@ -582,8 +866,27 @@ export function ProductGrid({
                       </span>
                     </span>
                     {available && (
-                      <div className="flex size-6 items-center justify-center rounded-full bg-secondary text-muted-foreground group-hover:bg-primary group-hover:text-white transition-colors">
-                        <Plus className="size-3.5" />
+                      <div
+                        title={
+                          inCart > 0
+                            ? 'القطعة محددة بالسلة — اضغط لإلغاء التحديد وحذفها'
+                            : 'اضغط للإضافة للفاتورة'
+                        }
+                        className={cn(
+                          'flex size-6 items-center justify-center rounded-full transition-all',
+                          inCart > 0
+                            ? 'bg-primary text-white group-hover:bg-rose-600 group-hover:text-white shadow-xs'
+                            : 'bg-secondary text-muted-foreground group-hover:bg-primary group-hover:text-white',
+                        )}
+                      >
+                        {inCart > 0 ? (
+                          <>
+                            <Check className="size-3.5 group-hover:hidden" />
+                            <X className="size-3.5 hidden group-hover:block" />
+                          </>
+                        ) : (
+                          <Plus className="size-3.5" />
+                        )}
                       </div>
                     )}
                   </div>
@@ -594,15 +897,21 @@ export function ProductGrid({
         )}
       </div>
 
-      {/* ديالوج التصنيفات */}
-      <CategoryDialog
-        open={categoryOpen}
-        onOpenChange={setCategoryOpen}
-        value={category}
-        onChange={(key) => {
-          setCategory(key)
-          setCategoryOpen(false)
-        }}
+      {/* ديالوج الفلاتر والتصنيفات المدمج: يجمع العيار، حالة الذهب، والتصنيفات بحرية كاملة */}
+      <CombinedFiltersDialog
+        open={combinedFiltersOpen}
+        onOpenChange={setCombinedFiltersOpen}
+        category={category}
+        onCategoryChange={setCategory}
+        goldTypeFilter={goldTypeFilter}
+        onGoldTypeChange={setGoldTypeFilter}
+        karatFilter={karatFilter}
+        onKaratChange={setKaratFilter}
+        storageFilter={storageFilter}
+        onStorageChange={setStorageFilter}
+        storages={storages}
+        matchingCount={filtered.length}
+        onResetAll={resetAllFilters}
       />
 
       {/* ديالوج فلترة الوزن المتكامل مع المخزن */}
@@ -616,85 +925,250 @@ export function ProductGrid({
         storageName={selectedStorage?.name || selectedStorage?.location || 'كل المخازن'}
       />
 
+      {/* معاينة سريعة وكاملة للصورة مع إمكانية التكبير ملء الشاشة وإلغاء/إضافة السلة */}
       <ProductQuickView
         product={preview}
         goldPrice={goldPrice}
         storages={storages}
+        inCart={preview && preview.productId ? (cartCount.get(preview.productId) ?? 0) : 0}
         onClose={() => setPreview(null)}
-        onAdd={(p) => {
+        onToggleCart={(p) => {
           onAdd(p)
-          setPreview(null)
         }}
       />
     </div>
   )
 }
 
-function CategoryDialog({
+/**
+ * ديالوج الفلاتر المدمج (Combined Filters Dialog)
+ * يفصل تصنيف القطعة (حلقان، خواتم...) عن حالة الذهب (جديد، مجدد، كسر) وعن العيار (24، 21، 18، 14)
+ * ويسمح بتعديلهم معاً دون أي تعارض
+ */
+function CombinedFiltersDialog({
   open,
   onOpenChange,
-  value,
-  onChange,
+  category,
+  onCategoryChange,
+  goldTypeFilter,
+  onGoldTypeChange,
+  karatFilter,
+  onKaratChange,
+  storageFilter,
+  onStorageChange,
+  storages,
+  matchingCount,
+  onResetAll,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  value: string
-  onChange: (key: string) => void
+  category: string
+  onCategoryChange: (k: string) => void
+  goldTypeFilter: string
+  onGoldTypeChange: (k: string) => void
+  karatFilter: string
+  onKaratChange: (k: string) => void
+  storageFilter: string
+  onStorageChange: (k: string) => void
+  storages: StorageLocation[]
+  matchingCount: number
+  onResetAll: () => void
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[18px]">
-            <LayoutGrid className="size-5 text-amber-500" />
-            اختيار التصنيف
-          </DialogTitle>
-          <DialogDescription>
-            اعرض القطع بالتصنيف الذي تريده — توفيراً للمساحة على شاشة البيع
+      <DialogContent className="sm:max-w-xl max-w-[calc(100%-1rem)] max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-[26px]">
+        <DialogHeader className="px-6 pt-5 pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="size-5 text-primary" />
+              <DialogTitle className="text-[17px] font-bold">فلاتر وتصنيفات القطع</DialogTitle>
+            </div>
+            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary tabular-nums">
+              {matchingCount} قطعة مطابقة
+            </span>
+          </div>
+          <DialogDescription className="text-xs text-muted-foreground">
+            حدد التصنيف والعيار وحالة الذهب معاً بحرية تامة دون تعارض
           </DialogDescription>
         </DialogHeader>
 
-        <div className="p-5 sm:p-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-          {categories.map(({ key, label, icon: Icon }) => {
-            const active = value === key
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onChange(key)}
-                className={cn(
-                  'flex h-16 touch-target flex-col items-center justify-center gap-1.5 rounded-2xl border-2 transition-colors',
-                  active
-                    ? 'border-primary bg-primary/10'
-                    : 'border-black/10 bg-white hover:border-primary/50',
-                )}
-              >
-                <Icon
+        <DialogBody className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-5">
+          {/* قسم 1: التصنيف (خواتم، سلاسل، حلقان...) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <LayoutGrid className="size-3.5 text-amber-500" />
+                تصنيف القطعة
+              </label>
+              {category !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => onCategoryChange('all')}
+                  className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+                >
+                  الكل
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-3">
+              {categories.map(({ key, label, icon: Icon }) => {
+                const active = category === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => onCategoryChange(key)}
+                    className={cn(
+                      'flex h-12 touch-target items-center justify-center gap-1.5 rounded-xl border px-2.5 text-center text-xs font-bold transition-all cursor-pointer',
+                      active
+                        ? 'border-primary bg-primary/10 text-primary shadow-xs'
+                        : 'border-black/10 bg-white text-foreground hover:border-primary/40',
+                    )}
+                  >
+                    <Icon className={cn('size-3.5 shrink-0', active ? 'text-primary' : 'text-amber-500')} />
+                    <span className="truncate">{label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* قسم 2: حالة الذهب (مفصول تماماً: جديد / مجدد / كسر) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Sparkles className="size-3.5 text-amber-500" />
+                حالة الذهب (مفصولة ومستقلة)
+              </label>
+              {goldTypeFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => onGoldTypeChange('all')}
+                  className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+                >
+                  الكل
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {goldConditions.map((cond) => {
+                const active = goldTypeFilter === cond.key
+                return (
+                  <button
+                    key={cond.key}
+                    type="button"
+                    onClick={() => onGoldTypeChange(cond.key)}
+                    className={cn(
+                      'flex h-11 touch-target items-center justify-center rounded-xl border text-xs font-bold transition-all cursor-pointer',
+                      active
+                        ? 'border-primary bg-primary text-white shadow-xs'
+                        : 'border-black/10 bg-white text-foreground hover:border-primary/40',
+                    )}
+                  >
+                    {cond.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* قسم 3: العيار (مفصول تماماً: 24 / 21 / 18 / 14) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Gem className="size-3.5 text-amber-500" />
+                العيار
+              </label>
+              {karatFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => onKaratChange('all')}
+                  className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+                >
+                  الكل
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {karatOptions.map((k) => {
+                const active = karatFilter === k.key
+                return (
+                  <button
+                    key={k.key}
+                    type="button"
+                    onClick={() => onKaratChange(k.key)}
+                    className={cn(
+                      'flex h-11 touch-target items-center justify-center rounded-xl border text-xs font-bold transition-all cursor-pointer tabular-nums',
+                      active
+                        ? 'border-amber-400 bg-amber-500 text-white shadow-xs font-extrabold'
+                        : 'border-black/10 bg-white text-foreground hover:border-amber-300',
+                    )}
+                  >
+                    {k.key === 'all' ? 'الكل' : `${k.key}k`}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* قسم 4: المخزن */}
+          {storages.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <MapPin className="size-3.5 text-sky-500" />
+                المخزن
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onStorageChange('all')}
                   className={cn(
-                    'size-5',
-                    active ? 'text-primary' : 'text-amber-500',
-                  )}
-                />
-                <span
-                  className={cn(
-                    'text-[12px] font-bold',
-                    active ? 'text-primary' : 'text-foreground',
+                    'h-10 touch-target rounded-xl border px-3 text-xs font-bold transition-all cursor-pointer',
+                    storageFilter === 'all'
+                      ? 'border-sky-500 bg-sky-50 text-sky-800'
+                      : 'border-black/10 bg-white text-muted-foreground hover:border-sky-300',
                   )}
                 >
-                  {label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+                  كل المخازن
+                </button>
+                {storages.map((s) => {
+                  const active = storageFilter === String(s.id)
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => onStorageChange(String(s.id))}
+                      className={cn(
+                        'h-10 touch-target rounded-xl border px-3 text-xs font-bold transition-all cursor-pointer',
+                        active
+                          ? 'border-sky-500 bg-sky-50 text-sky-800'
+                          : 'border-black/10 bg-white text-muted-foreground hover:border-sky-300',
+                      )}
+                    >
+                      {s.name || s.location || `مخزن #${s.id}`}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </DialogBody>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-3.5 flex flex-row items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onResetAll}
+            className="rounded-full h-11 px-4 text-xs font-bold text-muted-foreground hover:text-foreground touch-target"
+          >
+            إعادة ضبط الفلاتر
+          </Button>
           <Button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-11 flex-1 rounded-full touch-target"
+            className="rounded-full h-11 px-6 text-xs font-bold bg-primary text-white touch-target shadow-xs"
           >
-            إغلاق
+            تطبيق (عرض {matchingCount} قطعة)
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -702,19 +1176,32 @@ function CategoryDialog({
   )
 }
 
+/**
+ * معاينة تفصيلية للقطعة:
+ * تم حل مشكلة ظهور الصورة غير كاملة عبر:
+ * 1. استخدام DialogBody لضمان التمرير الكامل وعدم اقتصاص الصورة على أي شاشة تابلت
+ * 2. عرض الصورة كاملة بأبعاد uncropped وتوسيط متناسق
+ * 3. إضافة زر "تكبير الصورة بالكامل" Lightbox يتيح معاينة تفاصيل القطعة والدمغة بملء الشاشة مع التكبير
+ * 4. إظهار زر إلغاء التحديد وحذفها من السلة إذا كانت محددة
+ */
 function ProductQuickView({
   product,
   goldPrice,
   storages = [],
+  inCart = 0,
   onClose,
-  onAdd,
+  onToggleCart,
 }: {
   product: Product | null
   goldPrice: number
   storages?: StorageLocation[]
+  inCart?: number
   onClose: () => void
-  onAdd: (p: Product) => void
+  onToggleCart: (p: Product) => void
 }) {
+  const [selectedImgIndex, setSelectedImgIndex] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+
   const available = Boolean(
     product && product.isActive && product.quantity > 0 && product.productId != null,
   )
@@ -726,89 +1213,279 @@ function ProductQuickView({
     : 0
 
   const storageName = product ? getProductStorageName(product, storages) : 'بدون مخزن'
+  const images = useMemo(() => getProductDisplayImages(product), [product])
+  const currentImage = images[selectedImgIndex] || images[0]
 
   return (
-    <Dialog open={Boolean(product)} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{product?.productName ?? ''}</DialogTitle>
-          <DialogDescription>
-            {product
-              ? `${typeLabels[product.typegolde as keyof typeof typeLabels] ?? '—'} • ${
-                  designLabel(product)
-                }`
-              : ''}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog
+        open={Boolean(product) && !lightboxOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setSelectedImgIndex(0)
+            onClose()
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl max-w-[calc(100%-1rem)] max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-[26px]">
+          <DialogHeader className="px-6 pt-5 pb-3">
+            <div className="flex items-center justify-between pe-8">
+              <div>
+                <DialogTitle className="text-[17px] font-bold">
+                  {product?.productName ?? ''}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  {product
+                    ? `${typeLabels[product.typegolde as keyof typeof typeLabels] || 'ذهب'} • ${
+                        designLabel(product)
+                      }`
+                    : ''}
+                </DialogDescription>
+              </div>
+              {inCart > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-1 text-[11px] font-bold text-primary">
+                  <Check className="size-3" />
+                  محدد في الفاتورة ({inCart})
+                </span>
+              )}
+            </div>
+          </DialogHeader>
 
-        <div className="p-5 sm:p-6 space-y-2.5 text-[15px]">
-          {product?.primaryImageUrl ? (
-            <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-2xl bg-secondary">
-              <img
-                src={product.primaryImageUrl}
-                alt={product.productName}
-                className="h-full w-full object-cover"
+          <DialogBody className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
+            {/* حاوية الصورة الكاملة مع زر التكبير والألبومات المتعددة */}
+            {currentImage ? (
+              <div className="space-y-2">
+                <div className="relative flex max-h-[38vh] min-h-[220px] w-full items-center justify-center overflow-hidden rounded-2xl border border-black/8 bg-gradient-to-b from-neutral-50 via-slate-50 to-neutral-100 p-2 group shadow-2xs">
+                  <img
+                    src={currentImage}
+                    alt={product?.productName}
+                    className="max-h-[35vh] w-auto max-w-full object-contain drop-shadow-md select-none transition-transform duration-300 group-hover:scale-102 cursor-zoom-in"
+                    onClick={() => setLightboxOpen(true)}
+                  />
+
+                  {/* زر التكبير ملء الشاشة لعرض كامل تفاصيل الصورة */}
+                  <button
+                    type="button"
+                    onClick={() => setLightboxOpen(true)}
+                    className="absolute end-3 bottom-3 flex items-center gap-1.5 rounded-full bg-white/95 backdrop-blur-md px-3 py-1.5 text-[11px] font-bold text-foreground shadow-md transition-all hover:bg-white hover:text-primary cursor-pointer border border-black/5"
+                    title="تكبير الصورة ملء الشاشة لمعاينة التفاصيل والدمغة"
+                  >
+                    <Maximize2 className="size-3.5 text-primary" />
+                    <span>تكبير الصورة كاملة</span>
+                  </button>
+                </div>
+
+                {/* معرض الصور المصغرة إذا كانت القطعة تحتوي أكثر من صورة */}
+                {images.length > 1 && (
+                  <div className="flex items-center gap-2 overflow-x-auto py-1">
+                    {images.map((img, idx) => (
+                      <button
+                        key={img}
+                        type="button"
+                        onClick={() => setSelectedImgIndex(idx)}
+                        className={cn(
+                          'relative size-14 shrink-0 overflow-hidden rounded-xl border-2 transition-all cursor-pointer',
+                          selectedImgIndex === idx
+                            ? 'border-primary ring-2 ring-primary/30'
+                            : 'border-black/10 opacity-70 hover:opacity-100',
+                        )}
+                      >
+                        <img src={img} alt="" className="size-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-black/15 bg-neutral-50">
+                <Gem className="size-8 text-amber-500/60" />
+                <span className="text-xs text-muted-foreground">لا تتوفر صورة لهذه القطعة</span>
+              </div>
+            )}
+
+            {/* تفاصيل وبيانات القطعة المالية والفيزيائية */}
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+              <QuickViewRow label="العيار" value={`${product?.karat ?? 0}k`} highlight />
+              <QuickViewRow label="الوزن" value={`${formatNumber(product?.weight ?? 0)} جم`} />
+              <QuickViewRow
+                label="المصنعية"
+                value={`${formatNumber(effectiveMaking)} ج.م/جم`}
+              />
+              <QuickViewRow label="المخزن" value={storageName} />
+              <QuickViewRow
+                label="السعر المقدر للبيع"
+                value={
+                  product
+                    ? `${formatNumber(salePriceFor(product, goldPrice, useTaxStore.getState().stampAndTaxRate))} ج.م`
+                    : '—'
+                }
+                highlight
+              />
+              <QuickViewRow
+                label="حالة التوفر"
+                value={available ? 'متاح للبيع' : 'غير متوفر'}
               />
             </div>
-          ) : null}
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <QuickViewRow label="العيار" value={`${product?.karat ?? 0}k`} />
-            <QuickViewRow label="الوزن" value={`${formatNumber(product?.weight ?? 0)} جم`} />
-            <QuickViewRow
-              label="المصنعية"
-              value={`${formatNumber(effectiveMaking)} ج.م/جم`}
-            />
-            <QuickViewRow label="المخزن" value={storageName} />
-            <QuickViewRow
-              label="سعر البيع"
-              value={
-                product
-                  ? `${formatNumber(salePriceFor(product, goldPrice, useTaxStore.getState().stampAndTaxRate))} ج.م`
-                  : '—'
-              }
-            />
-          </div>
-
-          {(product?.sku || product?.barcode) && (
-            <p className="rounded-xl bg-black/5 p-2.5 text-[13px] text-muted-foreground">
-              {product?.sku && <span>SKU: {product.sku}</span>}
-              {product?.sku && product?.barcode && <span> • </span>}
-              {product?.barcode && <span>باركود: {product.barcode}</span>}
-            </p>
-          )}
-
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">الحالة</span>
-            {available ? (
-              <Badge>متاح</Badge>
-            ) : (
-              <Badge variant="destructive">غير متاح</Badge>
+            {(product?.sku || product?.barcode) && (
+              <div className="rounded-xl border border-black/5 bg-slate-50/70 p-2.5 text-[12px] text-muted-foreground flex items-center justify-between">
+                <span>الترميز والباركود:</span>
+                <span dir="ltr" className="font-mono font-bold text-foreground">
+                  {product?.sku && `SKU: ${product.sku}`}
+                  {product?.sku && product?.barcode ? ' • ' : ''}
+                  {product?.barcode && `باركود: ${product.barcode}`}
+                </span>
+              </div>
             )}
-          </div>
+          </DialogBody>
+
+          <DialogFooter className="px-6 py-3.5 flex flex-row items-center justify-between gap-2.5">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="rounded-full h-11 px-5 touch-target font-bold"
+            >
+              إغلاق
+            </Button>
+
+            {inCart > 0 ? (
+              <Button
+                type="button"
+                onClick={() => product && onToggleCart(product)}
+                className="rounded-full h-11 flex-1 gap-2 border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 touch-target font-bold"
+              >
+                <X className="size-4 text-rose-600" />
+                <span>إلغاء التحديد وحذف من الفاتورة</span>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                disabled={!available || !product}
+                onClick={() => product && onToggleCart(product)}
+                className="rounded-full h-11 flex-1 gap-2 bg-primary text-white touch-target font-bold shadow-xs hover:bg-primary/90"
+              >
+                <Plus className="size-4" />
+                <span>إضافة إلى الفاتورة</span>
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox تكبير الصورة كاملة ملء الشاشة */}
+      {lightboxOpen && currentImage && (
+        <FullImageLightbox
+          imageUrl={currentImage}
+          title={product?.productName ?? ''}
+          subtitle={`عيار ${product?.karat ?? 0} • ${formatNumber(product?.weight ?? 0)} جم`}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * نافذة تكبير الصورة ملء الشاشة (Lightbox)
+ * تعالج مشكلة عدم اكتمال الصورة بشكل جذري، وتتيح للصائغ فحص أدق تفاصيل القطعة والدمغة بتكبير تفاعلي
+ */
+function FullImageLightbox({
+  imageUrl,
+  title,
+  subtitle,
+  onClose,
+}: {
+  imageUrl: string
+  title: string
+  subtitle: string
+  onClose: () => void
+}) {
+  const [zoomLevel, setZoomLevel] = useState(1)
+
+  function handleZoomIn() {
+    setZoomLevel((z) => Math.min(3, Math.round((z + 0.5) * 10) / 10))
+  }
+
+  function handleZoomOut() {
+    setZoomLevel((z) => Math.max(1, Math.round((z - 0.5) * 10) / 10))
+  }
+
+  function handleReset() {
+    setZoomLevel(1)
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-md animate-in fade-in-0 duration-200"
+    >
+      {/* شريط أدوات Lightbox العلوي */}
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-4 sm:px-6">
+        <div className="flex flex-col text-white">
+          <p className="text-sm font-bold truncate max-w-[240px] sm:max-w-md">{title}</p>
+          <p className="text-xs text-white/70">{subtitle}</p>
         </div>
 
-        <DialogFooter>
-          <Button
+        {/* أزرار التحكم بالتكبير */}
+        <div className="flex items-center gap-2">
+          <button
             type="button"
-            variant="outline"
+            onClick={handleZoomIn}
+            disabled={zoomLevel >= 3}
+            title="تكبير"
+            className="flex size-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-30 touch-target cursor-pointer transition-colors"
+          >
+            <ZoomIn className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= 1}
+            title="تصغير"
+            className="flex size-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-30 touch-target cursor-pointer transition-colors"
+          >
+            <ZoomOut className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleReset}
+            title="الحجم الأصلي 100%"
+            className="flex h-10 px-3 items-center justify-center gap-1 rounded-full bg-white/10 text-white hover:bg-white/20 touch-target cursor-pointer text-xs font-bold transition-colors"
+          >
+            <RotateCcw className="size-3.5" />
+            <span>{Math.round(zoomLevel * 100)}%</span>
+          </button>
+          <button
+            type="button"
             onClick={onClose}
-            className="h-11 flex-1 rounded-full touch-target"
+            title="إغلاق المعاينة"
+            className="flex size-10 items-center justify-center rounded-full bg-white/15 text-white hover:bg-rose-600 hover:text-white touch-target cursor-pointer transition-colors ms-2"
           >
-            إغلاق
-          </Button>
-          <Button
-            type="button"
-            disabled={!available || !product}
-            onClick={() => product && onAdd(product)}
-            className="h-11 flex-1 gap-2 rounded-full touch-target"
-          >
-            <Plus className="size-4" />
-            إضافة للفاتورة
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <X className="size-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* منطقة عرض الصورة الكاملة غير المقتطعة */}
+      <div
+        onClick={onClose}
+        className="flex flex-1 items-center justify-center overflow-auto p-4 sm:p-8 cursor-zoom-out"
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="relative flex items-center justify-center max-w-full max-h-full transition-transform duration-200"
+          style={{ transform: `scale(${zoomLevel})` }}
+        >
+          <img
+            src={imageUrl}
+            alt={title}
+            className="max-h-[82vh] max-w-[88vw] rounded-xl object-contain drop-shadow-2xl select-none"
+          />
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -822,11 +1499,31 @@ function designLabel(product: Product): string {
   return map[product.design] ?? '—'
 }
 
-function QuickViewRow({ label, value }: { label: string; value: string }) {
+function QuickViewRow({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string
+  value: string
+  highlight?: boolean
+}) {
   return (
-    <div className="rounded-xl border border-black/5 bg-white p-3">
-      <p className="text-[12px] text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-[16px] font-bold tabular-nums text-foreground">
+    <div
+      className={cn(
+        'rounded-xl border p-3',
+        highlight
+          ? 'border-amber-300/70 bg-amber-50/50'
+          : 'border-black/5 bg-white',
+      )}
+    >
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          'mt-0.5 text-[15px] font-bold tabular-nums',
+          highlight ? 'text-amber-900' : 'text-foreground',
+        )}
+      >
         {value}
       </p>
     </div>
