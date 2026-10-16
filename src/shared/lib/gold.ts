@@ -65,7 +65,7 @@ export function purchaseLineMath(
 /**
  * حساب سطر من فاتورة بيع:
  * - metal: سعر الذهب (الوزن × سعر الجرام اللحظي)
- * - taxAndStamp: الدمغة والضريبة مجتمعين (1% من سعر الذهب)
+ * - taxAndStamp: الدمغة والضريبة مجتمعين (نسبة من سعر الذهب، افتراضياً 1%)
  * - making: المصنعية البيعية (مصنعية البيع × الوزن)
  */
 export function cartLineMath(
@@ -73,12 +73,14 @@ export function cartLineMath(
   karat: number,
   grams: number,
   factory: number,
+  taxRate = TAX_AND_STAMP_RATE,
 ): CartLineMath {
   const purchase = purchasePerGram(gold21Price, karat)
   const metal = purchase * grams
   const margin = SALE_MARKUP * grams
   const making = factory * grams
-  const taxAndStamp = metal * TAX_AND_STAMP_RATE
+  const effectiveTaxRate = taxRate >= 0 ? taxRate : TAX_AND_STAMP_RATE
+  const taxAndStamp = metal * effectiveTaxRate
   return {
     metal,
     margin,

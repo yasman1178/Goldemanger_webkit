@@ -21,11 +21,13 @@ import {
   Sparkles,
   RefreshCw,
   Recycle,
+  MapPin,
 } from 'lucide-react'
 
 import type { Product } from '@/features/products/types'
 import { typeLabels } from '@/features/products/types'
 import { salePerGram } from '@/shared/lib/gold'
+import { useTaxStore } from '@/shared/stores/tax-store'
 import { cn, formatNumber } from '@/shared/lib/utils'
 import type { StorageLocation } from '@/shared/types/api'
 import type { CartLine } from './types'
@@ -131,10 +133,10 @@ const typeBadgeClasses: Record<number, string> = {
   3: 'bg-black/5 text-warning',
 }
 
-function salePriceFor(product: Product, goldPrice: number): number {
+function salePriceFor(product: Product, goldPrice: number, taxRate = 0.01): number {
   const perGram = salePerGram(goldPrice, product.karat)
   const metal = perGram
-  const taxAndStamp = metal * 0.01
+  const taxAndStamp = metal * (taxRate >= 0 ? taxRate : 0.01)
   const making = product.factoryForSale || product.factory
   return Math.round((metal + taxAndStamp + making) * product.weight)
 }
@@ -180,6 +182,7 @@ export function ProductGrid({
     () => new Map(cart.map((l) => [l.product.productId, l.quantity])),
     [cart],
   )
+  const stampAndTaxRate = useTaxStore((s) => s.stampAndTaxRate)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -500,7 +503,7 @@ export function ProductGrid({
                       )}
                     </p>
 
-                    {/* شارات العيار والوزن البارزة بأرقام ثابتة */}
+                    {/* شارات العيار والوزن ورقم المخزن البارزة بأرقام ثابتة */}
                     <div className="mt-1 flex flex-wrap items-center gap-1">
                       <span className="inline-flex items-center rounded-md bg-amber-100/90 border border-amber-300/60 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-900 tabular-nums">
                         {karatText}
@@ -508,6 +511,19 @@ export function ProductGrid({
                       <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 border border-black/5 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-foreground tabular-nums">
                         <Scale className="size-2.5 text-muted-foreground" />
                         {formatNumber(product.weight)} جم
+                      </span>
+                      {/* شارة رقم واسم المخزن للقطعة */}
+                      <span
+                        className="inline-flex items-center gap-1 rounded-md bg-sky-50 border border-sky-300/80 px-1.5 py-0.5 text-[9.5px] font-bold text-sky-900 tabular-nums shadow-2xs"
+                        title={
+                          storages.find((s) => s.id === product.storageId)?.name ||
+                          (product.storageId != null ? `مخزن #${product.storageId}` : 'بدون مخزن')
+                        }
+                      >
+                        <MapPin className="size-2.5 text-sky-600 shrink-0" />
+                        <span>
+                          {product.storageId != null ? `مخزن #${product.storageId}` : 'بدون مخزن'}
+                        </span>
                       </span>
                       {product.typegolde >= 1 && product.typegolde <= 3 && (
                         <span
@@ -537,7 +553,7 @@ export function ProductGrid({
                   {/* السعر الإجمالي بارز في الأسفل */}
                   <div className="mt-auto flex items-center justify-between border-t border-black/6 pt-1.5">
                     <span className="tabular-nums text-[13px] font-black text-primary">
-                      <FormatEg value={salePriceFor(product, goldPrice)} />
+                      <FormatEg value={salePriceFor(product, goldPrice, stampAndTaxRate)} />
                       <span className="ms-0.5 text-[9px] font-bold text-amber-600">
                         ج.م
                       </span>
@@ -707,10 +723,14 @@ function ProductQuickView({
             <QuickViewRow label="الوزن" value={`${formatNumber(product?.weight ?? 0)} جم`} />
             <QuickViewRow label="المصنعية" value={formatNumber(product?.factory ?? 0)} />
             <QuickViewRow
+              label="المخزن"
+              value={product?.storageId != null ? `مخزن #${product.storageId}` : 'بدون مخزن'}
+            />
+            <QuickViewRow
               label="سعر البيع"
               value={
                 product
-                  ? `${formatNumber(salePriceFor(product, goldPrice))} ج.م`
+                  ? `${formatNumber(salePriceFor(product, goldPrice, useTaxStore.getState().stampAndTaxRate))} ج.م`
                   : '—'
               }
             />

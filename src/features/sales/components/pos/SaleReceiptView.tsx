@@ -2,6 +2,7 @@ import type { CompanyInfo } from '@/features/purchases/types'
 import type { SalePrintData } from '@/features/sales/api'
 import { purchasePerGram, TAX_AND_STAMP_RATE } from '@/shared/lib/gold'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
+import { useTaxStore, formatTaxRatePercent } from '@/shared/stores/tax-store'
 
 const receiptTypeLabels: Record<number, string> = {
   1: 'جديد',
@@ -23,11 +24,17 @@ function formatReceiptDate(iso?: string | null): string {
 interface Props {
   data: SalePrintData
   shop?: CompanyInfo
+  /** نسبة الدمغة والضريبة المحتسبة (اختياري، يقرأ من الإعدادات تلقائياً) */
+  taxRate?: number
   /** إظهار تفاصيل القطعة (المصنعية والضريبة والدمغة) — تُفتح بزرار من الديالوج ولا تُطبع إلا وهي ظاهرة. */
   showDetails?: boolean
 }
 
-export function SaleReceiptView({ data, shop, showDetails = false }: Props) {
+export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Props) {
+  const effectiveTaxRate = taxRate != null && taxRate >= 0
+    ? taxRate
+    : useTaxStore.getState().stampAndTaxRate ?? TAX_AND_STAMP_RATE
+
   const shopName = shop?.name?.trim() || 'محل الذهب'
   const address = [
     shop?.location?.trim(),
@@ -51,7 +58,7 @@ export function SaleReceiptView({ data, shop, showDetails = false }: Props) {
     const grams = (i.weight ?? 0) * (i.quantity ?? 0)
     return sum + (i.factory ?? 0) * grams
   }, 0)
-  const taxSubtotal = goldSubtotal * TAX_AND_STAMP_RATE
+  const taxSubtotal = goldSubtotal * effectiveTaxRate
   const rounded = Math.round(data.totalAmount ?? 0)
   const paid = Math.round(data.paid ?? 0)
   const remaining = Math.round(data.amountOwed ?? 0)
@@ -111,7 +118,7 @@ export function SaleReceiptView({ data, shop, showDetails = false }: Props) {
             const goldUnit = purchasePerGram(gold21, i.karat ?? 21)
             const makingUnit = i.factory ?? 0
             const makingPiece = makingUnit * grams
-            const taxPiece = goldUnit * grams * TAX_AND_STAMP_RATE
+            const taxPiece = goldUnit * grams * effectiveTaxRate
             const lineTotal = (goldUnit + makingUnit) * grams
             return (
               <div
@@ -152,7 +159,7 @@ export function SaleReceiptView({ data, shop, showDetails = false }: Props) {
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <span>
-                        ضريبة ودمغة (1%): {formatNumber(goldUnit * TAX_AND_STAMP_RATE)}/جم
+                        ضريبة ودمغة ({formatTaxRatePercent(effectiveTaxRate)}): {formatNumber(goldUnit * effectiveTaxRate)}/جم
                       </span>
                       <span className="tabular-nums font-semibold">
                         للقطعة: {formatEgp(taxPiece)}
@@ -188,7 +195,7 @@ export function SaleReceiptView({ data, shop, showDetails = false }: Props) {
               <span className="tabular-nums">{formatEgp(makingSubtotal)}</span>
             </div>
             <div className="flex justify-between">
-              <span>إجمالي الضريبة والدمغة</span>
+              <span>إجمالي الضريبة والدمغة ({formatTaxRatePercent(effectiveTaxRate)})</span>
               <span className="tabular-nums">{formatEgp(taxSubtotal)}</span>
             </div>
           </>

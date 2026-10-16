@@ -3,6 +3,7 @@ import { Minus, Plus, Trash2, ShoppingCart, Tag, Save, Scale } from 'lucide-reac
 import { TAX_AND_STAMP_RATE, cartLineMath } from '@/shared/lib/gold'
 import { cn, currencySymbol, formatNumber } from '@/shared/lib/utils'
 import { useCurrencyStore } from '@/shared/stores/currency-store'
+import { useTaxStore, formatTaxRatePercent } from '@/shared/stores/tax-store'
 import type { CartLine, CartTotals } from './types'
 import { isWeightAdjusted, karatLabel } from './types'
 import { typeLabels } from '@/features/products/types'
@@ -38,6 +39,7 @@ export function CurrentCart({
   savingHeld = false,
 }: Props) {
   const currency = useCurrencyStore((s) => s.currency)
+  const stampAndTaxRate = useTaxStore((s) => s.stampAndTaxRate)
   const metalIncludingMaking = totals.metal + totals.making
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -89,7 +91,7 @@ export function CurrentCart({
               value={metalIncludingMaking}
             />
             <TotalRow
-              label={`الدمغة والضريبة (${TAX_AND_STAMP_RATE * 100}%)`}
+              label={`الدمغة والضريبة (${formatTaxRatePercent(stampAndTaxRate)})`}
               value={totals.taxAndStamp}
             />
             {totals.discount > 0 && (

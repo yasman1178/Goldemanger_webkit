@@ -13,6 +13,7 @@ import { getOverview } from '@/features/settings/api'
 import { getLatestGoldPrice, getStorages, saveGoldPrice } from '@/shared/lib/parties'
 import type { StorageLocation } from '@/shared/types/api'
 import { useGoldStore } from '@/shared/stores/gold-store'
+import { useTaxStore } from '@/shared/stores/tax-store'
 import { useGoldPriceGate } from '@/shared/hooks/useGoldPriceGate'
 import {
   PriceMismatchDialog,
@@ -82,6 +83,7 @@ export function SalesPage() {
   const setGold21Buy = useGoldStore((s) => s.setGold21Buy)
   const freezeGold = useGoldStore((s) => s.freezeGold)
   const setFreezeGold = useGoldStore((s) => s.setFreezeGold)
+  const stampAndTaxRate = useTaxStore((s) => s.stampAndTaxRate)
 
   const roles = useAuthStore((s) => s.user?.roles ?? [])
   const isOwner = roles.includes('Owner')
@@ -188,6 +190,7 @@ export function SalesPage() {
         l.product.karat,
         l.weight * l.quantity,
         l.product.factoryForSale || l.product.factory,
+        stampAndTaxRate,
       )
       acc.grams += m.grams
       acc.metal += m.metal
@@ -195,9 +198,6 @@ export function SalesPage() {
       acc.making += m.making
       acc.taxAndStamp += m.taxAndStamp
       // نجمع القيم غير المقرَّبة ثم نقرّب الإجمالي مرة واحدة عند الأسفل.
-      // جمع m.total (المقرَّب لكل سطر) ثم التقريب مرة ثانية يجعل الإجمالي ينحرف
-      // عن حساب الخادم حتى 0.5 ج.م عن كل سطر — أي 2 ج.م عند 4 أسطر و4 عند 8 —
-      // وهو ما كان سيُسجَّل كـ«انحراف سعر» حقيقي لو دُقِّق الإجمالي على السيرفر.
       acc.gross += m.metal + m.margin + m.making + m.taxAndStamp
     }
     const discountCap = Math.min(discount, acc.making)
@@ -211,7 +211,7 @@ export function SalesPage() {
       discount: discountCap,
       total: Math.round(acc.gross - discountCap),
     }
-  }, [cart, effectiveGold, discount])
+  }, [cart, effectiveGold, discount, stampAndTaxRate])
 
   function grams21Of(list: CartLine[]): number {
     const total = list.reduce(

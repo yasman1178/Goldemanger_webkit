@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 
 import { useAuthStore } from '@/shared/stores/auth-store'
+import { useTaxStore } from '@/shared/stores/tax-store'
 import {
   getStoreProfile,
   updateStoreProfile,
@@ -24,6 +25,7 @@ import {
   updateEmployee,
   updateEmployeeRoles,
   disableEmployee,
+  upsertKeyValue,
 } from '@/features/settings/api'
 import type {
   BranchSummary,
@@ -347,6 +349,10 @@ function StoreSection() {
   const [form, setForm] = useState<Partial<StoreProfile> | null>(null)
   const current = form ?? data ?? {}
 
+  const stampAndTaxRate = useTaxStore((s) => s.stampAndTaxRate)
+  const setStampAndTaxRate = useTaxStore((s) => s.setStampAndTaxRate)
+  const [taxRateInput, setTaxRateInput] = useState(() => (stampAndTaxRate * 100).toString())
+
   const mutation = useMutation({
     mutationFn: updateStoreProfile,
     onSuccess: () => {
@@ -397,15 +403,67 @@ function StoreSection() {
         value={current.taxCardNumber ?? ''}
         onChange={(v) => setForm({ ...(form ?? {}), taxCardNumber: v })}
       />
+
+      {/* إعدادات نسبة الدمغة والضريبة على فواتير البيع */}
+      <div className="sm:col-span-2 rounded-2xl border border-amber-300/60 bg-amber-50/50 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <Label className="text-[14px] font-bold text-foreground">
+              نسبة الدمغة والضريبة على فاتورة البيع (%)
+            </Label>
+            <p className="text-[12px] text-muted-foreground mt-0.5">
+              النسبة المئوية التي تُحتسب تلقائياً على قيمة الذهب في فواتير البيع (الافتراضي 1%، ويمكن تغييرها لأي نسبة مثل 1.5% أو 2%).
+            </p>
+          </div>
+          <span className="rounded-full bg-amber-100 border border-amber-300 px-3 py-1 text-[13px] font-black text-amber-900 tabular-nums">
+            النسبة الحالية: {taxRateInput || '1'}%
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={taxRateInput}
+            onChange={(e) => setTaxRateInput(e.target.value)}
+            type="number"
+            step="0.05"
+            min="0"
+            max="100"
+            className="h-11 w-36 rounded-[14px] bg-white text-center font-bold tabular-nums text-foreground touch-target"
+            placeholder="1.0"
+          />
+          <div className="flex flex-wrap items-center gap-1.5">
+            {['0', '0.5', '1', '1.25', '1.5', '2'].map((preset) => (
+              <Button
+                key={preset}
+                type="button"
+                variant={taxRateInput === preset ? 'default' : 'outline'}
+                size="sm"
+                className="h-9 rounded-full px-3 text-[12px] font-bold touch-target"
+                onClick={() => setTaxRateInput(preset)}
+              >
+                {preset}%
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="sm:col-span-2 flex justify-end">
         <Button
           type="button"
-          onClick={() => mutation.mutate(current)}
+          onClick={() => {
+            const parsed = parseFloat(taxRateInput)
+            if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+              setStampAndTaxRate(parsed / 100)
+              void upsertKeyValue({ key: 'saleTaxAndStampRate', value: taxRateInput }).catch(() => {})
+            }
+            mutation.mutate(current)
+          }}
           disabled={mutation.isPending}
           className="h-11 gap-2 rounded-full touch-target"
         >
           {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          حفظ بيانات المحل
+          حفظ بيانات المحل والضريبة
         </Button>
       </div>
     </div>
