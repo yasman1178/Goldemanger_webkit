@@ -9,6 +9,7 @@ import {
   Plus,
   Save,
   ShieldAlert,
+  ShieldCheck,
   ShoppingBag,
   Store as StoreIcon,
   Users,
@@ -431,6 +432,13 @@ function StoreSection() {
           </div>
           <span className="rounded-full bg-amber-100 border border-amber-300 px-3 py-1 text-[13px] font-black text-amber-900 tabular-nums">
             النسبة الحالية: {taxRateInput || '1'}%
+          </span>
+        </div>
+
+        <div className="rounded-xl border border-amber-300/80 bg-white/80 p-2.5 text-[11.5px] text-amber-950 flex items-center gap-2">
+          <ShieldCheck className="size-4 text-emerald-600 shrink-0" />
+          <span>
+            <strong>حماية المعاملات التاريخية:</strong> أي تعديل على نسبة الدمغة أو المصنعية يطبَّق حصراً على الفواتير الجديدة الصادرة بعد الحفظ. الفواتير السابقة تظل مسجلة بلقطتها التاريخية على السيرفر ولا تتأثر أبداً.
           </span>
         </div>
 

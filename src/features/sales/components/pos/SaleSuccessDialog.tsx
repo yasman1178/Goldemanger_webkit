@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CheckCircle2, Copy, Printer, Clock } from 'lucide-react'
@@ -13,9 +13,16 @@ import {
 } from '@/shared/components/ui/dialog'
 import { getCompanyInfo } from '@/features/purchases/api'
 import { getSaleForPrint } from '@/features/sales/api'
+import { getKeyValues } from '@/features/settings/api'
 import { SaleReceiptView } from '@/features/sales/components/pos/SaleReceiptView'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { formatNumber } from '@/shared/lib/utils'
+import {
+  getSaleSnapshot,
+  deduceAndFreezeLegacySnapshot,
+  type SaleSnapshot,
+} from '@/shared/lib/sale-snapshots'
+import { useTaxStore } from '@/shared/stores/tax-store'
 
 export interface SaleSuccessInfo {
   saleId: number
@@ -49,11 +56,36 @@ export function SaleSuccessDialog({ info, onClose, onNewSale }: Props) {
     enabled: Boolean(info) && !info?.held,
   })
 
+  const { data: keyValues } = useQuery({
+    queryKey: ['settings-keyvalues'],
+    queryFn: getKeyValues,
+    enabled: Boolean(info) && !info?.held,
+  })
+
   const { data, isError, refetch } = useQuery({
     queryKey: ['sale-print', saleId, activeBranchId],
     queryFn: () => getSaleForPrint(saleId, activeBranchId ?? undefined),
     enabled: Boolean(info) && !info?.held && saleId > 0,
   })
+
+  const [snapshot, setSnapshot] = useState<SaleSnapshot | null>(null)
+
+  useEffect(() => {
+    if (!data?.saleId) return
+    let active = true
+    void getSaleSnapshot(data.saleId, keyValues).then((res) => {
+      if (!active) return
+      if (res) {
+        setSnapshot(res)
+      } else {
+        const deduced = deduceAndFreezeLegacySnapshot(data, useTaxStore.getState().stampAndTaxRate)
+        setSnapshot(deduced)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [data, keyValues])
 
   if (!info) return null
 
@@ -136,7 +168,7 @@ export function SaleSuccessDialog({ info, onClose, onNewSale }: Props) {
                   {showDetails ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
                 </Button>
               </div>
-              <SaleReceiptView data={data} shop={shop} showDetails={showDetails} />
+              <SaleReceiptView data={data} shop={shop} snapshot={snapshot} showDetails={showDetails} />
             </>
           ) : isError ? (
             <div className="space-y-3 py-4 text-center">

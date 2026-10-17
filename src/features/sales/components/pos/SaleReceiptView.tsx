@@ -3,6 +3,8 @@ import type { SalePrintData } from '@/features/sales/api'
 import { purchasePerGram, TAX_AND_STAMP_RATE } from '@/shared/lib/gold'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
 import { useTaxStore, formatTaxRatePercent } from '@/shared/stores/tax-store'
+import { useGoldStore } from '@/shared/stores/gold-store'
+import type { SaleSnapshot } from '@/shared/lib/sale-snapshots'
 
 const receiptTypeLabels: Record<number, string> = {
   1: 'جديد',
@@ -24,13 +26,15 @@ function formatReceiptDate(iso?: string | null): string {
 interface Props {
   data: SalePrintData
   shop?: CompanyInfo
+  /** لقطة الفاتورة التاريخية المحفوظة على الباك إند — تمنع أي تغير في النسب عند تعديل إعدادات الفرع لاحقاً */
+  snapshot?: SaleSnapshot | null
   /** نسبة الدمغة والضريبة المحتسبة (اختياري، يقرأ من الإعدادات تلقائياً) */
   taxRate?: number
   /** إظهار تفاصيل القطعة (المصنعية والضريبة والدمغة) — تُفتح بزرار من الديالوج ولا تُطبع إلا وهي ظاهرة. */
   showDetails?: boolean
 }
 
-export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Props) {
+export function SaleReceiptView({ data, shop, snapshot, taxRate, showDetails = false }: Props) {
   const shopName = shop?.name?.trim() || 'محل الذهب'
   const address = [
     shop?.location?.trim(),
@@ -41,7 +45,16 @@ export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Pr
 
   const items = data.saleItems ?? []
   const isHistorical = Boolean(data.saleId && data.saleId > 0)
-  const gold21 = data.gold21Price ?? 0
+  const gold21 =
+    snapshot?.gold21Price ||
+    data.gold21Price ||
+    (() => {
+      const itemWithPrice = items.find((i) => i.price && i.price > 0)
+      if (itemWithPrice) {
+        return Math.round(itemWithPrice.price * (21 / (itemWithPrice.karat || 21)))
+      }
+      return useGoldStore.getState().gold21 || 0
+    })()
   const pieceCount = items.reduce((sum, i) => sum + (i.quantity ?? 0), 0)
   const totalWeight = items.reduce(
     (sum, i) => sum + (i.weight ?? 0) * (i.quantity ?? 0),
@@ -53,9 +66,19 @@ export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Pr
     return sum + purchasePerGram(gold21, i.karat ?? 21) * grams
   }, 0)
 
-  const getItemMakingUnit = (i: { karat?: number; factory?: number }) => {
-    // في الفواتير المحفوظة بالسيرفر: نعتمد حصراً المصنعية المسجلة تاريخياً بالقطعة (i.factory)
-    // لمنع تغيير قيم وسند الفاتورة القانوني عند تغيير إعدادات مصنعية الفرع لاحقاً.
+  const getItemMakingUnit = (i: { productId?: number; karat?: number; factory?: number }) => {
+    // 1. أولوية للقطة التاريخية المحفوظة على الباك إند
+    if (snapshot) {
+      if (Array.isArray(snapshot.items)) {
+        const match = snapshot.items.find((it) => it.productId === i.productId)
+        if (match && match.makingPerGram != null) return match.makingPerGram
+      }
+      const k = Math.round(i.karat ?? 21)
+      if (snapshot.karatMakingFees && snapshot.karatMakingFees[k] != null && snapshot.karatMakingFees[k] > 0) {
+        return snapshot.karatMakingFees[k]
+      }
+    }
+    // 2. في الفواتير المحفوظة بالسيرفر: نعتمد حصراً المصنعية المسجلة تاريخياً بالقطعة (i.factory)
     if (isHistorical) {
       return i.factory ?? 0
     }
@@ -75,20 +98,31 @@ export function SaleReceiptView({ data, shop, taxRate, showDetails = false }: Pr
 
   // حساب قيمة الضريبة والدمغة المحفوظة بالفاتورة تاريخياً
   const calculatedTaxFromTotal = Math.max(0, rounded - Math.round(grossBeforeTax))
-  const fallbackTaxRate =
-    taxRate != null && taxRate >= 0
-      ? taxRate
-      : useTaxStore.getState().stampAndTaxRate ?? TAX_AND_STAMP_RATE
 
-  const effectiveTaxRate =
-    isHistorical && goldSubtotal > 0 && calculatedTaxFromTotal > 0
-      ? calculatedTaxFromTotal / goldSubtotal
-      : fallbackTaxRate
+  // نسبة الدمغة والضريبة: اللقطة التاريخية تحسمها نهائياً
+  const effectiveTaxRate = (() => {
+    if (snapshot?.stampAndTaxRate != null && snapshot.stampAndTaxRate >= 0) {
+      return snapshot.stampAndTaxRate
+    }
+    if (taxRate != null && taxRate >= 0) {
+      return taxRate
+    }
+    if (isHistorical && goldSubtotal > 0 && calculatedTaxFromTotal > 0) {
+      const exact = calculatedTaxFromTotal / goldSubtotal
+      if (Math.abs(exact - 0.01) < 0.003) return 0.01
+      if (Math.abs(exact - 0.015) < 0.003) return 0.015
+      if (Math.abs(exact - 0.02) < 0.003) return 0.02
+      return exact
+    }
+    return useTaxStore.getState().stampAndTaxRate ?? TAX_AND_STAMP_RATE
+  })()
 
   const taxSubtotal =
-    isHistorical && calculatedTaxFromTotal > 0
-      ? calculatedTaxFromTotal
-      : goldSubtotal * effectiveTaxRate
+    snapshot?.stampAndTaxRate != null
+      ? goldSubtotal * snapshot.stampAndTaxRate
+      : isHistorical && calculatedTaxFromTotal > 0
+        ? calculatedTaxFromTotal
+        : goldSubtotal * effectiveTaxRate
 
   const paid = Math.round(data.paid ?? 0)
   const remaining = Math.round(data.amountOwed ?? 0)

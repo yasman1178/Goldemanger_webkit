@@ -1,12 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Printer, X } from 'lucide-react'
 
 import { getCompanyInfo } from '@/features/purchases/api'
 import { getSaleForPrint } from '@/features/sales/api'
+import { getKeyValues } from '@/features/settings/api'
 import { SaleReceiptView } from '@/features/sales/components/pos/SaleReceiptView'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { Button } from '@/shared/components/ui/button'
+import {
+  getSaleSnapshot,
+  deduceAndFreezeLegacySnapshot,
+  type SaleSnapshot,
+} from '@/shared/lib/sale-snapshots'
+import { useTaxStore } from '@/shared/stores/tax-store'
 
 interface SaleReceiptDialogProps {
   open: boolean
@@ -31,11 +38,37 @@ export function SaleReceiptDialog({
     enabled: open,
   })
 
+  const { data: keyValues } = useQuery({
+    queryKey: ['settings-keyvalues'],
+    queryFn: getKeyValues,
+    enabled: open,
+  })
+
   const { data: data, isLoading } = useQuery({
     queryKey: ['sale-print', saleId, activeBranchId],
     queryFn: () => getSaleForPrint(saleId, activeBranchId ?? undefined),
     enabled: open && saleId > 0,
   })
+
+  const [snapshot, setSnapshot] = useState<SaleSnapshot | null>(null)
+
+  useEffect(() => {
+    if (!data?.saleId) return
+    let active = true
+    void getSaleSnapshot(data.saleId, keyValues).then((res) => {
+      if (!active) return
+      if (res) {
+        setSnapshot(res)
+      } else {
+        const deduced = deduceAndFreezeLegacySnapshot(data, useTaxStore.getState().stampAndTaxRate)
+        setSnapshot(deduced)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [data, keyValues])
+
   // تفاصيل القطعة (المصنعية والضريبة والدمغة) مخفية افتراضياً — تُفتح يدوياً
   // ولا تُطبع إلا وهي ظاهرة، نفس سلوك فاتورة الشراء.
   const [showDetails, setShowDetails] = useState(false)
@@ -83,7 +116,7 @@ export function SaleReceiptDialog({
           </div>
         </div>
 
-        <SaleReceiptView data={data} shop={shop} showDetails={showDetails} />
+        <SaleReceiptView data={data} shop={shop} snapshot={snapshot} showDetails={showDetails} />
 
         <div className="mt-3 flex gap-2 receipt-no-print">
           <Button

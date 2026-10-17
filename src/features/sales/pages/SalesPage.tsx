@@ -19,7 +19,8 @@ import {
   PriceMismatchDialog,
   type PriceGateMode,
 } from '@/shared/components/PriceMismatchDialog'
-import { cartLineMath } from '@/shared/lib/gold'
+import { cartLineMath, purchasePerGram } from '@/shared/lib/gold'
+import { saveSaleSnapshot, type SaleSnapshot } from '@/shared/lib/sale-snapshots'
 import { formatEgp, formatNumber, cn } from '@/shared/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog'
 import { Button } from '@/shared/components/ui/button'
@@ -476,9 +477,99 @@ export function SalesPage() {
         paid,
         change: Math.max(0, paid - paymentTotal),
         items: paymentLines.length,
-        grams: 0,
-        stamp: 0,
+        grams: totals.grams,
+        stamp: totals.taxAndStamp,
       })
+
+      // حفظ لقطة تاريخية غير قابلة للتغيير للفاتورة على خادم الباك إند
+      if (saleId > 0) {
+        if (cart.length > 0) {
+          const snapItems = cart.map((l) => {
+            const k = Math.round(l.product.karat) as 14 | 18 | 21 | 24
+            const branchFee = karatMakingFees[k]
+            const fallbackFee = l.product.factoryForSale || l.product.factory || 0
+            const making = branchFee && branchFee > 0 ? branchFee : fallbackFee
+            const goldUnit = purchasePerGram(effectiveGold, l.product.karat)
+            const taxUnit = goldUnit * stampAndTaxRate
+            const m = cartLineMath(
+              effectiveGold,
+              l.product.karat,
+              l.weight * l.quantity,
+              making,
+              stampAndTaxRate,
+            )
+            return {
+              productId: l.product.productId!,
+              productName: l.product.productName,
+              quantity: l.quantity,
+              weight: l.weight,
+              karat: l.product.karat,
+              goldPerGram: goldUnit,
+              makingPerGram: making,
+              taxPerGram: taxUnit,
+              taxAmount: m.taxAndStamp,
+              lineTotal: m.total,
+            }
+          })
+
+          const snapshot: SaleSnapshot = {
+            saleId,
+            branchId: activeBranchId,
+            saleDate: new Date().toISOString(),
+            totalAmount: paymentTotal,
+            discount: payingFromEdit ? totals.discount : (payingHeld?.discount ?? 0),
+            gold21Price: effectiveGold,
+            stampAndTaxRate,
+            karatMakingFees: { ...karatMakingFees },
+            items: snapItems,
+            createdAt: new Date().toISOString(),
+          }
+          void saveSaleSnapshot(snapshot)
+        } else if (payingHeld?.saleItems && payingHeld.saleItems.length > 0) {
+          const snapItems = payingHeld.saleItems.map((i) => {
+            const karat = i.karat ?? 21
+            const weight = i.weight ?? 0
+            const k = Math.round(karat) as 14 | 18 | 21 | 24
+            const branchFee = karatMakingFees[k]
+            const making = branchFee && branchFee > 0 ? branchFee : (i.factory || 0)
+            const goldUnit = purchasePerGram(effectiveGold, karat)
+            const taxUnit = goldUnit * stampAndTaxRate
+            const m = cartLineMath(
+              effectiveGold,
+              karat,
+              weight * i.quantity,
+              making,
+              stampAndTaxRate,
+            )
+            return {
+              productId: i.productId,
+              productName: i.productName,
+              quantity: i.quantity,
+              weight,
+              karat,
+              goldPerGram: goldUnit,
+              makingPerGram: making,
+              taxPerGram: taxUnit,
+              taxAmount: m.taxAndStamp,
+              lineTotal: m.total,
+            }
+          })
+
+          const snapshot: SaleSnapshot = {
+            saleId,
+            branchId: activeBranchId,
+            saleDate: new Date().toISOString(),
+            totalAmount: paymentTotal,
+            discount: payingHeld.discount ?? 0,
+            gold21Price: effectiveGold,
+            stampAndTaxRate,
+            karatMakingFees: { ...karatMakingFees },
+            items: snapItems,
+            createdAt: new Date().toISOString(),
+          }
+          void saveSaleSnapshot(snapshot)
+        }
+      }
     }
     clearSale()
     setEditingHeld(null)

@@ -123,3 +123,12 @@ export async function updateHeldSale(payload: CreateSalePayload): Promise<Sale> 
 export async function cancelHeldSale(saleId: number): Promise<void> {
   await api.delete(`${base}/CancelHeldSale/${saleId}`)
 }
+
+export {
+  saveSaleSnapshot,
+  getSaleSnapshot,
+  saveSaleSnapshotToServer,
+  getSaleSnapshotFromServer,
+  deduceAndFreezeLegacySnapshot,
+  type SaleSnapshot,
+} from '@/shared/lib/sale-snapshots'
