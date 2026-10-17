@@ -172,12 +172,10 @@ export function deduceAndFreezeLegacySnapshot(
   const grossBeforeTax = goldSubtotal + makingSubtotal - discount
 
   // مطابقة النسبة التاريخية: فحص ما إذا كانت قريبة من 1% أو 1.5% أو النسبة المحتسبة
-  let resolvedTaxRate = currentTaxRate
+  let resolvedTaxRate = currentTaxRate > 0 ? currentTaxRate : 0.01
   if (goldSubtotal > 0) {
     const diff = rounded - Math.round(grossBeforeTax)
-    if (diff <= 1) {
-      resolvedTaxRate = 0
-    } else {
+    if (diff > 1) {
       const exactRate = diff / goldSubtotal
       if (Math.abs(exactRate - 0.01) < 0.003) {
         resolvedTaxRate = 0.01

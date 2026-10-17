@@ -194,7 +194,9 @@ function CartItemRow({
     line.product.karat,
     line.weight * line.quantity,
     effectiveMaking,
-    useTaxStore.getState().stampAndTaxRate,
+    useTaxStore.getState().stampAndTaxRate > 0
+      ? useTaxStore.getState().stampAndTaxRate
+      : 0.01,
   )
   const stock = line.product.quantity ?? 0
   const atStock = line.quantity >= stock

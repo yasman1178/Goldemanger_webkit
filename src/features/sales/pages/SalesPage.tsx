@@ -190,15 +190,16 @@ export function SalesPage() {
     const acc = { grams: 0, metal: 0, margin: 0, making: 0, taxAndStamp: 0, gross: 0 }
     for (const l of cart) {
       const k = Math.round(l.product.karat) as 14 | 18 | 21 | 24
-      const branchFee = karatMakingFees[k]
-      const fallbackFee = l.product.factoryForSale || l.product.factory || 0
-      const effectiveMaking = branchFee && branchFee > 0 ? branchFee : fallbackFee
+      const productFee = l.product.factoryForSale || l.product.factory || 0
+      const branchFee = karatMakingFees[k] || 0
+      const effectiveMaking = productFee > 0 ? productFee : branchFee
+      const safeTaxRate = stampAndTaxRate > 0 ? stampAndTaxRate : 0.01
       const m = cartLineMath(
         effectiveGold,
         l.product.karat,
         l.weight * l.quantity,
         effectiveMaking,
-        stampAndTaxRate,
+        safeTaxRate,
       )
       acc.grams += m.grams
       acc.metal += m.metal
@@ -719,6 +720,10 @@ export function SalesPage() {
         onCustomerChange={setCustomerId}
         discount={payingFromEdit ? totals.discount : (payingHeld?.discount ?? 0)}
         totals={{ total: paymentTotal }}
+        cartTotals={payingFromEdit ? totals : (!payingHeld ? totals : undefined)}
+        cartLines={payingFromEdit ? cart : (!payingHeld ? cart : undefined)}
+        goldPrice={effectiveGold}
+        stampAndTaxRate={stampAndTaxRate > 0 ? stampAndTaxRate : 0.01}
         lines={paymentLines}
         grams21={paymentGrams21}
         heldSaleId={payingHeld ? payingHeld.saleId : null}

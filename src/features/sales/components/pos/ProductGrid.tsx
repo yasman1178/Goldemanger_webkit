@@ -705,8 +705,120 @@ export function ProductGrid({
         </div>
       </div>
 
-      {/* شبكة المنتجات */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* شبكة المنتجات وقسم القطع المضافة المثبت بأعلى يمين الشاشة */}
+      <div className="min-h-0 flex-1 overflow-y-auto space-y-3.5 pe-1">
+        {/* قسم القطع المضافة للفاتورة: يظل ثابتاً ومفعلاً دائماً في يمين الشاشة حتى عند تغيير التصنيف */}
+        {cart.length > 0 && (
+          <div className="rounded-[16px] border border-primary/25 bg-gradient-to-br from-primary/[0.04] via-amber-500/[0.03] to-white p-3 shadow-xs">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="flex size-6 items-center justify-center rounded-full bg-primary text-white text-[11px] font-black shadow-xs">
+                  {cart.length}
+                </span>
+                <span className="text-[13px] font-bold text-foreground">
+                  القطع المضافة للفاتورة (مفعلة دائماً)
+                </span>
+                <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                  • تظل مثبتة هنا حتى بعد اختيار تصنيف مختلف
+                </span>
+              </div>
+              <span className="text-[11.5px] font-extrabold text-primary tabular-nums">
+                إجمالي الوزن: {formatNumber(cart.reduce((s, l) => s + l.weight * l.quantity, 0))} جم
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+              {cart.map((line) => {
+                const product = line.product
+                const images = getProductDisplayImages(product)
+                const displayImage = images[0]
+                const karatText = karatLabel(product.karat)
+                const sName = getProductStorageName(product, storages)
+                return (
+                  <div
+                    key={`cart-pinned-${line.key}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onAdd(product)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        onAdd(product)
+                      }
+                    }}
+                    title="اضغط لإلغاء التحديد وحذف القطعة من الفاتورة"
+                    className="group relative flex touch-target flex-col gap-1.5 rounded-[14px] border border-primary bg-white p-2 text-start elevation-card ring-2 ring-primary/40 shadow-xs cursor-pointer transition-all active:scale-[0.98]"
+                  >
+                    <button
+                      type="button"
+                      aria-label={`معاينة ${product.productName}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setPreview(product)
+                      }}
+                      className="absolute end-1.5 top-1.5 z-10 flex size-7 items-center justify-center rounded-full bg-white/95 text-muted-foreground shadow-xs hover:text-primary cursor-pointer border border-black/5"
+                    >
+                      <Eye className="size-3.5" />
+                    </button>
+
+                    <span className="absolute start-1.5 top-1.5 z-10 flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
+                      <Check className="size-2.5" />
+                      محدد
+                    </span>
+
+                    <div className="relative aspect-square w-full overflow-hidden rounded-[10px] border border-black/5 bg-gradient-to-b from-amber-50/20 via-neutral-50 to-neutral-100 flex items-center justify-center p-1">
+                      {displayImage ? (
+                        <img
+                          src={displayImage}
+                          alt={product.productName}
+                          className="h-full w-full object-contain"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-1 text-center p-1">
+                          <Gem className="size-5 text-amber-500/70" />
+                          <span className="text-[9.5px] font-bold text-muted-foreground tabular-nums">
+                            {formatNumber(line.weight)} جم
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11.5px] font-bold text-foreground">
+                        {product.productName}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <span className="rounded bg-amber-100/90 border border-amber-300/60 px-1 py-0.2 text-[9px] font-black text-amber-900 tabular-nums">
+                          {karatText}
+                        </span>
+                        <span className="rounded bg-neutral-100 border border-black/5 px-1 py-0.2 text-[9px] font-extrabold text-foreground tabular-nums">
+                          {formatNumber(line.weight)} جم
+                        </span>
+                      </div>
+                      <span className="mt-1 inline-flex items-center gap-0.5 text-[9px] font-bold text-sky-800 truncate max-w-full">
+                        <MapPin className="size-2.5 shrink-0 text-sky-600" />
+                        <span className="truncate">{sName}</span>
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* عنوان المعروضات حسب التصنيف النشط والفلاتر */}
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[12.5px] font-bold text-muted-foreground flex items-center gap-1.5">
+            <ActiveCategoryIcon className="size-3.5 text-amber-500" />
+            <span>المعروضات ({activeCategory?.label ?? 'الكل'})</span>
+            <span className="text-[11px] font-medium text-muted-foreground/80">
+              — {filtered.length} قطعة متاحة
+            </span>
+          </p>
+        </div>
+
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <Search className="size-10 text-muted-foreground" />

@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, User, Loader2, CheckCircle2, Zap, Clock } from 'lucide-react'
+import { Plus, User, Loader2, CheckCircle2, Zap, Clock, ReceiptText, ChevronDown, ChevronUp } from 'lucide-react'
 
 import { completeHeldSale, createSale } from '@/features/sales/api'
 import { getOverview } from '@/features/settings/api'
 import { invalidateAfterSale } from '@/shared/lib/invalidateShop'
 import { useActiveBranchId } from '@/shared/hooks/useActiveBranchId'
 import { useAuthStore } from '@/shared/stores/auth-store'
+import { formatTaxRatePercent } from '@/shared/stores/tax-store'
 import { extractServerMessage } from '@/shared/lib/serverError'
-import type { PaymentMethod } from './types'
+import type { PaymentMethod, CartLine, CartTotals } from './types'
 import { createCustomer, getCustomers } from '@/shared/lib/parties'
 import { amountToNumber } from '@/shared/lib/gold'
 import { formatEgp, formatNumber } from '@/shared/lib/utils'
@@ -33,6 +34,10 @@ interface Props {
   onCustomerChange: (id: number) => void
   discount: number
   totals: { total: number }
+  cartTotals?: CartTotals
+  cartLines?: CartLine[]
+  goldPrice?: number
+  stampAndTaxRate?: number
   lines: Array<{ productId: number; quantity: number; weight?: number }>
   grams21?: number
   heldSaleId?: number | null
@@ -53,6 +58,10 @@ export function PaymentDialog({
   onCustomerChange,
   discount,
   totals,
+  cartTotals,
+  cartLines,
+  goldPrice,
+  stampAndTaxRate = 0.01,
   lines,
   grams21 = 0,
   heldSaleId,
@@ -63,6 +72,7 @@ export function PaymentDialog({
   const [paid, setPaid] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [showCustomer, setShowCustomer] = useState(false)
+  const [detailsExpanded, setDetailsExpanded] = useState(true)
 
   const isCompletion = (heldSaleId ?? 0) > 0
 
@@ -202,11 +212,96 @@ export function PaymentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-3">
-          <span className="text-[13px] font-semibold text-primary">الإجمالي</span>
-          <span className="rounded-lg bg-primary px-2.5 py-1 text-[14px] font-bold tabular-nums text-white shadow-sm">
-            {formatEgp(totals.total)}
-          </span>
+        {/* كشف الفاتورة كاملة التفاصيل قبل إتمام البيع */}
+        <div className="rounded-[14px] border border-black/8 bg-slate-50/70 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setDetailsExpanded((prev) => !prev)}
+              className="flex items-center gap-1.5 text-[13px] font-bold text-foreground hover:text-primary transition-colors cursor-pointer"
+            >
+              <ReceiptText className="size-4 text-primary" />
+              <span>كشف تفاصيل الفاتورة ({lines.length} {lines.length === 1 ? 'قطعة' : 'قطع'})</span>
+              {detailsExpanded ? (
+                <ChevronUp className="size-3.5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="size-3.5 text-muted-foreground" />
+              )}
+            </button>
+            <span className="rounded-lg bg-primary px-2.5 py-1 text-[13px] font-bold tabular-nums text-white shadow-2xs">
+              {formatEgp(totals.total)}
+            </span>
+          </div>
+
+          {detailsExpanded && (
+            <div className="space-y-2.5 pt-1">
+              {/* قائمة القطع بتفاصيلها */}
+              {cartLines && cartLines.length > 0 && (
+                <div className="max-h-36 overflow-y-auto divide-y divide-black/5 rounded-[10px] border border-black/6 bg-white p-2 text-[11.5px]">
+                  {cartLines.map((l) => {
+                    const k = Math.round(l.product.karat)
+                    const pieceMaking = l.product.factoryForSale || l.product.factory || 0
+                    const goldUnit = goldPrice ? Math.round(goldPrice * (l.product.karat / 21)) : 0
+                    const lineGrams = l.weight * l.quantity
+                    const taxPiece = goldUnit * lineGrams * stampAndTaxRate
+                    const lineGross = (goldUnit + pieceMaking) * lineGrams + taxPiece
+                    return (
+                      <div key={l.key} className="py-1.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-bold text-foreground">{l.product.productName}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            عيار {k} • {formatNumber(lineGrams)} جم • مصنعية: {formatNumber(pieceMaking)} ج/جم
+                          </p>
+                        </div>
+                        {goldUnit > 0 && (
+                          <span className="tabular-nums font-bold text-foreground shrink-0 text-end">
+                            {formatEgp(lineGross)}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* ملخص الحسابات المالية الدقيقة */}
+              <div className="space-y-1 text-[11px] pt-1">
+                {cartTotals ? (
+                  <>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>إجمالي وزن المشغولات:</span>
+                      <span className="font-semibold text-foreground tabular-nums">
+                        {formatNumber(cartTotals.grams)} جم
+                        {grams21 > 0 && ` (${formatNumber(grams21)} جم عيار 21)`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>قيمة الذهب الخام:</span>
+                      <span className="font-semibold text-foreground tabular-nums">{formatEgp(cartTotals.metal)}</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>إجمالي المصنعية المسجلة:</span>
+                      <span className="font-semibold text-foreground tabular-nums">{formatEgp(cartTotals.making)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-foreground">
+                      <span>الضريبة والدمغة ({formatTaxRatePercent(stampAndTaxRate)}):</span>
+                      <span className="tabular-nums text-primary">{formatEgp(cartTotals.taxAndStamp)}</span>
+                    </div>
+                    {cartTotals.discount > 0 && (
+                      <div className="flex justify-between text-error font-semibold">
+                        <span>الخصم المطبق:</span>
+                        <span className="tabular-nums">-{formatEgp(cartTotals.discount)}</span>
+                      </div>
+                    )}
+                  </>
+                ) : null}
+                <div className="flex items-center justify-between pt-1.5 border-t border-black/10 text-[12.5px] font-bold text-foreground">
+                  <span>الصافي المطلوب سداده:</span>
+                  <span className="text-[15px] font-black text-primary tabular-nums">{formatEgp(totals.total)}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-1.5 rounded-xl border border-primary/20 bg-primary/5 p-2">

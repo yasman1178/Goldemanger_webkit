@@ -101,10 +101,10 @@ export function SaleReceiptView({ data, shop, snapshot, taxRate, showDetails = f
 
   // نسبة الدمغة والضريبة: اللقطة التاريخية تحسمها نهائياً
   const effectiveTaxRate = (() => {
-    if (snapshot?.stampAndTaxRate != null && snapshot.stampAndTaxRate >= 0) {
+    if (snapshot?.stampAndTaxRate != null && snapshot.stampAndTaxRate > 0) {
       return snapshot.stampAndTaxRate
     }
-    if (taxRate != null && taxRate >= 0) {
+    if (taxRate != null && taxRate > 0) {
       return taxRate
     }
     if (isHistorical && goldSubtotal > 0 && calculatedTaxFromTotal > 0) {
@@ -114,15 +114,11 @@ export function SaleReceiptView({ data, shop, snapshot, taxRate, showDetails = f
       if (Math.abs(exact - 0.02) < 0.003) return 0.02
       return exact
     }
-    return useTaxStore.getState().stampAndTaxRate ?? TAX_AND_STAMP_RATE
+    const storeTax = useTaxStore.getState().stampAndTaxRate
+    return storeTax && storeTax > 0 ? storeTax : TAX_AND_STAMP_RATE
   })()
 
-  const taxSubtotal =
-    snapshot?.stampAndTaxRate != null
-      ? goldSubtotal * snapshot.stampAndTaxRate
-      : isHistorical && calculatedTaxFromTotal > 0
-        ? calculatedTaxFromTotal
-        : goldSubtotal * effectiveTaxRate
+  const taxSubtotal = goldSubtotal * effectiveTaxRate
 
   const paid = Math.round(data.paid ?? 0)
   const remaining = Math.round(data.amountOwed ?? 0)
@@ -252,17 +248,15 @@ export function SaleReceiptView({ data, shop, snapshot, taxRate, showDetails = f
             <span>{formatEgp(goldSubtotal)}</span>
           </div>
         )}
+        <div className="flex justify-between font-semibold">
+          <span>الضريبة والدمغة ({formatTaxRatePercent(effectiveTaxRate)})</span>
+          <span className="tabular-nums">{formatEgp(taxSubtotal)}</span>
+        </div>
         {showDetails && (
-          <>
-            <div className="flex justify-between">
-              <span>إجمالي المصنعية</span>
-              <span className="tabular-nums">{formatEgp(makingSubtotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>إجمالي الضريبة والدمغة ({formatTaxRatePercent(effectiveTaxRate)})</span>
-              <span className="tabular-nums">{formatEgp(taxSubtotal)}</span>
-            </div>
-          </>
+          <div className="flex justify-between text-muted-foreground">
+            <span>إجمالي المصنعية</span>
+            <span className="tabular-nums">{formatEgp(makingSubtotal)}</span>
+          </div>
         )}
         {data.discount > 0 && (
           <div className="flex justify-between">

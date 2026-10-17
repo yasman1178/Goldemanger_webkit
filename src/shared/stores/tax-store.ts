@@ -43,7 +43,7 @@ function loadInitialTaxRate(): number {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw != null) {
       const parsed = parseFloat(raw)
-      if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+      if (!Number.isNaN(parsed) && parsed > 0 && parsed <= 1) {
         return parsed
       }
     }
@@ -114,11 +114,13 @@ export const useTaxStore = create<TaxState>((set, get) => ({
     })
   },
   getEffectiveMakingFee: (karat, productFee) => {
+    // 1. الأولوية الدائمة لأصل المصنعية المسجلة بالقطعة في المخزن
+    if (productFee != null && productFee > 0) return productFee
+    // 2. في حال لم تكن للقطعة مصنعية مسجلة، نأخذ مصنعية العيار العامة كاحتياطي
     const fees = get().karatMakingFees
     const k = Math.round(karat)
     if (k in fees) {
       const branchFee = fees[k as 14 | 18 | 21 | 24]
-      // إذا كانت مصنعية العيار محددة في الفرع يتم تطبيقها إلزامياً
       if (branchFee > 0) return branchFee
     }
     return productFee ?? 0
